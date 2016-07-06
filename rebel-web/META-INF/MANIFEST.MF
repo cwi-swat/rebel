@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: rebel_web
+Bundle-SymbolicName: rebel_web
+Bundle-Version: 1.0.0
+Require-Bundle: rascal
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
