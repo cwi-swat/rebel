@@ -1,0 +1,44 @@
+module account.saving.SimpleSavingsLib
+
+event openAccount[minimalDeposit : Money = EUR 0.00](accountNr: Integer, initialDeposit : Money) {
+	preconditions {
+		initialDeposit >= minimalDeposit;
+	}
+	postconditions { 
+		new this.balance == initialDeposit;
+		new this.accountNumber == accountNr;
+	}
+}
+
+event withdraw(amount : Money) {
+	preconditions {
+		this.balance >= amount;
+		amount > EUR 0.00;
+	}
+	postconditions {
+		new this.balance == this.balance - amount;
+	}
+}
+
+event deposit(amount : Money) {
+	preconditions {
+		amount > EUR 0.00;
+	} 
+	postconditions {
+		new this.balance == this.balance + amount;
+	}
+}
+
+function singleInterest(balance: Money, interest: Percentage): Money =  (balance / 100) * interest;
+function noInterest(balance: Money, interest: Percentage): Money = balance;
+
+event interest[maxInterest: Percentage = 10%, interestCalc: (Money, Percentage) -> Money = noInterest](currentInterest: Percentage) {
+	preconditions {
+		currentInterest <= maxInterest;
+	}
+	postconditions {
+		new this.balance == this.balance + interestCalc(this.balance, currentInterest);
+	}
+}
+
+event block2() {}

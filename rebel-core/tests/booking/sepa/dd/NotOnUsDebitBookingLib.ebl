@@ -1,0 +1,32 @@
+module booking.sepa.dd.NotOnUsDebitBookingLib
+
+import account.payment.BusinessCurrentAccount
+import account.process.SepaDirectDebitWashAccount
+import account.system.BankTreasury
+
+event create(id: Integer, creditor: IBAN, debtor: IBAN, amount: Money, settlementDate: Date) {
+	preconditions {
+		amount > EUR 0.00;
+		settlementDate >= now; 
+		
+		// Sepa DD bookings can only be created by business customers
+		initialized BusinessCurrentAccount[creditor];
+	}
+	postconditions {
+		new this.id == id;
+		new this.creditor == creditor;
+		new this.debtor == debtor;
+		new this.amount == amount;
+		new this.settlementDate == settlementDate;
+	}
+}
+
+event book() {
+	preconditions {
+		this.settlementDate <= now; 
+	}
+	sync {
+		SepaDirectDebitWashAccount[1].depositToWash(this.amount);
+		BankTreasury[1].withdraw(this.amount);
+	}
+}

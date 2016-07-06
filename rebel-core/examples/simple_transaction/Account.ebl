@@ -1,0 +1,37 @@
+module simple_transaction.Account
+
+import simple_transaction.Library
+
+@doc {
+	This is a specification of a toy Account.
+	The account can be opened, blocked and closed and can never be overdrawn.
+}
+specification Account {
+	fields {
+		accountNumber: IBAN @key
+		balance: Money		
+	}
+	
+	events {
+		openAccount[]
+		withdraw[]
+		deposit[]
+		block[]
+		unblock[]
+		close[]
+	}
+	
+	invariants {
+		positiveBalance
+	}
+	
+	lifeCycle {
+		initial init -> opened: openAccount
+		opened -> opened: withdraw, deposit
+			   -> blocked: block
+			   -> closed: close
+		blocked -> opened: unblock
+		final closed			  	
+			
+	}
+}

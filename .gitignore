@@ -1,0 +1,10 @@
+target/
+bin/
+.idea/
+.settings
+*.class
+.DS_Store
+*.iml
+.recommenders
+.metadata/
+*.zip

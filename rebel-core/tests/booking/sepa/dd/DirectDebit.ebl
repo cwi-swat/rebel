@@ -1,0 +1,31 @@
+module booking.sepa.dd.DirectDebit
+
+import booking.sepa.dd.DirectDebitLib
+
+specification DirectDebit {
+	fields {
+		id: Integer @key
+		creationDate: Date
+		creditor: IBAN
+		totalAmount: Money
+		settlementDate: Date
+		creditBooking: set[Integer] // CreditorAccountBooking
+		debitBookings: set[Integer] // DirectDebitBooking
+	}
+	
+	events {
+		createDirectDebit[]
+		addCreditBooking[]
+		addDebitBooking[]
+		execute[]
+		finalizeBookings[]
+	}
+	
+	lifeCycle {
+		initial init	-> initialized: createDirectDebit
+		initialized		-> initialized: addCreditBooking, addDebitBooking
+						-> inExecution: execute
+		inExecution		-> irrevocable: finalizeBookings
+		final irrevocable		
+	}
+}

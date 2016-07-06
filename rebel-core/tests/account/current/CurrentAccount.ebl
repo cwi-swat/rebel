@@ -1,0 +1,40 @@
+module account.current.CurrentAccount
+
+import account.current.CurrentAccountLib
+
+specification CurrentAccount {
+	fields {
+	    accountNumber: IBAN @key
+	    holds: Money 
+		balance: Money
+	}
+
+	events { 
+		openPaymentAccount[]
+		deposit[]
+		withdraw[]
+		forcedWithdrawIgnoreDisposition[] // afboeken door dispositieruimte heen
+		// TODO: Interest
+		//interest[] // kapitaliseer rente
+	  	denounce[]
+	  	indicateRegret[]
+	  	close[] 
+	  	updateCredit[]
+	  	updateHolds[]  
+	}
+	
+	lifeCycle {
+		initial init
+			-> opened: openPaymentAccount
+		opened 
+			-> opened: withdraw, deposit, 
+					   forcedWithdrawIgnoreDisposition, updateCredit,
+					   updateHolds
+			-> denounced: denounce
+		denounced // the customer announced he wants to close this account
+			-> closed: close
+			-> opened: indicateRegret
+			-> denounced: forcedWithdrawIgnoreDisposition
+		closed 
+	}
+}

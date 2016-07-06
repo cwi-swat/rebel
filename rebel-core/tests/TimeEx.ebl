@@ -1,0 +1,20 @@
+module TimeEx
+
+import TimeLib
+
+specification TimeEx {
+	fields {
+		hours: Integer
+		minutes: Integer
+		seconds: Integer
+	}
+
+	events {
+		set[]
+	}
+
+	lifeCycle {
+		initial init -> closed: set
+		final closed
+	}
+} 

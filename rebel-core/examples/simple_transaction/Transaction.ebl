@@ -1,0 +1,32 @@
+module simple_transaction.Transaction
+
+import simple_transaction.Library
+
+@doc{
+	This is a specification of a toy Transaction.
+	Via a transaction money can be transfered between two accounts
+}
+specification Transaction {
+	fields {
+		id: Integer @key
+		amount: Money
+		from: IBAN
+		to: IBAN
+		createdOn: Date
+		bookedOn: Date
+	}
+	
+	events {
+		start[]
+		book[]
+		fail[]
+	}
+	
+	lifeCycle {
+		initial init -> validated: start
+		validated   -> booked: book
+					-> failed: fail
+		final booked
+		final failed
+	}	
+}

@@ -1,0 +1,14 @@
+module TimeLib
+
+event set(totalSeconds: Integer) {
+	preconditions {
+		totalSeconds > 0;
+	}
+	postconditions {
+		new this.hours >= 0;
+		new this.minutes >= 0 && new this.minutes < 60;
+		new this.seconds >= 0 && new this.seconds < 60;
+		
+		totalSeconds == new this.hours * 3600 + new this.minutes * 60 + new this.seconds;
+	}
+}

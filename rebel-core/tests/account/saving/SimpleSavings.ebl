@@ -1,0 +1,21 @@
+module account.saving.SimpleSavings
+
+import account.saving.SavingsAccount
+import account.saving.SimpleSavingsLib
+
+@doc{
+	This is a specification of a simple savings account
+}
+specification SimpleSavings extends SavingsAccount {
+	events {
+		openAccount[minimalDeposit=EUR 50.00]
+		withdraw[] 
+		deposit[]
+		interest[interestCalc=singleInterest] 
+	}
+	
+	lifeCycle {
+		initial init	-> opened: openAccount 
+		opened			-> opened: withdraw, deposit, interest 
+	}
+}
