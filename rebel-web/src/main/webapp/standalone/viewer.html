@@ -182,7 +182,6 @@ function getExtraSpecInfo() {
   }
 }
 
-var specs = JSON.parse(specJsonStr);
 var finder = new SpecificationFinder(specs);
 var noSpecFound = new SpecRenderer.Specification("$NO_SPEC_FOUND$", "No specification found", "No specficiation could be found", {}, [], [], [], [], [], []);
 

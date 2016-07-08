@@ -49,7 +49,7 @@ void toJs(loc base, loc output) {
 	str jsJsonStringVar = asJsStringVar(specs);
 	
 	// step 5, save generated json
-	writeFile(output, "var specJsonStr=<jsJsonStringVar>");
+	writeFile(output, "var specs = <jsJsonStringVar>");
 }
 
 set[JsSpec] filterMissingLinks(set[JsSpec] specs) {
