@@ -77,7 +77,8 @@ syntax StateVia = {VarName ","}+ refs;
 // Generic rules
 syntax ConfigParameter = VarName name "=" Expr val; 
 
-syntax Parameter = VarName name ":" Type tipe ("=" Expr defaultVal)?;
+syntax Parameter = VarName name ":" Type tipe DefaultValue? defaultValue;
+syntax DefaultValue = "=" Expr val;
 
 syntax Statement  
 	= bracket "(" Statement ")"
