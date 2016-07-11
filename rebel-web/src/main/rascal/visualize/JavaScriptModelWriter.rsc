@@ -81,7 +81,7 @@ str toJson(jsFinalState(str name)) = "{\"id\":\"state_<jsonEsc(name)>\", \"label
 str toJson(jsState(str name)) = "{\"id\":\"state_<jsonEsc(name)>\", \"label\":\"<jsonEsc(splitter(name))>\"}";
 
 str toJson(typeOnly(str name, str tipe)) = "{\"name\":\"<jsonEsc(name)>\", \"type\":\"<jsonEsc(tipe)>\"}";
-str toJson(withValue(str name, str tipe, str val)) = "{\"name\":\"<jsonEsc(name)>\", \"value\":\"<jsonEsc(val)>\"}";
+str toJson(withValue(str name, str tipe, str val)) = "{\"name\":\"<jsonEsc(name)>\", \"type\":\"<jsonEsc(tipe)>\", \"value\":\"<jsonEsc(val)>\"}";
 
 str toJson(outgoing()) = "out";
 str toJson(incoming()) = "in";
