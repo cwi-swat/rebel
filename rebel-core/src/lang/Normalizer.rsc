@@ -374,8 +374,10 @@ set[EventDef] desugarStates(set[EventDef] events, set[StateFrom] states) {
 set[EventDef] inlineConfigurationParameters(set[EventDef] events) {
 	EventDef rewriteEvent(EventDef e) {
 		return visit(e) {
-			case (Ref)`<VarName field>` => (Expr)`<Expr resolvedField>`
-				when /(Parameter)`<VarName f>: <Type tipe> = <Expr resolvedField>` := e.configParams && f == field
+			case (Expr)`<Ref ref>` => (Expr)`<Expr resolvedField>`
+				when /(Parameter)`<VarName f>: <Type tipe> = <Expr resolvedField>` := e.configParams,
+					 /(Ref)`<VarName field>` := ref, 
+					 f == field
 				
 			case (Expr)`<VarName function>(<{Expr ","}* params>)` => (Expr)`<VarName resolvedFunction>(<{Expr ","}* params>)`
 				when /(Parameter)`<VarName f>: <Type tipe> = <Expr resolvedFunction>` := e.configParams && f == function
