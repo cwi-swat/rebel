@@ -21,18 +21,18 @@ import visualize::JsonUtil;
 import IO;
 
 str asJsStringVar(set[JsSpec] specs) =
-	"<("" | "<it>\'<line>\' +\n" | /<line:.*>[\n]/ := toJson(specs))>\'\'";
+	"<("" | "<it><line> \n" | /<line:.*>[\n]/ := toJson(specs))>";
 
 str toJson(set[JsSpec] specs) =
 	"[
 	'	<intercalate(",\n", [toJson(sp) | sp <- specs])>
-	']
+	'];
 	";	
 
 str toJson(JsSpec sp) = 
 	"{
-	'	\"fqn\":\"<sp.fqn>\", 
-	'	\"name\":\"<splitter(sp.name)>\",
+	'	\"fqn\":\"<jsonEsc(sp.fqn)>\", 
+	'	\"name\":\"<jsonEsc(splitter(sp.name))>\",
 	'	\"documentation\":\"<jsonEsc(sp.doc)>\",
 	'	\"modifier\":\"<toJson(sp.specMod)>\",
 	'	\"inheritsFrom\": <toJson(sp.inheritsFrom)>,
@@ -46,19 +46,19 @@ str toJson(JsSpec sp) =
 	'	\"transitionsFromExternalMachines\":[<intercalate(",\n", [toJson(t) | t <- sp.transitionsFromExternal])>]
 	'}";
 
-str toJson(extends(str name, str fqn)) = "{\"name\":\"<name>\", \"url\":\"<fqn>\"}";
+str toJson(extends(str name, str fqn)) = "{\"name\":\"<jsonEsc(name)>\", \"url\":\"<jsonEsc(fqn)>\"}";
 default str toJson(none()) = "{}";
 
 str toJson(abstract()) = "abstract";
 str toJson(external()) = "external";
 default str toJson(noMod()) = "";
 
-str toJson(JsField field) = "{\"name\":\"<field.name>\", \"type\":\"<field.tipe>\"}";
+str toJson(JsField field) = "{\"name\":\"<jsonEsc(field.name)>\", \"type\":\"<jsonEsc(field.tipe)>\"}";
 
 str toJson(JsEvent evnt) = "{
-	'	\"id\": \"event_<evnt.id>\",
-	'	\"label\": \"<evnt.name>\",
-	'   \"doc\": \"<jsonEsc(evnt.doc)>\",
+	'	\"id\": \"event_<jsonEsc(evnt.id)>\",
+	'	\"label\": \"<jsonEsc(evnt.name)>\",
+	'	\"doc\": \"<jsonEsc(evnt.doc)>\",
 	'	\"config\": [<intercalate(",", [toJson(c) | c <- evnt.config])>],
 	' 	\"params\": [<intercalate(",", [toJson(p) | p <- evnt.params])>],
 	' 	\"preconditions\": [<intercalate(",", [toJson(p) | p <- evnt.preconditions])>],
@@ -66,22 +66,22 @@ str toJson(JsEvent evnt) = "{
 	' 	\"sync\": [<intercalate(",", [toJson(s) | s <- evnt.sync])>]
 	}";
 	
-str toJson(jsCodeOnly(str code)) = "{\"code\":\"<code>\"}";
-str toJson(jsDocAndCode(str doc, str code)) = "{\"doc\":\"<jsonEsc(doc)>\", \"code\":\"<code>\"}";
+str toJson(jsCodeOnly(str code)) = "{\"code\":\"<jsonEsc(code)>\"}";
+str toJson(jsDocAndCode(str doc, str code)) = "{\"doc\":\"<jsonEsc(doc)>\", \"code\":\"<jsonEsc(code)>\"}";
 
-str toJson(JsExternalMachine em) = "{\"id\":\"externalmachine_<em.name>\", \"label\":\"<splitter(em.name)>\", \"url\":\"<em.fqn>\", \"referenceType\":\"<toJson(em.rt)>\"}";
+str toJson(JsExternalMachine em) = "{\"id\":\"externalmachine_<jsonEsc(em.name)>\", \"label\":\"<jsonEsc(splitter(em.name))>\", \"url\":\"<jsonEsc(em.fqn)>\", \"referenceType\":\"<toJson(em.rt)>\"}";
 
-str toJson(jsTrans(str from, str to, str via)) = "{\"from\":\"state_<from>\", \"to\":\"state_<to>\", \"via\":\"event_<via>\"}";
-str toJson(jsTransToExternal(str from, str toMachine)) = "{\"from\":\"event_<from>\", \"to\":\"externalmachine_<toMachine>\"}";
-str toJson(jsTransToExternal(str from, str toMachine, str toEvent)) = "{\"from\":\"event_<from>\", \"to\":\"externalmachine_<toMachine>\", \"toEvent\":\"event_<toEvent>\"}";
-str toJson(jsTransFromExternal(str fromMachine, str fromEvent, str to)) = "{\"fromMachine\":\"externalmachine_<fromMachine>\", \"fromEvent\":\"event_<fromEvent>\", \"to\":\"event_<to>\"}";
+str toJson(jsTrans(str from, str to, str via)) = "{\"from\":\"state_<jsonEsc(from)>\", \"to\":\"state_<jsonEsc(to)>\", \"via\":\"event_<jsonEsc(via)>\"}";
+str toJson(jsTransToExternal(str from, str toMachine)) = "{\"from\":\"event_<jsonEsc(from)>\", \"to\":\"externalmachine_<jsonEsc(toMachine)>\"}";
+str toJson(jsTransToExternal(str from, str toMachine, str toEvent)) = "{\"from\":\"event_<jsonEsc(from)>\", \"to\":\"externalmachine_<jsonEsc(toMachine)>\", \"toEvent\":\"event_<jsonEsc(toEvent)>\"}";
+str toJson(jsTransFromExternal(str fromMachine, str fromEvent, str to)) = "{\"fromMachine\":\"externalmachine_<jsonEsc(fromMachine)>\", \"fromEvent\":\"event_<jsonEsc(fromEvent)>\", \"to\":\"event_<jsonEsc(to)>\"}";
 
-str toJson(jsInitialState(str name)) = "{\"id\":\"state_<name>\", \"label\": \"\", \"initial\": true}";
-str toJson(jsFinalState(str name)) = "{\"id\":\"state_<name>\", \"label\":\"\", \"final\": true}";
-str toJson(jsState(str name)) = "{\"id\":\"state_<name>\", \"label\":\"<splitter(name)>\"}";
+str toJson(jsInitialState(str name)) = "{\"id\":\"state_<jsonEsc(name)>\", \"label\": \"\", \"initial\": true}";
+str toJson(jsFinalState(str name)) = "{\"id\":\"state_<jsonEsc(name)>\", \"label\":\"\", \"final\": true}";
+str toJson(jsState(str name)) = "{\"id\":\"state_<jsonEsc(name)>\", \"label\":\"<jsonEsc(splitter(name))>\"}";
 
-str toJson(typeOnly(str name, str tipe)) = "{\"name\":\"<name>\", \"type\":\"<tipe>\"}";
-str toJson(withValue(str name, str tipe, str val)) = "{\"name\":\"<name>\", \"value\":\"<val>\"}";
+str toJson(typeOnly(str name, str tipe)) = "{\"name\":\"<jsonEsc(name)>\", \"type\":\"<jsonEsc(tipe)>\"}";
+str toJson(withValue(str name, str tipe, str val)) = "{\"name\":\"<jsonEsc(name)>\", \"type\":\"<jsonEsc(tipe)>\", \"value\":\"<jsonEsc(val)>\"}";
 
 str toJson(outgoing()) = "out";
 str toJson(incoming()) = "in";

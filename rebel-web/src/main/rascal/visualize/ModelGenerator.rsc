@@ -49,7 +49,7 @@ void toJs(loc base, loc output) {
 	str jsJsonStringVar = asJsStringVar(specs);
 	
 	// step 5, save generated json
-	writeFile(output, "var specJsonStr=<jsJsonStringVar>");
+	writeFile(output, "var specs = <jsJsonStringVar>");
 }
 
 set[JsSpec] filterMissingLinks(set[JsSpec] specs) {
@@ -131,6 +131,7 @@ JsSpec augmentWithIncomingExternalMachinesAndLinks(JsSpec subject, set[JsSpec] a
 }
 
 Maybe[JsSpec] generateJsStructureOfInternals(loc file) {
+	
 	println("Working on: <file>");
 
 	try {		
@@ -154,7 +155,7 @@ Maybe[JsSpec] generateJsStructureOfInternals(loc file) {
 					{jsEvent("<from.from>_<e.name>_<to.to>", 
 						"<e.name>",
 						processEventDoc(e),
-						[withValue("<p.name>", "<p.tipe>", "<defaultVal>") | /Parameter p := e.configParams, /Expr defaultVal := p], 
+						[withValue("<p.name>", "<p.tipe>", "<p.defaultValue>") | /Parameter p := e.configParams], 
 						[typeOnly("<p.name>", "<p.tipe>") | /Parameter p := e.transitionParams], 
 						processPreconditions(e), 
 						processPostconditions(e), 
