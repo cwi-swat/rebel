@@ -90,35 +90,35 @@ syntax Case = Literal lit "=\>" Statement stat;
 
 syntax Expr
   	= bracket "(" Expr ")"
-	| Literal!reference lit 
-  	| Ref ref
+	| literal: Literal!reference lit 
+  	| reference: Ref ref
     | VarName function "(" {Expr ","}* exprs ")"
-    | left Expr lhs "." Expr field 
+    | left property: Expr lhs "." Expr field 
     | "{" Expr lower ".." Expr upper"}"
 	| left Expr var!accessor "[" Expr indx "]"
   	| "(" {MapElement ","}* mapElems ")"
   	| "{" {Expr ","}* setElems "}"
   	| "{" Expr elem "|" Expr loopVar "\<-" Expr set "}"
   	| "{" Expr init "|" Statement reducer "|" Expr loopVar "\<-" Expr set "}" 
-	> "new" Expr expr
+	> new: "new" Expr expr
   	| "not" Expr expr
   	| "-" Expr
   	> left	( Expr lhs "*" Expr rhs
-		    | Expr lhs "in" Expr rhs
+		    | isMember: Expr lhs "in" Expr rhs
 		    | Expr lhs "/" Expr rhs
 		    | Expr lhs "%" Expr rhs
 		  	)
   	> left 	( Expr lhs "+" Expr rhs
-    		| Expr lhs "-" Expr rhs
+    		| subtract: Expr lhs "-" Expr rhs
     		)
-	> non-assoc	( Expr lhs "\<" Expr rhs
-				| Expr lhs "\<=" Expr rhs
-				| Expr lhs "\>" Expr rhs
-				| Expr lhs "\>=" Expr rhs
-				| Expr lhs "==" Expr rhs
-				| Expr lhs "!=" Expr rhs
+	> non-assoc	( smallerThan: Expr lhs "\<" Expr rhs
+				| smallerThanEquals: Expr lhs "\<=" Expr rhs
+				| greaterThan: Expr lhs "\>" Expr rhs
+				| greaterThanEquals: Expr lhs "\>=" Expr rhs
+				| equals: Expr lhs "==" Expr rhs
+				| notEqual: Expr lhs "!=" Expr rhs
 				)
- 	> left Expr lhs "&&" Expr rhs
+ 	> left and: Expr lhs "&&" Expr rhs
   	> left Expr lhs "||" Expr rhs
 	> right ( Expr cond "?" Expr whenTrue ":" Expr whenFalse
 			| Expr cond "-\>" Expr implication
@@ -137,7 +137,7 @@ syntax FieldDecl
 syntax Ref 
 	= FullyQualifiedVarName field
 	| FullyQualifiedName tipe
-	| "this"
+	| this: "this"
 	| "it"
 	; 
 	
@@ -168,7 +168,7 @@ syntax Literal
   	| @category="Constant" Bool
   	| @category="Constant" Period
   	| @category="Constant" Frequency
-  	| @category="Constant" Term
+  	| @category="Constant" Term term
   	| @category="Constant" Date
   	| @category="Constant" Time
   	| @category="Constant" Percentage
@@ -181,8 +181,8 @@ syntax Literal
 syntax Date = Int day Month month Int? year;
 	
 lexical Time
-	= "now"
-	| "t" Int millsSince1970
+	= now: "now"
+	| epoch: "t" Int millsSince1970
 	;
 	
 syntax Annotations = Annotation* annos;	
