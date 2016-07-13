@@ -24,7 +24,7 @@ start syntax Module
 	
 syntax ModuleDef = "module" FullyQualifiedName fqn;
 
-syntax FullyQualifiedName = ({VarName "."}+ packages ".")? TypeName modName;
+syntax FullyQualifiedName = ({VarName "."}+ packages ".")? modulePath TypeName modName;
 
 syntax FullyQualifiedVarName = (FullyQualifiedName fqn ".")? VarName name;
 
@@ -97,7 +97,7 @@ syntax Expr
     | "{" Expr lower ".." Expr upper"}"
 	| left Expr var!accessor "[" Expr indx "]"
   	| "(" {MapElement ","}* mapElems ")"
-  	| "{" {Expr ","}* setElems "}"
+  	| staticSet: "{" {Expr ","}* setElems "}"
   	| "{" Expr elem "|" Expr loopVar "\<-" Expr set "}"
   	| "{" Expr init "|" Statement reducer "|" Expr loopVar "\<-" Expr set "}" 
 	> new: "new" Expr expr
