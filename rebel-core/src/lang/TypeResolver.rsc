@@ -11,15 +11,20 @@ Redistribution and use in source and binary forms, with or without modification,
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 }
 @contributor{Jouke Stoel - jouke.stoel@cwi.nl - CWI}
-module lang::TypeChecker
+module lang::TypeResolver
 
+import IO;
 extend lang::Syntax;
+syntax Type = "$$INVALID$$";
 
-syntax Type 
-	= "$$INVALID$$"
-	;
-	
-Type typeOf((Literal)`<Int _>`) 		= (Type)`Integer`;
+map[loc, Type] getTypeMapping() {
+    map[loc, Type] typeMapping = ();
+    // visit nodes bottom-up (breadth-first traversal) and append map with types
+    // todo: interesting for IDE typechecking specifications, SMT proof and code generation
+    return typeMapping;
+}
+
+Type typeOf((Literal)`<Int x>`) = (Type)`Integer`;
 Type typeOf((Literal)`<Bool _>`) 		= (Type)`Boolean`;
 Type typeOf((Literal)`<String _>`) 		= (Type)`String`;
 Type typeOf((Literal)`<Percentage _>`)	= (Type)`Percentage`;
