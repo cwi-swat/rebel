@@ -25,7 +25,7 @@ import Set;
 data ResolvedType = invalidType() | validType(Type resolvedType);
 data ScopeType = global(loc globalScope) | local(loc localScope); // store affecting locations
 data ScopeKey = scopeKey(ScopeType scopeType, loc declareLocation, Type variableType); 
-alias Scope = map[str, ScopeKey];
+alias Scope = map[str, ScopeKey]; // todo: multiple entries for same keyword?
 
 // visit nodes bottom-up (breadth-first traversal) and append map with types
 // todo: interesting for IDE typechecking specifications, SMT proof and code generation
@@ -42,43 +42,50 @@ map[loc, ResolvedType] visitNode(Specification s, Scope scope, map[loc, Resolved
 
     if (s has events) {
         for (EventDef ev <- s.events.events) {
-            typeMap = visitNode(ev, typeMap);
+            typeMap = visitNode(ev, scope, typeMap);
         }
     }
     return typeMap;
 }
 
-map[loc, ResolvedType] visitNode(EventDef ev, map[loc, ResolvedType] typeMap) { // todo perhaps add a variable scope? maybe not necessary due to ref
+map[loc, ResolvedType] visitNode(EventDef ev, Scope scope, map[loc, ResolvedType] typeMap) { // todo perhaps add a variable scope? maybe not necessary due to ref
     for (Parameter p <- ev.transitionParams) typeMap[ev@\loc] = validType(p.tipe);
     
-    typeMap = visitNode(ev.pre, typeMap);
-    typeMap = visitNode(ev.post, typeMap);
+    Scope appendParameterScope(Scope scope, EventDef event) {
+        for (Parameter p <- event.transitionParams) {
+            scope["<p.name>"] = scopeKey(local(event@\loc), p@\loc, p.tipe); 
+        }
+        return scope;
+    }
+    scope = appendParameterScope(scope, ev); // TODO test this
+    typeMap = visitNode(ev.pre, scope, typeMap);
+    typeMap = visitNode(ev.post, scope, typeMap);
     // TODO: syncblock
 
     return typeMap;
 }
 
-map[loc, ResolvedType] visitNode(Preconditions? pre, map[loc, ResolvedType] typeMap) = visitNode(p.stats, typeMap) when (/Preconditions p := pre);
-default map[loc, ResolvedType] visitNode(Preconditions? _, map[loc, ResolvedType] typeMap) = typeMap;
+map[loc, ResolvedType] visitNode(Preconditions? pre, Scope scope, map[loc, ResolvedType] typeMap) = visitNode(p.stats, scope, typeMap) when (/Preconditions p := pre);
+default map[loc, ResolvedType] visitNode(Preconditions? _, Scope scope, map[loc, ResolvedType] typeMap) = typeMap;
 
-map[loc, ResolvedType] visitNode(Postconditions? post, map[loc, ResolvedType] typeMap) = visitNode(removePostConditionPrefix(p.stats), typeMap) when (/Postconditions p := post);
-default map[loc, ResolvedType] visitNode(Postconditions? _, map[loc, ResolvedType] typeMap) = typeMap;
+map[loc, ResolvedType] visitNode(Postconditions? post, Scope scope, map[loc, ResolvedType] typeMap) = visitNode(removePostConditionPrefix(p.stats), scope, typeMap) when (/Postconditions p := post);
+default map[loc, ResolvedType] visitNode(Postconditions? _, Scope scope, map[loc, ResolvedType] typeMap) = typeMap;
 Statement* removePostConditionPrefix(Statement* stats) = visit (stats) { case (Expr)`new this.<VarName v>` => (Expr)`<VarName v>` };
 
-map[loc, ResolvedType] visitNode((Statement)`<Annotations _><Expr e>;`, map[loc, ResolvedType] typeMap) = visitNode(e, typeMap);
-default map[loc, ResolvedType] visitNode(Statement s, map[loc, ResolvedType] typeMap) {
+map[loc, ResolvedType] visitNode((Statement)`<Annotations _><Expr e>;`, Scope scope, map[loc, ResolvedType] typeMap) = visitNode(e, scope, typeMap);
+default map[loc, ResolvedType] visitNode(Statement s, Scope scope, map[loc, ResolvedType] typeMap) {
     println("Unsupported statement type");
     return typeMap;
 }
 
-map[loc, ResolvedType] visitNode(Statement* stats, map[loc, ResolvedType] typeMap) {
-    for (Statement stat <- stats) typeMap = visitNode(stat, typeMap);
+map[loc, ResolvedType] visitNode(Statement* stats, Scope scope, map[loc, ResolvedType] typeMap) {
+    for (Statement stat <- stats) typeMap = visitNode(stat, scope, typeMap);
     return typeMap;
 }
 
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> * <Expr rhs>`, map[loc, ResolvedType] typeMap) {
-    typeMap = visitNode(lhs, typeMap);
-    typeMap = visitNode(rhs, typeMap);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> * <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) {
+    typeMap = visitNode(lhs, scope, typeMap);
+    typeMap = visitNode(rhs, scope, typeMap);
 
     println("Checking <n>");
     if (typeMap[lhs@\loc] is invalidType || typeMap[rhs@\loc] is invalidType) {
@@ -104,9 +111,9 @@ map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> * <Expr rhs>`, map[loc, Res
     return typeMap;
 }
 
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> + <Expr rhs>`, map[loc, ResolvedType] typeMap) {
-    typeMap = visitNode(rhs, typeMap);
-    typeMap = visitNode(lhs, typeMap);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> + <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) {
+    typeMap = visitNode(rhs, scope, typeMap);
+    typeMap = visitNode(lhs, scope, typeMap);
 
     println("Checking <n>");
     if (typeMap[lhs@\loc] is invalidType || typeMap[rhs@\loc] is invalidType) {
@@ -134,9 +141,9 @@ map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> + <Expr rhs>`, map[loc, Res
 }
 
 
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> - <Expr rhs>`, map[loc, ResolvedType] typeMap) {
-    typeMap = visitNode(rhs, typeMap);
-    typeMap = visitNode(lhs, typeMap);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> - <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) {
+    typeMap = visitNode(rhs, scope, typeMap);
+    typeMap = visitNode(lhs, scope, typeMap);
 
     println("Checking <n>");
     if (typeMap[lhs@\loc] is invalidType || typeMap[rhs@\loc] is invalidType) {
@@ -164,9 +171,9 @@ map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> - <Expr rhs>`, map[loc, Res
     return typeMap;
 }
 
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> in <Expr rhs>`, map[loc, ResolvedType] typeMap) {
-    typeMap = visitNode(lhs, typeMap);
-    typeMap = visitNode(rhs, typeMap);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> in <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) {
+    typeMap = visitNode(lhs, scope, typeMap);
+    typeMap = visitNode(rhs, scope, typeMap);
     
     println("Checking <n>");
 
@@ -190,7 +197,7 @@ map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> in <Expr rhs>`, map[loc, Re
     return typeMap;
 }
 
-map[loc, ResolvedType] visitNode(n:(Expr)`{<{Expr ","}* setElems>}`, map[loc, ResolvedType] typeMap) {
+map[loc, ResolvedType] visitNode(n:(Expr)`{<{Expr ","}* setElems>}`, Scope scope, map[loc, ResolvedType] typeMap) {
     elements = [ e | Expr e <- setElems];
     if (isEmpty(elements)) {
          // empty set
@@ -198,7 +205,7 @@ map[loc, ResolvedType] visitNode(n:(Expr)`{<{Expr ","}* setElems>}`, map[loc, Re
     }
 
     // Visit set elements
-    for (Expr e <- elements) typeMap = visitNode(e, typeMap);
+    for (Expr e <- elements) typeMap = visitNode(e, scope, typeMap);
 
     elementTypes = [ typeMap[e@\loc] | Expr e <- elements ];
     distinctTypeCount = size(toSet(elementTypes)); 
@@ -211,15 +218,15 @@ map[loc, ResolvedType] visitNode(n:(Expr)`{<{Expr ","}* setElems>}`, map[loc, Re
     return typeMap;
 }
 
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> \> <Expr rhs>`, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, typeMap);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> \< <Expr rhs>`, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, typeMap);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> != <Expr rhs>`, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, typeMap);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> == <Expr rhs>`, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, typeMap);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> \>= <Expr rhs>`, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, typeMap);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> \<= <Expr rhs>`, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, typeMap);
-map[loc, ResolvedType] checkComparisonExpression(Expr parent, Expr lhs, Expr rhs, map[loc, ResolvedType] typeMap) {
-    typeMap = visitNode(lhs, typeMap);
-    typeMap = visitNode(rhs, typeMap);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> \> <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, scope, typeMap);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> \< <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, scope, typeMap);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> != <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, scope, typeMap);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> == <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, scope, typeMap);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> \>= <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, scope, typeMap);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> \<= <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, scope, typeMap);
+map[loc, ResolvedType] checkComparisonExpression(Expr parent, Expr lhs, Expr rhs, Scope scope, map[loc, ResolvedType] typeMap) {
+    typeMap = visitNode(lhs, scope, typeMap);
+    typeMap = visitNode(rhs, scope, typeMap);
     
     println("Checking <parent>");
     
@@ -250,19 +257,19 @@ map[loc, ResolvedType] addResolvedTypeToMap(Tree n, map[loc, ResolvedType] typeM
     return typeMap;
 }
 
-default map[loc, ResolvedType] visitNode(Expr e, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(e, typeMap, (Type)`Integer`);
-map[loc, ResolvedType] visitNode((Expr)`<Time t>`, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(t, typeMap, (Type)`Time`);
-map[loc, ResolvedType] visitNode((Expr)`<Ref r>`, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(r, typeMap, (Type)`Ref`);
+default map[loc, ResolvedType] visitNode(Expr e, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(e, typeMap, (Type)`Integer`);
+map[loc, ResolvedType] visitNode((Expr)`<Time t>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(t, typeMap, (Type)`Time`);
+map[loc, ResolvedType] visitNode((Expr)`<Ref r>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(r, typeMap, (Type)`Ref`);
 // TODO: support more types
 // TODO: resolve refs by scope
-map[loc, ResolvedType] visitNode(n:(Expr)`<Int x>`, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Integer`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Bool _>`, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Boolean`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<String _>`, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`String`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Percentage _>`, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Percentage`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Date _>`, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Date`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Period _>`, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Period`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Frequency _>`, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Frequency`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Money _>`, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Money`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Currency _>`, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Currency`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Term _>`, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Term`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<IBAN _>`, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`IBAN`);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Int x>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Integer`);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Bool _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Boolean`);
+map[loc, ResolvedType] visitNode(n:(Expr)`<String _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`String`);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Percentage _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Percentage`);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Date _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Date`);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Period _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Period`);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Frequency _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Frequency`);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Money _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Money`);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Currency _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Currency`);
+map[loc, ResolvedType] visitNode(n:(Expr)`<Term _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Term`);
+map[loc, ResolvedType] visitNode(n:(Expr)`<IBAN _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`IBAN`);
