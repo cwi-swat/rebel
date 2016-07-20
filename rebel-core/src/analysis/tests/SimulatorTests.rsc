@@ -15,12 +15,23 @@ import lang::smtlib25::AST;
 import IO;
 
 void testInitializeEntity() {
-  Module spc = parseModule(|project://ing-specs/src/booking/sepa/ct/CreditTransfer.ebl|);
+  Module spc = parseModule(|project://ing-specs/src/booking/sepa/ct/OnUsCreditTransfer.ebl|);
   set[Module] imports = loadImports(spc);
   Refs refs = resolve({spc} + imports);
   Module normalizedSpc = normalize(spc, imports, refs);
   
-  list[Command] smt = declareSmtTypes(normalizedSpc + imports);
+  list[Command] smt = declareSmtTypes(normalizedSpc + imports) +
+    declareSmtVariables("<normalizedSpc.spec.name>", 
+      "create", [
+        var("ordering", [Type]"IBAN", [IBAN]"NL34INGB0000000001"),
+        var("beneficiary", [Type]"IBAN", [IBAN]"NL34INGB0000000002"),
+        var("executionDate", [Type]"Date", [Date]"13 Jul 2016"),
+        var("receiveDate", [Type]"Date", [Date]"13 Jul 2016"),
+        var("amount", [Type]"Money", [Money]"EUR 60.00")
+      ],
+      state(0,[])
+    );
+    
   for (c <- smt) { 
     println(compile(c));
   }

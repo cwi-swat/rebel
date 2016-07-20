@@ -43,17 +43,20 @@ list[Command] declareSmtTypes(set[Module] specs) {
   return smt; 
 }
 
-list[Command] declareSmtVariables(list[Variable] transitionParams, State current) {
-  set[Command] smt = {declareConst(v.name, toSort(v.tipe)) | v <- transitionParams};
+list[Command] declareSmtVariables(str entity, str transitionToFire, list[Variable] transitionParams, State current) {
+  // declare functions for all entity fields
+  set[Command] smt = {declareFunction("<ei.entityType>_<v.name>", [custom("State")], toSort(v.tipe)) | EntityInstance ei <- current.instances, Variable v <- ei.vals};
+  
+  smt += {declareFunction("<entity>_<transitionToFire>_<v.name>", [custom("State")], toSort(v.tipe)) | Variable v <- transitionParams};
   
   return smt; 
 }
 
-
+Sort toSort((Type)`Currency`) = \int();
+Sort toSort((Type)`Date`) = custom("Date");
 
 list[Command] declareRebelTypesAsSmtSorts() {   
   set[tuple[str,Sort]] rebelTypes = {<"Currency", \int()>,
-                                     <"Date", \int()>,
                                      <"Frequency", \int()>,
                                      <"Percentage", \int()>,
                                      <"Period", \int()>,
@@ -62,6 +65,8 @@ list[Command] declareRebelTypesAsSmtSorts() {
                              
   return [defineSort(name, [], sort) | <str name, Sort sort> <- rebelTypes] +
          [declareDataTypes([], [dataTypeDef("IBAN", [combinedCons("consIBAN", [sortedVar("countryCode", \int()), sortedVar("checksum",\int()), sortedVar("accountNumber", \int())])])]),
-          declareDataTypes([], [dataTypeDef("Money", [combinedCons("consMoney", [sortedVar("currency", \int()), sortedVar("amount", \int())])])])];                                  
+          declareDataTypes([], [dataTypeDef("Money", [combinedCons("consMoney", [sortedVar("currency", \int()), sortedVar("amount", \int())])])]),
+          declareDataTypes([], [dataTypeDef("Date", [combinedCons("consDate", [sortedVar("date", \int()), sortedVar("month", \int()), sortedVar("year", \int())]), cons("undefDate")])])                                  
+          ];                                  
 }
 
