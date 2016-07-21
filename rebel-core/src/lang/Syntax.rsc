@@ -188,8 +188,9 @@ lexical Time
 syntax Annotations = Annotation* annos;	
 
 syntax Annotation 
-	= @category="Comment" "@" VarName name
-	| @Foldable @category="Comment" "@" VarName name TagString tagString
+	= @category="Comment" key: "@" "key" name
+	| @category="Comment" ref: "@" "ref" name "=" FullyQualifiedName spc
+	| @Foldable @category="Comment" doc:"@" VarName name TagString tagString
 	;
 
 lexical TagString
