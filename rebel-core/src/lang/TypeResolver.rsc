@@ -83,6 +83,16 @@ map[loc, ResolvedType] visitNode(Statement* stats, Scope scope, map[loc, Resolve
     return typeMap;
 }
 
+ResolvedType getTypeInScope(str var, Scope scope) {
+    if (var notin scope) {
+        println("Variable reference (<var>) is not in scope");
+        return invalidType();
+    }
+    
+    ScopeKey key = scope[var];
+    return validType(key.variableType);
+} 
+
 map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> * <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) {
     typeMap = visitNode(lhs, scope, typeMap);
     typeMap = visitNode(rhs, scope, typeMap);
@@ -157,14 +167,14 @@ map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> - <Expr rhs>`, Scope scope,
     if (lhsType == (Type)`Integer`) {
 	   if (rhsType == (Type)`Integer`) resolvedType = validType((Type)`Integer`);
     }
-	else if (lhsType == (Type)`Date`) {
+	elseif (lhsType == (Type)`Date`) {
         if (rhsType == (Type)`Date`) resolvedType = validType((Type)`Term`);
-        else if (rhsType == (Type)`Integer`) resolvedType = validType((Type)`Date`); // Is this ok? or should we limit to terms
-	    else if (rhsType == (Type)`Term`) resolvedType = validType((Type)`Date`);
+        elseif (rhsType == (Type)`Integer`) resolvedType = validType((Type)`Date`); // Is this ok? or should we limit to terms
+	    elseif (rhsType == (Type)`Term`) resolvedType = validType((Type)`Date`);
     }
-    else if (lhsType == (Type)`Money` && rhsType == (Type)`Money`) resolvedType = validType((Type)`Money`);
-    else if (lhsType == (Type)`Time` && rhsType == (Type)`Date`) resolvedType = validType((Type)`Date`); // assumption that time gets converted to date basis
-    else if (lhsType == (Type)`Date` && rhsType == (Type)`Time`) resolvedType = validType((Type)`Date`); // assumption that time gets converted to date basis
+    elseif (lhsType == (Type)`Money` && rhsType == (Type)`Money`) resolvedType = validType((Type)`Money`);
+    elseif (lhsType == (Type)`Time` && rhsType == (Type)`Date`) resolvedType = validType((Type)`Term`); // assumption that time gets converted to date basis
+    elseif (lhsType == (Type)`Date` && rhsType == (Type)`Time`) resolvedType = validType((Type)`Date`); // assumption that time gets converted to date basis
     println("Resolved type for <n> to <resolvedType>");
     
     typeMap[n@\loc] = resolvedType;
@@ -178,7 +188,7 @@ map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> in <Expr rhs>`, Scope scope
     println("Checking <n>");
 
     if (typeMap[lhs@\loc] is invalidType || typeMap[rhs@\loc] is invalidType) {
-        return addInvalidTypeToMap(parent, typeMap); // cascades to upper level
+        return addInvalidTypeToMap(n, typeMap); // cascades to upper level
     }
     
     lhsType = typeMap[rhs@\loc];
@@ -229,13 +239,13 @@ map[loc, ResolvedType] checkComparisonExpression(Expr parent, Expr lhs, Expr rhs
     typeMap = visitNode(rhs, scope, typeMap);
     
     println("Checking <parent>");
-    
     if (typeMap[lhs@\loc] is invalidType || typeMap[rhs@\loc] is invalidType) {
         return addInvalidTypeToMap(parent, typeMap); // cascades to upper level
     }
     
     lhsType = typeMap[lhs@\loc].resolvedType;
     rhsType = typeMap[rhs@\loc].resolvedType;
+    println("Checking <parent> with types <lhsType> and <rhsType>");
 
     ResolvedType resolvedType = invalidType();
     if (lhsType == rhsType) resolvedType = validType((Type)`Bool`);
@@ -253,13 +263,55 @@ map[loc, ResolvedType] addInvalidTypeToMap(Tree n, map[loc, ResolvedType] typeMa
 
 map[loc, ResolvedType] addResolvedTypeToMap(Tree n, map[loc, ResolvedType] typeMap, Type t) {
     println("Resolve: <n> to <t>");
-    typeMap[n@\loc] = validType(t);
+    return addResolvedTypeToMap(n, typeMap, validType(t));
+}
+map[loc, ResolvedType] addResolvedTypeToMap(Tree n, map[loc, ResolvedType] typeMap, ResolvedType t) {
+    typeMap[n@\loc] = t;
     return typeMap;
 }
 
-default map[loc, ResolvedType] visitNode(Expr e, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(e, typeMap, (Type)`Integer`);
+default map[loc, ResolvedType] visitNode(Expr e, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(e, typeMap, invalidType()); // fall back 
 map[loc, ResolvedType] visitNode((Expr)`<Time t>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(t, typeMap, (Type)`Time`);
-map[loc, ResolvedType] visitNode((Expr)`<Ref r>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(r, typeMap, (Type)`Ref`);
+map[loc, ResolvedType] visitNode((Expr)`<Ref r>`, Scope scope, map[loc, ResolvedType] typeMap) {
+    println("Finding reference <r> in scope (type in scope: <getTypeInScope("<r>", scope)>)");
+    return addResolvedTypeToMap(r, typeMap, getTypeInScope("<r>", scope));
+}
+map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs>.<Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) {
+//    ResolvedType resolveType(n
+
+    typeMap = visitNode(lhs, scope, typeMap);
+    //typeMap = visitNode(rhs, scope, typeMap); 
+    //rhs: we dont need to visit rhs due to that it can only be a string property
+    println("Checking property <n>");
+    
+    if (typeMap[lhs@\loc] is invalidType) {
+        return addInvalidTypeToMap(n, typeMap); // cascades to upper level
+    }
+
+    lhsType = typeMap[lhs@\loc].resolvedType;
+
+    ResolvedType resolvedType = invalidType();
+    // Get type of ref
+    ResolvedType lhsResolvedType = getTypeInScope("<lhs>", scope);
+    if (lhsResolvedType is validType) {
+        lhsReferredType = lhsResolvedType.resolvedType;
+        if (lhsReferredType == (Type)`Date`) {
+            if ("<rhs>" in { "day", "month", "year" }) resolvedType = validType((Type)`Integer`);
+        }
+        elseif (lhsReferredType == (Type)`Time`) {
+            if ("<rhs>" in { "hour", "minutes", "seconds", "timestamp" }) resolvedType = validType((Type)`Integer`);
+        }
+        elseif (lhsReferredType == (Type)`Money`) {
+                if ("<rhs>" == "currency") resolvedType = validType((Type)`String`);
+                elseif ("<rhs>" == "amount") resolvedType = validType((Type)`Integer`);
+        }
+        elseif (lhsReferredType == (Type)`IBAN`) {
+            if ("<rhs>" == "countryCode") resolvedType = validType((Type)`String`);
+        }
+    }
+    typeMap[n@\loc] = resolvedType;
+    return typeMap;
+}
 // TODO: support more types
 // TODO: resolve refs by scope
 map[loc, ResolvedType] visitNode(n:(Expr)`<Int x>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Integer`);
