@@ -19,7 +19,7 @@ extend lang::std::Id;
 
 start syntax Module
 	= ModuleDef modDef Import* imports Specification spec
-	| ModuleDef modDef Import* imports LibraryModule* decls
+	| ModuleDef modDef Import* imports LibraryModules decls
 	;
 	
 syntax ModuleDef = "module" FullyQualifiedName fqn;
@@ -29,6 +29,8 @@ syntax FullyQualifiedName = ({VarName "."}+ packages ".")? modulePath TypeName m
 syntax FullyQualifiedVarName = (FullyQualifiedName fqn ".")? VarName name;
 
 syntax Import = "import" FullyQualifiedName fqn;
+
+syntax LibraryModules = LibraryModule*;
 
 syntax LibraryModule
 	= @Foldable EventDef eventDef
@@ -64,7 +66,9 @@ syntax EventRefs =  @Foldable eventInstances: "events" "{" EventRef* events "}";
 
 syntax EventRef = FullyQualifiedVarName eventRef "[" {ConfigParameter ","}* config "]";
 
-syntax InvariantRefs =  @Foldable "invariants" "{" FullyQualifiedVarName* invariants "}";
+syntax InvariantRef = FullyQualifiedVarName invariantRef;
+
+syntax InvariantRefs =  @Foldable "invariants" "{" InvariantRef* invariants "}";
 
 syntax LifeCycle = "lifeCycle" "{" StateFrom* from "}";
 
