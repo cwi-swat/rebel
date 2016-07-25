@@ -22,306 +22,139 @@ import ParseTree;
 import Set;
 
 // Invalid type should have originator location
-data ResolvedType = invalidType() | validType(Type resolvedType);
-data ScopeType = global(loc globalScope) | local(loc localScope); // store affecting locations
-data ScopeKey = scopeKey(ScopeType scopeType, loc declareLocation, Type variableType); 
-alias Scope = map[str, ScopeKey]; // todo: multiple entries for same keyword?
+data ScopeKey = scopeKey(loc declareLocation, Type variableType); 
+data Scope = scope(loc scopeRange, map[str, ScopeKey] variables);
+data Context = globalContext(str specificationName, Scope globalScope) | localContext(str specificationName, Scope globalScope, Scope localScope);
 
-// visit nodes bottom-up (breadth-first traversal) and append map with types
-// todo: interesting for IDE typechecking specifications, SMT proof and code generation
-map[loc, ResolvedType] getTypeMapping(Specification spec) {
-    Scope getGlobalScope(Specification spec) = ("<f.name>" : scopeKey(global(spec@\loc), f@\loc, f.tipe) | FieldDecl f <- spec.fields.fields) when spec.fields has fields;
-    default Scope getGlobalScope(Specification spec) = ();
-    return visitNode(spec, getGlobalScope(spec), ());
+bool isCurrentScope(TypeName name, Context ctx) = "<name>" == ctx.specificationName;
+bool inScope(str var, Scope scope) = var in scope.variables;
+Type getTypeInScope(str var, Context ctx) {
+    if (ctx is localContext) {
+        if (inScope(var, ctx.localContext.variables)) return ctx.localScope.variables[var].variableType;
+    }
+    return ctx.globalScope.variables[var].variableType;
 }
 
-map[loc, ResolvedType] visitNode(Specification s, Scope scope, map[loc, ResolvedType] typeMap) {
-    println("We have a scope: <scope>");
-    
-    // TODO: use scope everywhere and append it blabla
+// Subtraction
+Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Integer` when resolveType(lhs, ctx) == (Type)`Integer` && resolveType(rhs, ctx) == (Type)`Integer`;
+Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Date` when resolveType(lhs, ctx) == (Type)`Date` && resolveType(rhs, ctx) == (Type)`Term`;
+Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Integer` when resolveType(lhs, ctx) == (Type)`Integer` && resolveType(rhs, ctx) == (Type)`Integer`;
+Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Money` when resolveType(lhs, ctx) == (Type)`Money` && resolveType(rhs, ctx) == (Type)`Money`;
+Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Term` when resolveType(lhs, ctx) == (Type)`Date` && resolveType(rhs, ctx) == (Type)`Time`; // temp for "now" keyword
 
+// Plus
+Type resolveType((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = (Type)`Integer` when resolveType(lhs, ctx) == (Type)`Integer` && resolveType(rhs, ctx) == (Type)`Integer`;
+Type resolveType((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = (Type)`Date` when resolveType(lhs, ctx) == (Type)`Date` && resolveType(rhs, ctx) == (Type)`Term`;
+Type resolveType((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = (Type)`Date` when resolveType(lhs, ctx) == (Type)`Term` && resolveType(rhs, ctx) == (Type)`Date`;
+Type resolveType((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = (Type)`Money` when resolveType(lhs, ctx) == (Type)`Integer` && resolveType(rhs, ctx) == (Type)`Money`;
+
+// Multiply
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Money` when resolveType(lhs, ctx) == (Type)`Integer` && resolveType(rhs, ctx) == (Type)`Money`;
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Money` when resolveType(lhs, ctx) == (Type)`Money` && resolveType(rhs, ctx) == (Type)`Integer`;
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Term` when resolveType(lhs, ctx) == (Type)`Integer` && resolveType(rhs, ctx) == (Type)`Period`;
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Term` when resolveType(lhs, ctx) == (Type)`Period` && resolveType(rhs, ctx) == (Type)`Integer`;
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Percentage` when resolveType(lhs, ctx) == (Type)`Integer` && resolveType(rhs, ctx) == (Type)`Percentage`;
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Percentage` when resolveType(lhs, ctx) == (Type)`Percentage` && resolveType(rhs, ctx) == (Type)`Integer`;
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Money` when resolveType(lhs, ctx) == (Type)`Percentage` && resolveType(rhs, ctx) == (Type)`Money`;
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Money` when resolveType(lhs, ctx) == (Type)`Money` && resolveType(rhs, ctx) == (Type)`Percentage`;
+
+// Comparisons and boolean logic
+Type resolveType((Expr)`<Expr lhs> == <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == resolveType(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> \>= <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == resolveType(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> \<= <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == resolveType(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> != <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == resolveType(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> \> <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == resolveType(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> \< <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == resolveType(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> && <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == (Type)`Boolean` && resolveType(rhs, ctx) == (Type)`Boolean`;
+Type resolveType((Expr)`<Expr lhs> || <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == (Type)`Boolean` && resolveType(rhs, ctx) == (Type)`Boolean`;
+
+// In for structured expressions
+Type resolveType((Expr)`<Expr lhs> in <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == (Type)`set [<Type _>]` && resolveType(rhs, ctx) == (Type)`Set`;
+
+// Field access
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveType(lhs, ctx) == (Type)`Date` && "<rhs>" in { "day", "month", "year" };
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveType(lhs, ctx) == (Type)`Time` && "<rhs>" in { "hour", "minutes", "seconds", "timestamp" };
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Currency` when resolveType(lhs, ctx) == (Type)`Money` && "<rhs>" == "currency";
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveType(lhs, ctx) == (Type)`Money` && "<rhs>" == "amount";
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`String` when resolveType(lhs, ctx) == (Type)`IBAN` && "<rhs>" == "countryCode";
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = rhsType when (Type)`<TypeName custom>` := resolveType(lhs, ctx) && isCurrentScope(custom, ctx) && rhsType := resolveType(rhs, ctx); // spec is referring to itself
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = rhsType when (Type)`<TypeName custom>` := resolveType(lhs, ctx) && rhsType := resolveType(rhs, ctx); // TODO perhaps append context to find rhs
+
+// Literals
+Type resolveType((Expr)`{<{Expr ","}* elements>}`, Context _) = (Type)`set [<Type subType>]` when /Expr e := elements && subType := resolveType(e[0], ctx); // sets are homogenous so we take the type of the first element
+Type resolveType((Expr)`(<{MapElement ","}* elements>)`, Context _) =  (Type)`map [<Type keyType> : <Type valueType>]` when /MapElement e := elements && keyType := resolveType(e[0].key, ctx) && valueType := resolveType(e[0].val, ctx); // maps are homogenous so we take the type of the first element 
+
+// Literals
+Type resolveType((Expr)`<Int _>`, Context _) = (Type)`Integer`;
+Type resolveType((Expr)`<Bool _>`, Context _) = (Type)`Boolean`;
+Type resolveType((Expr)`<String _>`, Context _) = (Type)`String`;
+Type resolveType((Expr)`<Percentage _>`, Context _) = (Type)`Percentage`;
+Type resolveType((Expr)`<Date _>`, Context _) = (Type)`Date`;
+Type resolveType((Expr)`<Time _>`, Context _) = (Type)`Time`;
+Type resolveType((Expr)`<Period _>`, Context _) = (Type)`Period`;
+Type resolveType((Expr)`<Frequency _>`, Context _) = (Type)`Frequency`;
+Type resolveType((Expr)`<Money _>`, Context _) = (Type)`Money`;
+Type resolveType((Expr)`<Currency _>`, Context _) = (Type)`Currency`;
+Type resolveType((Expr)`<Term _>`, Context _) = (Type)`Term`;
+Type resolveType((Expr)`<IBAN _>`, Context _) = (Type)`IBAN`;
+Type resolveType((Expr)`<Ref r>`, Context ctx) = getTypeInScope("<r>", ctx);
+Type resolveType((Expr)`this`, Context ctx) = (Type)`<TypeName name>` when name := ctx.specificationName; // allows us to refer to own instance
+// TODO build propagation for parentheses etc
+
+
+default Type resolveType((Expr)`<Expr e>`, Context _) {
+    throw "Could not resolve expression <e>";
+}
+
+// visit nodes bottom-up (breadth-first traversal) and append map with types
+map[loc, Type] getTypeMapping(Specification spec) {
+    // TODO: is the this keyword a good idea actually?
+    Scope getGlobalScope(Specification spec) = scope(spec@\loc, ("<f.name>" : scopeKey(f@\loc, f.tipe) | FieldDecl f <- spec.fields.fields)) when spec.fields has fields;
+    default Scope getGlobalScope(Specification spec) = scope(spec@\loc, ());
+    return visitNode(spec, globalContext("<spec.name>", getGlobalScope(spec)), ());
+}
+
+map[loc, Type] visitNode(Specification s, Context ctx, map[loc, Type] typeMap) {
     if (s has events) {
         for (EventDef ev <- s.events.events) {
-            typeMap = visitNode(ev, scope, typeMap);
+            typeMap = visitNode(ev, ctx, typeMap);
         }
     }
     return typeMap;
 }
 
-map[loc, ResolvedType] visitNode(EventDef ev, Scope scope, map[loc, ResolvedType] typeMap) { // todo perhaps add a variable scope? maybe not necessary due to ref
-    for (Parameter p <- ev.transitionParams) typeMap[ev@\loc] = validType(p.tipe);
-    
-    Scope appendParameterScope(Scope scope, EventDef event) {
-        for (Parameter p <- event.transitionParams) {
-            scope["<p.name>"] = scopeKey(local(event@\loc), p@\loc, p.tipe); 
-        }
-        return scope;
-    }
-    scope = appendParameterScope(scope, ev); // TODO test this
-    typeMap = visitNode(ev.pre, scope, typeMap);
-    typeMap = visitNode(ev.post, scope, typeMap);
+map[loc, Type] visitNode(EventDef ev, Context ctx, map[loc, Type] typeMap) {
+    // We now have to add a local scope (a larger context)
+    localScopeMap = ( "<p.name>" : scopeKey(p@\loc, p.tipe) | Parameter p <- ev.transitionParams);
+    localCtx = localContext(ctx.specificationName, ctx.globalScope, scope(ev@\loc, localScopeMap));
+
+    // TODO: add types to map for declarations in local/global scope?
+    typeMap = visitNode(ev.pre, ctx, typeMap);
+    typeMap = visitNode(ev.post, ctx, typeMap);
     // TODO: syncblock
 
     return typeMap;
 }
 
-map[loc, ResolvedType] visitNode(Preconditions? pre, Scope scope, map[loc, ResolvedType] typeMap) = visitNode(p.stats, scope, typeMap) when (/Preconditions p := pre);
-default map[loc, ResolvedType] visitNode(Preconditions? _, Scope scope, map[loc, ResolvedType] typeMap) = typeMap;
+map[loc, Type] visitNode(Preconditions? pre, Context ctx, map[loc, Type] typeMap) = visitNode(p.stats, ctx, typeMap) when (/Preconditions p := pre);
+default map[loc, Type] visitNode(Preconditions? _, Context ctx, map[loc, Type] typeMap) = typeMap;
 
-map[loc, ResolvedType] visitNode(Postconditions? post, Scope scope, map[loc, ResolvedType] typeMap) = visitNode(removePostConditionPrefix(p.stats), scope, typeMap) when (/Postconditions p := post);
-default map[loc, ResolvedType] visitNode(Postconditions? _, Scope scope, map[loc, ResolvedType] typeMap) = typeMap;
-Statement* removePostConditionPrefix(Statement* stats) = visit (stats) { case (Expr)`new this.<VarName v>` => (Expr)`<VarName v>` };
+map[loc, Type] visitNode(Postconditions? post, Context ctx, map[loc, Type] typeMap) = visitNode(removePostConditionPrefix(p.stats), ctx, typeMap) when (/Postconditions p := post);
+default map[loc, Type] visitNode(Postconditions? _, Context ctx, map[loc, Type] typeMap) = typeMap;
+Statement* removePostConditionPrefix(Statement* stats, map[loc, Type] typeMap) = visit (stats) { case (Expr)`new this.<VarName v>` => (Expr)`this.<VarName v>` };
 
-map[loc, ResolvedType] visitNode((Statement)`<Annotations _><Expr e>;`, Scope scope, map[loc, ResolvedType] typeMap) = visitNode(e, scope, typeMap);
-default map[loc, ResolvedType] visitNode(Statement s, Scope scope, map[loc, ResolvedType] typeMap) {
+map[loc, Type] visitNode((Statement)`<Annotations _><Expr e>;`, Context ctx, map[loc, Type] typeMap) {
+    Type resolvedType = resolveType(e, ctx);
+    println("Resolved: <e> to <resolvedType>");
+    typeMap[e@\loc] = resolvedType;
+    return typeMap;    
+}
+default map[loc, Type] visitNode(Statement s, Context ctx, map[loc, Type] typeMap) {
     println("Unsupported statement type");
     return typeMap;
 }
 
-map[loc, ResolvedType] visitNode(Statement* stats, Scope scope, map[loc, ResolvedType] typeMap) {
-    for (Statement stat <- stats) typeMap = visitNode(stat, scope, typeMap);
+map[loc, Type] visitNode(Statement* stats, Context ctx, map[loc, Type] typeMap) {
+    for (Statement stat <- stats) typeMap = visitNode(stat, ctx, typeMap);
     return typeMap;
 }
-
-ResolvedType getTypeInScope(str var, Scope scope) {
-    if (var notin scope) {
-        println("Variable reference (<var>) is not in scope");
-        return invalidType();
-    }
-    
-    ScopeKey key = scope[var];
-    return validType(key.variableType);
-} 
-
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> * <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) {
-    typeMap = visitNode(lhs, scope, typeMap);
-    typeMap = visitNode(rhs, scope, typeMap);
-
-    println("Checking <n>");
-    if (typeMap[lhs@\loc] is invalidType || typeMap[rhs@\loc] is invalidType) {
-        return addInvalidTypeToMap(n, typeMap); // cascades to upper level
-    }
-    
-    lhsType = typeMap[lhs@\loc].resolvedType;
-    rhsType = typeMap[rhs@\loc].resolvedType;
-
-    Type resolvedType = invalidType();
-    if (lhsType == (Type)`Integer`) {
-        if (rhsType == (Type)`Integer`) resolvedType = (Type)`Integer`;
-        else if (rhsType == (Type)`Percentage`) resolvedType = (Type)`Percentage`;
-        else if (rhsType == (Type)`Money`) resolvedType = (Type)`Money`;
-    }
-    else if (lhsType == (Type)`Date`) {
-        if (rhsType == (Type)`Date`) resolvedType = (Type)`Term`;
-        else if (rhsType == (Type)`Integer`) resolvedType = (Type)`Date`;
-    }
-    println("Resolved type for <n> to <resolvedType>");
-    
-    typeMap[n@\loc] = resolvedType;
-    return typeMap;
-}
-
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> + <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) {
-    typeMap = visitNode(rhs, scope, typeMap);
-    typeMap = visitNode(lhs, scope, typeMap);
-
-    println("Checking <n>");
-    if (typeMap[lhs@\loc] is invalidType || typeMap[rhs@\loc] is invalidType) {
-        return addInvalidTypeToMap(n, typeMap); // cascades to upper level
-    }
-
-    lhsType = typeMap[lhs@\loc].resolvedType;
-    rhsType = typeMap[rhs@\loc].resolvedType;
-
-    ResolvedType resolvedType = invalidType();
-    if (lhsType == rhsType) {
-        if (lhsType == (Type)`Integer`) {
-            if (rhsType == (Type)`Integer`) resolvedType = validType((Type)`Integer`);
-        }
-        else if (lhsType == (Type)`Date`) {
-            if (rhsType == (Type)`Date`) resolvedType = validType((Type)`Term`);
-            else if (rhsType == (Type)`Integer`) resolvedType = validType((Type)`Date`); // Is this ok? or should we limit to terms
-            else if (rhsType == (Type)`Term`) resolvedType = validType((Type)`Date`);
-        }
-    }
-    println("Resolved type for <n> to <resolvedType>");
-    
-    typeMap[n@\loc] = resolvedType;
-    return typeMap;
-}
-
-
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> - <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) {
-    typeMap = visitNode(rhs, scope, typeMap);
-    typeMap = visitNode(lhs, scope, typeMap);
-
-    println("Checking <n>");
-    if (typeMap[lhs@\loc] is invalidType || typeMap[rhs@\loc] is invalidType) {
-        return addInvalidTypeToMap(n, typeMap); // cascades to upper level
-    }
-
-    lhsType = typeMap[lhs@\loc].resolvedType;
-    rhsType = typeMap[rhs@\loc].resolvedType;
-
-    ResolvedType resolvedType = invalidType();
-    if (lhsType == (Type)`Integer`) {
-	   if (rhsType == (Type)`Integer`) resolvedType = validType((Type)`Integer`);
-    }
-	elseif (lhsType == (Type)`Date`) {
-        if (rhsType == (Type)`Date`) resolvedType = validType((Type)`Term`);
-        elseif (rhsType == (Type)`Integer`) resolvedType = validType((Type)`Date`); // Is this ok? or should we limit to terms
-	    elseif (rhsType == (Type)`Term`) resolvedType = validType((Type)`Date`);
-    }
-    elseif (lhsType == (Type)`Money` && rhsType == (Type)`Money`) resolvedType = validType((Type)`Money`);
-    elseif (lhsType == (Type)`Time` && rhsType == (Type)`Date`) resolvedType = validType((Type)`Term`); // assumption that time gets converted to date basis
-    elseif (lhsType == (Type)`Date` && rhsType == (Type)`Time`) resolvedType = validType((Type)`Date`); // assumption that time gets converted to date basis
-    println("Resolved type for <n> to <resolvedType>");
-    
-    typeMap[n@\loc] = resolvedType;
-    return typeMap;
-}
-
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> in <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) {
-    typeMap = visitNode(lhs, scope, typeMap);
-    typeMap = visitNode(rhs, scope, typeMap);
-    
-    println("Checking <n>");
-
-    if (typeMap[lhs@\loc] is invalidType || typeMap[rhs@\loc] is invalidType) {
-        return addInvalidTypeToMap(n, typeMap); // cascades to upper level
-    }
-    
-    lhsType = typeMap[rhs@\loc];
-    rhsType = typeMap[rhs@\loc];
-    invalidExp = (lhsType is invalidType || rhsType is invalidType);
-    ResolvedType resolvedType = invalidType();
-    if (!invalidExp) {
-        if ((Type)`set [ <Type tipe> ]` := rhsType.resolvedType) {
-           println("the type of lhs is <lhsType.resolvedType>");
-           if (lhsType.resolvedType == rhsType.tipe) resolvedType = validType((Type)`Bool`);
-        }
-        // TODO: maps?
-    }
-    
-    typeMap[n@\loc] = resolvedType;
-    return typeMap;
-}
-
-map[loc, ResolvedType] visitNode(n:(Expr)`{<{Expr ","}* setElems>}`, Scope scope, map[loc, ResolvedType] typeMap) {
-    elements = [ e | Expr e <- setElems];
-    if (isEmpty(elements)) {
-         // empty set
-         throw "The empty set is not supported: <n>";
-    }
-
-    // Visit set elements
-    for (Expr e <- elements) typeMap = visitNode(e, scope, typeMap);
-
-    elementTypes = [ typeMap[e@\loc] | Expr e <- elements ];
-    distinctTypeCount = size(toSet(elementTypes)); 
-    if (distinctTypeCount > 1) {
-        throw "Sets can only be defined homogenous: <n>";
-    }
-    assert(distinctTypeCount == 1);
-    // Deduce type from first element in the list
-    typeMap[n@\loc] = typeMap[elements[0]@\loc];
-    return typeMap;
-}
-
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> \> <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, scope, typeMap);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> \< <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, scope, typeMap);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> != <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, scope, typeMap);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> == <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, scope, typeMap);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> \>= <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, scope, typeMap);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs> \<= <Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) = checkComparisonExpression(n, lhs, rhs, scope, typeMap);
-map[loc, ResolvedType] checkComparisonExpression(Expr parent, Expr lhs, Expr rhs, Scope scope, map[loc, ResolvedType] typeMap) {
-    typeMap = visitNode(lhs, scope, typeMap);
-    typeMap = visitNode(rhs, scope, typeMap);
-    
-    println("Checking <parent>");
-    if (typeMap[lhs@\loc] is invalidType || typeMap[rhs@\loc] is invalidType) {
-        return addInvalidTypeToMap(parent, typeMap); // cascades to upper level
-    }
-    
-    lhsType = typeMap[lhs@\loc].resolvedType;
-    rhsType = typeMap[rhs@\loc].resolvedType;
-    println("Checking <parent> with types <lhsType> and <rhsType>");
-
-    ResolvedType resolvedType = invalidType();
-    if (lhsType == rhsType) resolvedType = validType((Type)`Bool`);
-    typeMap[parent@\loc] = resolvedType;
-
-    return typeMap;    
-}
-
-
-
-map[loc, ResolvedType] addInvalidTypeToMap(Tree n, map[loc, ResolvedType] typeMap) {
-    typeMap[n@\loc] = invalidType();
-    return typeMap;
-}
-
-map[loc, ResolvedType] addResolvedTypeToMap(Tree n, map[loc, ResolvedType] typeMap, Type t) {
-    println("Resolve: <n> to <t>");
-    return addResolvedTypeToMap(n, typeMap, validType(t));
-}
-map[loc, ResolvedType] addResolvedTypeToMap(Tree n, map[loc, ResolvedType] typeMap, ResolvedType t) {
-    typeMap[n@\loc] = t;
-    return typeMap;
-}
-
-default map[loc, ResolvedType] visitNode(Expr e, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(e, typeMap, invalidType()); // fall back 
-map[loc, ResolvedType] visitNode((Expr)`<Time t>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(t, typeMap, (Type)`Time`);
-map[loc, ResolvedType] visitNode((Expr)`<Ref r>`, Scope scope, map[loc, ResolvedType] typeMap) {
-    println("Finding reference <r> in scope (type in scope: <getTypeInScope("<r>", scope)>)");
-    return addResolvedTypeToMap(r, typeMap, getTypeInScope("<r>", scope));
-}
-map[loc, ResolvedType] visitNode(n:(Expr)`<Expr lhs>.<Expr rhs>`, Scope scope, map[loc, ResolvedType] typeMap) {
-//    ResolvedType resolveType(n
-
-    typeMap = visitNode(lhs, scope, typeMap);
-    //typeMap = visitNode(rhs, scope, typeMap); 
-    //rhs: we dont need to visit rhs due to that it can only be a string property
-    println("Checking property <n>");
-    
-    if (typeMap[lhs@\loc] is invalidType) {
-        return addInvalidTypeToMap(n, typeMap); // cascades to upper level
-    }
-
-    lhsType = typeMap[lhs@\loc].resolvedType;
-
-    ResolvedType resolvedType = invalidType();
-    // Get type of ref
-    ResolvedType lhsResolvedType = getTypeInScope("<lhs>", scope);
-    if (lhsResolvedType is validType) {
-        lhsReferredType = lhsResolvedType.resolvedType;
-        if (lhsReferredType == (Type)`Date`) {
-            if ("<rhs>" in { "day", "month", "year" }) resolvedType = validType((Type)`Integer`);
-        }
-        elseif (lhsReferredType == (Type)`Time`) {
-            if ("<rhs>" in { "hour", "minutes", "seconds", "timestamp" }) resolvedType = validType((Type)`Integer`);
-        }
-        elseif (lhsReferredType == (Type)`Money`) {
-                if ("<rhs>" == "currency") resolvedType = validType((Type)`String`);
-                elseif ("<rhs>" == "amount") resolvedType = validType((Type)`Integer`);
-        }
-        elseif (lhsReferredType == (Type)`IBAN`) {
-            if ("<rhs>" == "countryCode") resolvedType = validType((Type)`String`);
-        }
-    }
-    typeMap[n@\loc] = resolvedType;
-    return typeMap;
-}
-// TODO: support more types
-// TODO: resolve refs by scope
-map[loc, ResolvedType] visitNode(n:(Expr)`<Int x>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Integer`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Bool _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Boolean`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<String _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`String`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Percentage _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Percentage`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Date _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Date`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Period _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Period`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Frequency _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Frequency`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Money _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Money`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Currency _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Currency`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<Term _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`Term`);
-map[loc, ResolvedType] visitNode(n:(Expr)`<IBAN _>`, Scope scope, map[loc, ResolvedType] typeMap) = addResolvedTypeToMap(n, typeMap, (Type)`IBAN`);
