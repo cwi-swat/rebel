@@ -69,7 +69,7 @@ Type resolveType((Expr)`<Expr lhs> && <Expr rhs>`, Context ctx) = (Type)`Boolean
 Type resolveType((Expr)`<Expr lhs> || <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == (Type)`Boolean` && resolveType(rhs, ctx) == (Type)`Boolean`;
 
 // In for structured expressions
-Type resolveType((Expr)`<Expr lhs> in <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == (Type)`set [<Type _>]` && resolveType(rhs, ctx) == (Type)`Set`;
+Type resolveType((Expr)`<Expr lhs> in <Expr rhs>`, Context ctx) = (Type)`Boolean` when (Type)`set [<Type rhsType>]` := resolveType(rhs, ctx) && rhsType == resolveType(lhs, ctx); 
 
 // Field access
 Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveType(lhs, ctx) == (Type)`Date` && "<rhs>" in { "day", "month", "year" };
@@ -80,9 +80,11 @@ Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`String` wh
 Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = rhsType when (Type)`<TypeName custom>` := resolveType(lhs, ctx) && isCurrentScope(custom, ctx) && rhsType := resolveType(rhs, ctx); // spec is referring to itself
 Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = rhsType when (Type)`<TypeName custom>` := resolveType(lhs, ctx) && rhsType := resolveType(rhs, ctx); // TODO perhaps append context to find rhs
 
+Type resolveType((Expr)`<VarName function>(<{Expr ","}* exprs>)`, Context ctx) = getTypeInScope("<function>", ctx);
+
 // Literals
-Type resolveType((Expr)`{<{Expr ","}* elements>}`, Context _) = (Type)`set [<Type subType>]` when /Expr e := elements && subType := resolveType(e[0], ctx); // sets are homogenous so we take the type of the first element
-Type resolveType((Expr)`(<{MapElement ","}* elements>)`, Context _) =  (Type)`map [<Type keyType> : <Type valueType>]` when /MapElement e := elements && keyType := resolveType(e[0].key, ctx) && valueType := resolveType(e[0].val, ctx); // maps are homogenous so we take the type of the first element 
+Type resolveType((Expr)`{<{Expr ","}* elements>}`, Context ctx) = (Type)`set [<Type subType>]` when /Expr e := elements && subType := resolveType(e, ctx); // sets are homogenous so we take the type of the first element
+Type resolveType((Expr)`(<{MapElement ","}* elements>)`, Context ctx) =  (Type)`map [<Type keyType> : <Type valueType>]` when /MapElement e := elements && keyType := resolveType(e.key, ctx) && valueType := resolveType(e.val, ctx); // maps are homogenous so we take the type of the first element 
 
 // Literals
 Type resolveType((Expr)`<Int _>`, Context _) = (Type)`Integer`;
@@ -97,8 +99,12 @@ Type resolveType((Expr)`<Money _>`, Context _) = (Type)`Money`;
 Type resolveType((Expr)`<Currency _>`, Context _) = (Type)`Currency`;
 Type resolveType((Expr)`<Term _>`, Context _) = (Type)`Term`;
 Type resolveType((Expr)`<IBAN _>`, Context _) = (Type)`IBAN`;
-Type resolveType((Expr)`<Ref r>`, Context ctx) = getTypeInScope("<r>", ctx);
-Type resolveType((Expr)`this`, Context ctx) = (Type)`<TypeName name>` when name := ctx.specificationName; // allows us to refer to own instance
+Type resolveType((Expr)`<Ref r>`, Context ctx) = (Type)`<TypeName name>` when "<r>" == "this" && name := [TypeName]ctx.specificationName;
+default Type resolveType((Expr)`<Ref r>`, Context ctx) {
+    println("Ref: <r> type: <getTypeInScope("<r>", ctx)>");
+    return getTypeInScope("<r>", ctx);
+}
+
 // TODO build propagation for parentheses etc
 
 
@@ -109,9 +115,14 @@ default Type resolveType((Expr)`<Expr e>`, Context _) {
 // visit nodes bottom-up (breadth-first traversal) and append map with types
 map[loc, Type] getTypeMapping(Specification spec) {
     // TODO: is the this keyword a good idea actually?
-    Scope getGlobalScope(Specification spec) = scope(spec@\loc, ("<f.name>" : scopeKey(f@\loc, f.tipe) | FieldDecl f <- spec.fields.fields)) when spec.fields has fields;
-    default Scope getGlobalScope(Specification spec) = scope(spec@\loc, ());
-    return visitNode(spec, globalContext("<spec.name>", getGlobalScope(spec)), ());
+    map[str, ScopeKey] getFieldMap() = ("<f.name>" : scopeKey(f@\loc, f.tipe) | FieldDecl f <- spec.fields.fields) when spec.fields has fields;
+    map[str, ScopeKey] getFunctionMap() = ("<f.name>" : scopeKey(f@\loc, f.returnType) | FunctionDef f <- spec.functions.defs) when spec.functions has defs;
+    default map[str, ScopeKey] getFieldMap() = ();
+    default map[str, ScopeKey] getFunctionMap() = ();
+    
+    
+    Scope globalScope = scope(spec@\loc, getFieldMap() + getFunctionMap());
+    return visitNode(spec, globalContext("<spec.name>", globalScope), ());
 }
 
 map[loc, Type] visitNode(Specification s, Context ctx, map[loc, Type] typeMap) {
@@ -139,7 +150,7 @@ map[loc, Type] visitNode(EventDef ev, Context ctx, map[loc, Type] typeMap) {
 map[loc, Type] visitNode(Preconditions? pre, Context ctx, map[loc, Type] typeMap) = visitNode(p.stats, ctx, typeMap) when (/Preconditions p := pre);
 default map[loc, Type] visitNode(Preconditions? _, Context ctx, map[loc, Type] typeMap) = typeMap;
 
-map[loc, Type] visitNode(Postconditions? post, Context ctx, map[loc, Type] typeMap) = visitNode(removePostConditionPrefix(p.stats), ctx, typeMap) when (/Postconditions p := post);
+map[loc, Type] visitNode(Postconditions? post, Context ctx, map[loc, Type] typeMap) = visitNode(removePostConditionPrefix(p.stats, typeMap), ctx, typeMap) when (/Postconditions p := post);
 default map[loc, Type] visitNode(Postconditions? _, Context ctx, map[loc, Type] typeMap) = typeMap;
 Statement* removePostConditionPrefix(Statement* stats, map[loc, Type] typeMap) = visit (stats) { case (Expr)`new this.<VarName v>` => (Expr)`this.<VarName v>` };
 
