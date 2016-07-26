@@ -35,56 +35,59 @@ Type getTypeInScope(str var, Context ctx) {
     return ctx.globalScope.variables[var].variableType;
 }
 
+@memo
+Type resolveTypeCached(Expr exp, Context ctx) = resolveType(exp, ctx);
+
 // Subtraction
-Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Integer` when resolveType(lhs, ctx) == (Type)`Integer` && resolveType(rhs, ctx) == (Type)`Integer`;
-Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Date` when resolveType(lhs, ctx) == (Type)`Date` && resolveType(rhs, ctx) == (Type)`Term`;
-Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Integer` when resolveType(lhs, ctx) == (Type)`Integer` && resolveType(rhs, ctx) == (Type)`Integer`;
-Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Money` when resolveType(lhs, ctx) == (Type)`Money` && resolveType(rhs, ctx) == (Type)`Money`;
-Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Term` when resolveType(lhs, ctx) == (Type)`Date` && resolveType(rhs, ctx) == (Type)`Time`; // temp for "now" keyword
+Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Integer` && resolveTypeCached(rhs, ctx) == (Type)`Integer`;
+Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Date` when resolveTypeCached(lhs, ctx) == (Type)`Date` && resolveTypeCached(rhs, ctx) == (Type)`Term`;
+Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Integer` && resolveTypeCached(rhs, ctx) == (Type)`Integer`;
+Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Money` when resolveTypeCached(lhs, ctx) == (Type)`Money` && resolveTypeCached(rhs, ctx) == (Type)`Money`;
+Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Term` when resolveTypeCached(lhs, ctx) == (Type)`Date` && resolveTypeCached(rhs, ctx) == (Type)`Time`; // temp for "now" keyword
 
 // Plus
-Type resolveType((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = (Type)`Integer` when resolveType(lhs, ctx) == (Type)`Integer` && resolveType(rhs, ctx) == (Type)`Integer`;
-Type resolveType((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = (Type)`Date` when resolveType(lhs, ctx) == (Type)`Date` && resolveType(rhs, ctx) == (Type)`Term`;
-Type resolveType((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = (Type)`Date` when resolveType(lhs, ctx) == (Type)`Term` && resolveType(rhs, ctx) == (Type)`Date`;
-Type resolveType((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = (Type)`Money` when resolveType(lhs, ctx) == (Type)`Integer` && resolveType(rhs, ctx) == (Type)`Money`;
+Type resolveType((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Integer` && resolveTypeCached(rhs, ctx) == (Type)`Integer`;
+Type resolveType((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = (Type)`Date` when resolveTypeCached(lhs, ctx) == (Type)`Date` && resolveTypeCached(rhs, ctx) == (Type)`Term`;
+Type resolveType((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = (Type)`Date` when resolveTypeCached(lhs, ctx) == (Type)`Term` && resolveTypeCached(rhs, ctx) == (Type)`Date`;
+Type resolveType((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = (Type)`Money` when resolveTypeCached(lhs, ctx) == (Type)`Integer` && resolveTypeCached(rhs, ctx) == (Type)`Money`;
 
 // Multiply
-Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Money` when resolveType(lhs, ctx) == (Type)`Integer` && resolveType(rhs, ctx) == (Type)`Money`;
-Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Money` when resolveType(lhs, ctx) == (Type)`Money` && resolveType(rhs, ctx) == (Type)`Integer`;
-Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Term` when resolveType(lhs, ctx) == (Type)`Integer` && resolveType(rhs, ctx) == (Type)`Period`;
-Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Term` when resolveType(lhs, ctx) == (Type)`Period` && resolveType(rhs, ctx) == (Type)`Integer`;
-Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Percentage` when resolveType(lhs, ctx) == (Type)`Integer` && resolveType(rhs, ctx) == (Type)`Percentage`;
-Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Percentage` when resolveType(lhs, ctx) == (Type)`Percentage` && resolveType(rhs, ctx) == (Type)`Integer`;
-Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Money` when resolveType(lhs, ctx) == (Type)`Percentage` && resolveType(rhs, ctx) == (Type)`Money`;
-Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Money` when resolveType(lhs, ctx) == (Type)`Money` && resolveType(rhs, ctx) == (Type)`Percentage`;
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Money` when resolveTypeCached(lhs, ctx) == (Type)`Integer` && resolveTypeCached(rhs, ctx) == (Type)`Money`;
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Money` when resolveTypeCached(lhs, ctx) == (Type)`Money` && resolveTypeCached(rhs, ctx) == (Type)`Integer`;
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Term` when resolveTypeCached(lhs, ctx) == (Type)`Integer` && resolveTypeCached(rhs, ctx) == (Type)`Period`;
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Term` when resolveTypeCached(lhs, ctx) == (Type)`Period` && resolveTypeCached(rhs, ctx) == (Type)`Integer`;
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Percentage` when resolveTypeCached(lhs, ctx) == (Type)`Integer` && resolveTypeCached(rhs, ctx) == (Type)`Percentage`;
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Percentage` when resolveTypeCached(lhs, ctx) == (Type)`Percentage` && resolveTypeCached(rhs, ctx) == (Type)`Integer`;
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Money` when resolveTypeCached(lhs, ctx) == (Type)`Percentage` && resolveTypeCached(rhs, ctx) == (Type)`Money`;
+Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = (Type)`Money` when resolveTypeCached(lhs, ctx) == (Type)`Money` && resolveTypeCached(rhs, ctx) == (Type)`Percentage`;
 
 // Comparisons and boolean logic
-Type resolveType((Expr)`<Expr lhs> == <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == resolveType(rhs, ctx);
-Type resolveType((Expr)`<Expr lhs> \>= <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == resolveType(rhs, ctx);
-Type resolveType((Expr)`<Expr lhs> \<= <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == resolveType(rhs, ctx);
-Type resolveType((Expr)`<Expr lhs> != <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == resolveType(rhs, ctx);
-Type resolveType((Expr)`<Expr lhs> \> <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == resolveType(rhs, ctx);
-Type resolveType((Expr)`<Expr lhs> \< <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == resolveType(rhs, ctx);
-Type resolveType((Expr)`<Expr lhs> && <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == (Type)`Boolean` && resolveType(rhs, ctx) == (Type)`Boolean`;
-Type resolveType((Expr)`<Expr lhs> || <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveType(lhs, ctx) == (Type)`Boolean` && resolveType(rhs, ctx) == (Type)`Boolean`;
+Type resolveType((Expr)`<Expr lhs> == <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> \>= <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> \<= <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> != <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> \> <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> \< <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> && <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == (Type)`Boolean` && resolveTypeCached(rhs, ctx) == (Type)`Boolean`;
+Type resolveType((Expr)`<Expr lhs> || <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == (Type)`Boolean` && resolveTypeCached(rhs, ctx) == (Type)`Boolean`;
 
 // In for structured expressions
-Type resolveType((Expr)`<Expr lhs> in <Expr rhs>`, Context ctx) = (Type)`Boolean` when (Type)`set [<Type rhsType>]` := resolveType(rhs, ctx) && rhsType == resolveType(lhs, ctx); 
+Type resolveType((Expr)`<Expr lhs> in <Expr rhs>`, Context ctx) = (Type)`Boolean` when (Type)`set [<Type rhsType>]` := resolveTypeCached(rhs, ctx) && rhsType == resolveTypeCached(lhs, ctx); 
 
 // Field access
-Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveType(lhs, ctx) == (Type)`Date` && "<rhs>" in { "day", "month", "year" };
-Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveType(lhs, ctx) == (Type)`Time` && "<rhs>" in { "hour", "minutes", "seconds", "timestamp" };
-Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Currency` when resolveType(lhs, ctx) == (Type)`Money` && "<rhs>" == "currency";
-Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveType(lhs, ctx) == (Type)`Money` && "<rhs>" == "amount";
-Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`String` when resolveType(lhs, ctx) == (Type)`IBAN` && "<rhs>" == "countryCode";
-Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = rhsType when (Type)`<TypeName custom>` := resolveType(lhs, ctx) && isCurrentScope(custom, ctx) && rhsType := resolveType(rhs, ctx); // spec is referring to itself
-Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = rhsType when (Type)`<TypeName custom>` := resolveType(lhs, ctx) && rhsType := resolveType(rhs, ctx); // TODO perhaps append context to find rhs
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Date` && "<rhs>" in { "day", "month", "year" };
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Time` && "<rhs>" in { "hour", "minutes", "seconds", "timestamp" };
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Currency` when resolveTypeCached(lhs, ctx) == (Type)`Money` && "<rhs>" == "currency";
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Money` && "<rhs>" == "amount";
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`String` when resolveTypeCached(lhs, ctx) == (Type)`IBAN` && "<rhs>" == "countryCode";
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = rhsType when (Type)`<TypeName custom>` := resolveTypeCached(lhs, ctx) && isCurrentScope(custom, ctx) && rhsType := resolveTypeCached(rhs, ctx); // spec is referring to itself
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = rhsType when (Type)`<TypeName custom>` := resolveTypeCached(lhs, ctx) && rhsType := resolveTypeCached(rhs, ctx); // TODO perhaps append context to find rhs
 
 Type resolveType((Expr)`<VarName function>(<{Expr ","}* exprs>)`, Context ctx) = getTypeInScope("<function>", ctx);
 
 // Literals
-Type resolveType((Expr)`{<{Expr ","}* elements>}`, Context ctx) = (Type)`set [<Type subType>]` when /Expr e := elements && subType := resolveType(e, ctx); // sets are homogenous so we take the type of the first element
-Type resolveType((Expr)`(<{MapElement ","}* elements>)`, Context ctx) =  (Type)`map [<Type keyType> : <Type valueType>]` when /MapElement e := elements && keyType := resolveType(e.key, ctx) && valueType := resolveType(e.val, ctx); // maps are homogenous so we take the type of the first element 
+Type resolveType((Expr)`{<{Expr ","}* elements>}`, Context ctx) = (Type)`set [<Type subType>]` when /Expr e := elements && subType := resolveTypeCached(e, ctx); // sets are homogenous so we take the type of the first element
+Type resolveType((Expr)`(<{MapElement ","}* elements>)`, Context ctx) =  (Type)`map [<Type keyType> : <Type valueType>]` when /MapElement e := elements && keyType := resolveTypeCached(e.key, ctx) && valueType := resolveTypeCached(e.val, ctx); // maps are homogenous so we take the type of the first element 
 
 // Literals
 Type resolveType((Expr)`<Int _>`, Context _) = (Type)`Integer`;
@@ -107,65 +110,6 @@ default Type resolveType((Expr)`<Ref r>`, Context ctx) {
 
 // TODO build propagation for parentheses etc
 
-
 default Type resolveType((Expr)`<Expr e>`, Context _) {
     throw "Could not resolve expression <e>";
-}
-
-// visit nodes bottom-up (breadth-first traversal) and append map with types
-map[loc, Type] getTypeMapping(Specification spec) {
-    // TODO: is the this keyword a good idea actually?
-    map[str, ScopeKey] getFieldMap() = ("<f.name>" : scopeKey(f@\loc, f.tipe) | FieldDecl f <- spec.fields.fields) when spec.fields has fields;
-    map[str, ScopeKey] getFunctionMap() = ("<f.name>" : scopeKey(f@\loc, f.returnType) | FunctionDef f <- spec.functions.defs) when spec.functions has defs;
-    default map[str, ScopeKey] getFieldMap() = ();
-    default map[str, ScopeKey] getFunctionMap() = ();
-    
-    
-    Scope globalScope = scope(spec@\loc, getFieldMap() + getFunctionMap());
-    return visitNode(spec, globalContext("<spec.name>", globalScope), ());
-}
-
-map[loc, Type] visitNode(Specification s, Context ctx, map[loc, Type] typeMap) {
-    if (s has events) {
-        for (EventDef ev <- s.events.events) {
-            typeMap = visitNode(ev, ctx, typeMap);
-        }
-    }
-    return typeMap;
-}
-
-map[loc, Type] visitNode(EventDef ev, Context ctx, map[loc, Type] typeMap) {
-    // We now have to add a local scope (a larger context)
-    localScopeMap = ( "<p.name>" : scopeKey(p@\loc, p.tipe) | Parameter p <- ev.transitionParams);
-    localCtx = localContext(ctx.specificationName, ctx.globalScope, scope(ev@\loc, localScopeMap));
-
-    // TODO: add types to map for declarations in local/global scope?
-    typeMap = visitNode(ev.pre, ctx, typeMap);
-    typeMap = visitNode(ev.post, ctx, typeMap);
-    // TODO: syncblock
-
-    return typeMap;
-}
-
-map[loc, Type] visitNode(Preconditions? pre, Context ctx, map[loc, Type] typeMap) = visitNode(p.stats, ctx, typeMap) when (/Preconditions p := pre);
-default map[loc, Type] visitNode(Preconditions? _, Context ctx, map[loc, Type] typeMap) = typeMap;
-
-map[loc, Type] visitNode(Postconditions? post, Context ctx, map[loc, Type] typeMap) = visitNode(removePostConditionPrefix(p.stats, typeMap), ctx, typeMap) when (/Postconditions p := post);
-default map[loc, Type] visitNode(Postconditions? _, Context ctx, map[loc, Type] typeMap) = typeMap;
-Statement* removePostConditionPrefix(Statement* stats, map[loc, Type] typeMap) = visit (stats) { case (Expr)`new this.<VarName v>` => (Expr)`this.<VarName v>` };
-
-map[loc, Type] visitNode((Statement)`<Annotations _><Expr e>;`, Context ctx, map[loc, Type] typeMap) {
-    Type resolvedType = resolveType(e, ctx);
-    println("Resolved: <e> to <resolvedType>");
-    typeMap[e@\loc] = resolvedType;
-    return typeMap;    
-}
-default map[loc, Type] visitNode(Statement s, Context ctx, map[loc, Type] typeMap) {
-    println("Unsupported statement type");
-    return typeMap;
-}
-
-map[loc, Type] visitNode(Statement* stats, Context ctx, map[loc, Type] typeMap) {
-    for (Statement stat <- stats) typeMap = visitNode(stat, ctx, typeMap);
-    return typeMap;
 }
