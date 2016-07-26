@@ -22,18 +22,20 @@ import ParseTree;
 import Set;
 
 // Invalid type should have originator location
-data ScopeKey = scopeKey(loc declareLocation, Type variableType); 
-data Scope = scope(loc scopeRange, map[str, ScopeKey] variables);
+data ScopeValue = ScopeValue(loc declareLocation, Type variableType); 
+data Scope = scope(loc scopeRange, map[str, ScopeValue] variables);
 data Context = globalContext(str specificationName, Scope globalScope) | localContext(str specificationName, Scope globalScope, Scope localScope);
 
 bool isCurrentScope(TypeName name, Context ctx) = "<name>" == ctx.specificationName;
 bool inScope(str var, Scope scope) = var in scope.variables;
+bool inGlobalScope(str var, Context ctx) = var in ctx.globalScope.variables;
 Type getTypeInScope(str var, Context ctx) {
     if (ctx is localContext) {
         if (inScope(var, ctx.localContext.variables)) return ctx.localScope.variables[var].variableType;
     }
-    return ctx.globalScope.variables[var].variableType;
+    return getTypeInGlobalScope(var, ctx);
 }
+Type getTypeInGlobalScope(str var, Context ctx) = ctx.globalScope.variables[var].variableType;
 
 @memo
 Type resolveTypeCached(Expr exp, Context ctx) = resolveType(exp, ctx);
@@ -80,9 +82,14 @@ Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` w
 Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Currency` when resolveTypeCached(lhs, ctx) == (Type)`Money` && "<rhs>" == "currency";
 Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Money` && "<rhs>" == "amount";
 Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`String` when resolveTypeCached(lhs, ctx) == (Type)`IBAN` && "<rhs>" == "countryCode";
+Type resolveType((Expr)`this.<Expr rhs>`, Context ctx) = rhsType when inGlobalScope(rhs, ctx) && rhsType := getTypeInGlobalScope(rhs, ctx); // spec is referring to itself
 Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = rhsType when (Type)`<TypeName custom>` := resolveTypeCached(lhs, ctx) && isCurrentScope(custom, ctx) && rhsType := resolveTypeCached(rhs, ctx); // spec is referring to itself
 Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = rhsType when (Type)`<TypeName custom>` := resolveTypeCached(lhs, ctx) && rhsType := resolveTypeCached(rhs, ctx); // TODO perhaps append context to find rhs
 
+// Field access on specific types
+// TODO
+
+// Function calls
 Type resolveType((Expr)`<VarName function>(<{Expr ","}* exprs>)`, Context ctx) = getTypeInScope("<function>", ctx);
 
 // Literals
