@@ -171,6 +171,7 @@ syntax Literal
   	| @category="Constant" Term term
   	| @category="Constant" Date
   	| @category="Constant" Time
+  	| @category="Constant" DateTime
   	| @category="Constant" Percentage
   	| @category="Constant" String
   	| @category="Constant" Money
@@ -180,10 +181,9 @@ syntax Literal
 
 syntax Date = Int day Month month Int? year;
 	
-lexical Time
-	= now: "now"
-	| epoch: "t" Int millsSince1970
-	;
+syntax Time = hhmmss: [0-9][0-9]? hour ":" [0-9][0-9]? minutes (":" [0-9][0-9]? seconds)?;
+
+syntax DateTime = Date date "," Time time;
 	
 syntax Annotations = Annotation* annos;	
 
