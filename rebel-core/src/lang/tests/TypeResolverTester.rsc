@@ -17,18 +17,20 @@ import lang::TypeResolver;
 import lang::Syntax;
 import ParseTree;
 
-test bool testTypeOf() {
-	return typeOf([Literal]"100") == (Type)`Integer` 
-	&& typeOf([Literal]"True") == (Type)`Boolean` 
-	&& typeOf([Literal]"\"some String\"") == (Type)`String` 
-	&& typeOf([Literal]"50%") == (Type)`Percentage` 
-	&& typeOf([Literal]"1 Apr 2016") == (Type)`Date` 
-	&& typeOf([Literal]"now") == (Type)`Time` 
-	&& typeOf([Literal]"Quarter") == (Type)`Period` 
-	&& typeOf([Literal]"Quarterly") == (Type)`Frequency` 
-	&& typeOf([Literal]"EUR 100.00") == (Type)`Money` 
-	&& typeOf([Literal]"EUR") == (Type)`Currency` 
-	&& typeOf([Literal]"2 Month") == (Type)`Term` 
-	&& typeOf([Literal]"NL12INGB0001234567") == (Type)`IBAN`
+test bool testResolveType() {
+	return resolveType([Literal]"100") == (Type)`Integer` 
+	&& resolveType([Literal]"True") == (Type)`Boolean` 
+	&& resolveType([Literal]"\"some String\"") == (Type)`String` 
+	&& resolveType([Literal]"50%") == (Type)`Percentage` 
+	&& resolveType([Literal]"1 Apr 2016") == (Type)`Date` 
+	&& resolveType([Literal]"now") == (Type)`Time` 
+	&& resolveType([Literal]"Quarter") == (Type)`Period` 
+	&& resolveType([Literal]"Quarterly") == (Type)`Frequency` 
+	&& resolveType([Literal]"EUR 100.00") == (Type)`Money` 
+	&& resolveType([Literal]"EUR") == (Type)`Currency` 
+	&& resolveType([Literal]"2 Month") == (Type)`Term` 
+	&& resolveType([Literal]"NL12INGB0001234567") == (Type)`IBAN`
 	;
+	
+	
 }

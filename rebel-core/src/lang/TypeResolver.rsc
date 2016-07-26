@@ -20,25 +20,19 @@ syntax Type = "$$INVALID$$";
 import Node;
 import ParseTree;
 import Set;
-
-// Invalid type should have originator location
-data ScopeValue = ScopeValue(loc declareLocation, Type variableType); 
-data Scope = scope(loc scopeRange, map[str, ScopeValue] variables);
-data Context = globalContext(str specificationName, Scope globalScope) | localContext(str specificationName, Scope globalScope, Scope localScope);
-
-bool isCurrentScope(TypeName name, Context ctx) = "<name>" == ctx.specificationName;
-bool inScope(str var, Scope scope) = var in scope.variables;
-bool inGlobalScope(str var, Context ctx) = var in ctx.globalScope.variables;
-Type getTypeInScope(str var, Context ctx) {
-    if (ctx is localContext) {
-        if (inScope(var, ctx.localContext.variables)) return ctx.localScope.variables[var].variableType;
-    }
-    return getTypeInGlobalScope(var, ctx);
-}
-Type getTypeInGlobalScope(str var, Context ctx) = ctx.globalScope.variables[var].variableType;
+import lang::Context;
 
 @memo
-Type resolveTypeCached(Expr exp, Context ctx) = resolveType(exp, ctx);
+Type resolveTypeCached(Expr exp, Context ctx) {
+    try {
+        Type t = resolveType(exp, ctx);
+        println("Resolved <exp>: <t>");
+        return t;
+    }
+    catch e:{
+        throw e;
+    }
+}
 
 // Subtraction
 Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Integer` && resolveTypeCached(rhs, ctx) == (Type)`Integer`;
@@ -77,14 +71,17 @@ Type resolveType((Expr)`<Expr lhs> || <Expr rhs>`, Context ctx) = (Type)`Boolean
 Type resolveType((Expr)`<Expr lhs> in <Expr rhs>`, Context ctx) = (Type)`Boolean` when (Type)`set [<Type rhsType>]` := resolveTypeCached(rhs, ctx) && rhsType == resolveTypeCached(lhs, ctx); 
 
 // Field access
-Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Date` && "<rhs>" in { "day", "month", "year" };
-Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Time` && "<rhs>" in { "hour", "minutes", "seconds", "timestamp" };
-Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Currency` when resolveTypeCached(lhs, ctx) == (Type)`Money` && "<rhs>" == "currency";
-Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Money` && "<rhs>" == "amount";
-Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`String` when resolveTypeCached(lhs, ctx) == (Type)`IBAN` && "<rhs>" == "countryCode";
-Type resolveType((Expr)`this.<Expr rhs>`, Context ctx) = rhsType when inGlobalScope(rhs, ctx) && rhsType := getTypeInGlobalScope(rhs, ctx); // spec is referring to itself
+Type resolveType((Expr)`this.<Expr rhs>`, Context ctx) = rhsType when inGlobalScope("<rhs>", ctx) && rhsType := getTypeInGlobalScope("<rhs>", ctx); // spec is referring to itself
+Type resolveType((Expr)`<Expr lhs>.currency`, Context ctx) = (Type)`Currency` when resolveTypeCached(lhs, ctx) == (Type)`Money`;
+Type resolveType((Expr)`<Expr lhs>.amount`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Money`;
+Type resolveType((Expr)`<Expr lhs>.countryCode`, Context ctx) = (Type)`String` when resolveTypeCached(lhs, ctx) == (Type)`IBAN`;
+Type resolveType((Expr)`<Expr lhs>.time`, Context ctx) = (Type)`Time` when resolveTypeCached(lhs, ctx) == (Type)`DateTime`;
+Type resolveType((Expr)`<Expr lhs>.date`, Context ctx) = (Type)`Date` when resolveTypeCached(lhs, ctx) == (Type)`DateTime`;
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Date` && "<rhs>" in { "day", "month", "year", "timestamp" };
+Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Time` && "<rhs>" in { "hour", "minutes", "seconds" };
 Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = rhsType when (Type)`<TypeName custom>` := resolveTypeCached(lhs, ctx) && isCurrentScope(custom, ctx) && rhsType := resolveTypeCached(rhs, ctx); // spec is referring to itself
 Type resolveType((Expr)`<Expr lhs>.<Expr rhs>`, Context ctx) = rhsType when (Type)`<TypeName custom>` := resolveTypeCached(lhs, ctx) && rhsType := resolveTypeCached(rhs, ctx); // TODO perhaps append context to find rhs
+
 
 // Field access on specific types
 // TODO
@@ -97,6 +94,7 @@ Type resolveType((Expr)`{<{Expr ","}* elements>}`, Context ctx) = (Type)`set [<T
 Type resolveType((Expr)`(<{MapElement ","}* elements>)`, Context ctx) =  (Type)`map [<Type keyType> : <Type valueType>]` when /MapElement e := elements && keyType := resolveTypeCached(e.key, ctx) && valueType := resolveTypeCached(e.val, ctx); // maps are homogenous so we take the type of the first element 
 
 // Literals
+Type resolveType((Expr)`<DateTime _>`, Context _) = (Type)`DateTime`;
 Type resolveType((Expr)`<Int _>`, Context _) = (Type)`Integer`;
 Type resolveType((Expr)`<Bool _>`, Context _) = (Type)`Boolean`;
 Type resolveType((Expr)`<String _>`, Context _) = (Type)`String`;
@@ -109,11 +107,7 @@ Type resolveType((Expr)`<Money _>`, Context _) = (Type)`Money`;
 Type resolveType((Expr)`<Currency _>`, Context _) = (Type)`Currency`;
 Type resolveType((Expr)`<Term _>`, Context _) = (Type)`Term`;
 Type resolveType((Expr)`<IBAN _>`, Context _) = (Type)`IBAN`;
-Type resolveType((Expr)`<Ref r>`, Context ctx) = (Type)`<TypeName name>` when "<r>" == "this" && name := [TypeName]ctx.specificationName;
-default Type resolveType((Expr)`<Ref r>`, Context ctx) {
-    println("Ref: <r> type: <getTypeInScope("<r>", ctx)>");
-    return getTypeInScope("<r>", ctx);
-}
+Type resolveType((Expr)`<Ref r>`, Context ctx) = getTypeInScope("<r>", ctx);
 
 // TODO build propagation for parentheses etc
 
