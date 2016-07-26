@@ -14,11 +14,19 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 module lang::tests::TypeResolverTester
 
 import lang::TypeResolver;
-import lang::Syntax;
-import ParseTree;
+import lang::ExtendedSyntax;
 
-test bool testResolveType() {
-	return resolveType([Literal]"100") == (Type)`Integer` 
+import lang::Parser;
+import lang::Importer;
+import lang::Resolver;
+import lang::Normalizer;
+
+import ParseTree;
+import Map;
+import IO;
+
+test bool testResolveType() =
+	resolveType([Literal]"100") == (Type)`Integer` 
 	&& resolveType([Literal]"True") == (Type)`Boolean` 
 	&& resolveType([Literal]"\"some String\"") == (Type)`String` 
 	&& resolveType([Literal]"50%") == (Type)`Percentage` 
@@ -31,6 +39,38 @@ test bool testResolveType() {
 	&& resolveType([Literal]"2 Month") == (Type)`Term` 
 	&& resolveType([Literal]"NL12INGB0001234567") == (Type)`IBAN`
 	;
-	
-	
+
+test bool testResolveSpec(loc file) {
+  Module orig = parseModule(file);
+  set[Module] imports = loadImports(orig);
+  Refs refs = resolve({orig} + imports);  
+  Module inlinedSpec = inline(orig, imports, refs);
+
+  Scope specScope = root("<inlinedSpec.spec.name>", ("this.<f.name>":f.tipe | /FieldDecl f := inlinedSpec.spec.fields) + ("this":[Type]"<inlinedSpec.spec.name>"));
+
+  map[loc, Type] resolvedTypes = (); 
+
+  for (EventDef evnt <- inlinedSpec.spec.events.events) {
+    Context ctx = context(buildEventScope(evnt, inlinedSpec.spec.functions, specScope));
+    
+    visit(evnt) {
+      case Expr expr: {
+        Type resolvedType = resolveTypeCached(expr, ctx);
+        
+        if ((Type)`$$TYPE_ERROR$$` := resolvedType) {
+          println("Error resolving type for <expr>");
+        }
+        
+        resolvedTypes += (expr@\loc:resolvedType);
+      }
+    }
+  }
+ 
+  return /(Type)`$$TYPE_ERROR$$` !:= range(resolvedTypes);
 }
+
+Scope buildEventScope(EventDef evnt, FunctionDefs functions, Scope parent) =
+  nested("<evnt.name>",
+          ("<p.name>":p.tipe | Parameter p <- evnt.transitionParams),
+          ("<f.name>":f.returnType | /(Expr)`<VarName ref>(<{Expr ","}* _>)` := evnt, FunctionDef f <- functions.defs, "<f.name>" == "<ref>"),
+          parent);

@@ -46,7 +46,7 @@ syntax Preconditions = "preconditions" "{" Statement* stats"}";
 
 syntax Postconditions = "postconditions" "{" Statement* stats "}";
 
-syntax SyncBlock = "sync" "{" Statement* stats "}";
+syntax SyncBlock = "sync" "{" SyncStatement* stats "}";
 
 syntax FunctionDef = Annotations annos "function" FullyQualifiedVarName name "(" {Parameter ","}* params ")" ":" Type returnType "=" Statement statement;
 
@@ -80,6 +80,10 @@ syntax ConfigParameter = VarName name "=" Expr val;
 syntax Parameter = VarName name ":" Type tipe DefaultValue? defaultValue;
 syntax DefaultValue = "=" Expr val;
 
+syntax SyncStatement
+  = "not"? TypeName specName "[" Expr id "]" "." VarName event "(" {Expr ","}* params ")" ";"
+  ;
+
 syntax Statement  
 	= bracket "(" Statement ")"
 	| "case" Expr "{" Case+ cases "}" ";"
@@ -93,7 +97,7 @@ syntax Expr
   | literal: Literal!reference lit 
 	| reference: Ref ref
   | VarName function "(" {Expr ","}* exprs ")"
-  | left property: Expr lhs "." Expr field 
+  | left fieldAccess: Expr lhs "." VarName field 
   | "{" Expr lower ".." Expr upper"}"
   | left Expr var!accessor "[" Expr indx "]"
 	| "(" {MapElement ","}* mapElems ")"

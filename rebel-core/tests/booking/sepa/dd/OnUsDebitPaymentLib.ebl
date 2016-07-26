@@ -63,7 +63,7 @@ event revolve() {
 	sync {
 		// not enough balance on account
 		not CurrentAccount[this.debtor].withdraw(this.amount);
-		SepaDirectDebitWashAccount.deposit(this.amount);
+		SepaDirectDebitWashAccount[1].deposit(this.amount);
 		//RevolvingWashAccount.withdraw(this.amount);
 	}
 }
