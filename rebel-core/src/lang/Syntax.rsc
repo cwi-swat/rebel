@@ -82,51 +82,51 @@ syntax DefaultValue = "=" Expr val;
 
 syntax Statement  
 	= bracket "(" Statement ")"
-  	| "case" Expr "{" Case+ cases "}" ";"
-  	| Annotations annos Expr ";"
-  	;  
+	| "case" Expr "{" Case+ cases "}" ";"
+	| Annotations annos Expr ";"
+	;  
   	
 syntax Case = Literal lit "=\>" Statement stat;
 
 syntax Expr
-  	= bracket "(" Expr ")"
-	| literal: Literal!reference lit 
-  	| reference: Ref ref
-    | VarName function "(" {Expr ","}* exprs ")"
-    | left property: Expr lhs "." Expr field 
-    | "{" Expr lower ".." Expr upper"}"
-	| left Expr var!accessor "[" Expr indx "]"
-  	| "(" {MapElement ","}* mapElems ")"
-  	| staticSet: "{" {Expr ","}* setElems "}"
-  	| "{" Expr elem "|" Expr loopVar "\<-" Expr set "}"
-  	| "{" Expr init "|" Statement reducer "|" Expr loopVar "\<-" Expr set "}" 
-	> new: "new" Expr expr
-  	| "not" Expr expr
-  	| "-" Expr
-  	> left	( Expr lhs "*" Expr rhs
-		    | isMember: Expr lhs "in" Expr rhs
-		    | Expr lhs "/" Expr rhs
-		    | Expr lhs "%" Expr rhs
-		  	)
-  	> left 	( Expr lhs "+" Expr rhs
-    		| subtract: Expr lhs "-" Expr rhs
-    		)
-	> non-assoc	( smallerThan: Expr lhs "\<" Expr rhs
-				| smallerThanEquals: Expr lhs "\<=" Expr rhs
-				| greaterThan: Expr lhs "\>" Expr rhs
-				| greaterThanEquals: Expr lhs "\>=" Expr rhs
-				| equals: Expr lhs "==" Expr rhs
-				| notEqual: Expr lhs "!=" Expr rhs
-				)
- 	> left and: Expr lhs "&&" Expr rhs
-  	> left Expr lhs "||" Expr rhs
-	> right ( Expr cond "?" Expr whenTrue ":" Expr whenFalse
-			| Expr cond "-\>" Expr implication
+	= bracket "(" Expr ")"
+  | literal: Literal!reference lit 
+	| reference: Ref ref
+  | VarName function "(" {Expr ","}* exprs ")"
+  | left property: Expr lhs "." Expr field 
+  | "{" Expr lower ".." Expr upper"}"
+  | left Expr var!accessor "[" Expr indx "]"
+	| "(" {MapElement ","}* mapElems ")"
+	| staticSet: "{" {Expr ","}* setElems "}"
+	| "{" Expr elem "|" Expr loopVar "\<-" Expr set "}"
+	| "{" Expr init "|" Statement reducer "|" Expr loopVar "\<-" Expr set "}" 
+  > new: "new" Expr expr
+	| "not" Expr expr
+	| "-" Expr
+	> left	( Expr lhs "*" Expr rhs
+	    | isMember: Expr lhs "in" Expr rhs
+	    | Expr lhs "/" Expr rhs
+	    | Expr lhs "%" Expr rhs
+	  	)
+	> left 	( Expr lhs "+" Expr rhs
+  		| subtract: Expr lhs "-" Expr rhs
+  		)
+  > non-assoc	( smallerThan: Expr lhs "\<" Expr rhs
+			| smallerThanEquals: Expr lhs "\<=" Expr rhs
+			| greaterThan: Expr lhs "\>" Expr rhs
+			| greaterThanEquals: Expr lhs "\>=" Expr rhs
+			| equals: Expr lhs "==" Expr rhs
+			| notEqual: Expr lhs "!=" Expr rhs
 			)
-	| "initialized" Expr
-	| "finalized" Expr
-	| Expr lhs "instate" Expr rhs
-  	;
+  > left and: Expr lhs "&&" Expr rhs
+	> left Expr lhs "||" Expr rhs
+  > right ( Expr cond "?" Expr whenTrue ":" Expr whenFalse
+		| Expr cond "-\>" Expr implication
+		)
+  | "initialized" Expr
+  | "finalized" Expr
+  | Expr lhs "instate" Expr rhs
+	;
  
 syntax MapElement =  Expr key ":" Expr val;
  
@@ -188,8 +188,9 @@ lexical Time
 syntax Annotations = Annotation* annos;	
 
 syntax Annotation 
-	= @category="Comment" "@" VarName name
-	| @Foldable @category="Comment" "@" VarName name TagString tagString
+	= @category="Comment" key: "@" "key" name
+	| @category="Comment" ref: "@" "ref" name "=" FullyQualifiedName spc
+	| @Foldable @category="Comment" doc:"@" VarName name TagString tagString
 	;
 
 lexical TagString
