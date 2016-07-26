@@ -84,7 +84,7 @@ public MyTree allLeafsDifferentAnnotated() {
 }
 
 test bool synthesizeShouldSynthesizeAllNodes() {
-  synthesized = synthesize(allLeafsAnnotated(), keywordParamNamesWithDefault = ("synth": "bottom-up"));
+  synthesized = synthesize(allLeafsAnnotated(), #str, keywordParamNamesWithDefault = ("synth": "bottom-up"));
   
  visit(synthesized) {
     case t:(MyTree)`1`         => {eq(t.synth, "bottom-up"); t;}
@@ -100,7 +100,7 @@ test bool synthesizeShouldSynthesizeAllNodes() {
 }
 
 test bool synthesizeShouldCombineCorrectly() {
-  synthesized = synthesize(allLeafsDifferentAnnotated());
+  synthesized = synthesize(allLeafsDifferentAnnotated(), #str, keywordParamNamesWithDefault = ("synth": "xxx"));
   
   visit(synthesized) {
     case t:(MyTree)`1`         => {eq(t.synth, "1"); t;}
@@ -169,7 +169,7 @@ test bool synthesizeShouldNotOverrideNonDefaultValues() {
     case leaf: (MyTree)`(2,3)` => leaf[synth2="explicitOn(2,3)"]
   };
 
-  synthesized = synthesize(tree, keywordParamNamesWithDefault = ("synth2": "default"));
+  synthesized = synthesize(tree, #str, keywordParamNamesWithDefault = ("synth2": "default"));
   
   visit(synthesized) {
     case t:(MyTree)`1`         => {eq(t.synth2, "default"); t;}
@@ -189,7 +189,9 @@ test bool synthesizeShouldNotOverrideNonDefaultValues() {
 int minCompute(Tree leaf, list[int] fromChildren) = toInt("<leaf>")
   when leaf is Leaf;
 int minCompute(Tree tree, list[int] fromChildren) = min(fromChildren)
-  when bprintln("try tree is nod (<tree is nod>) on <typeOf(tree)> <tree>"), tree is nod, bprintln("result <fromChildren> -\> <min(fromChildren)>");
+  when // bprintln("try tree is nod (<tree is nod>) on <typeOf(tree)> <tree>"),
+       tree is nod;
+       // , bprintln("result <fromChildren> -\> <min(fromChildren)>");
 default int minCompute(Tree _, list[int] _) = 1000000;
 
 //int(Tree, list[int]) minComputeFun = minCompute;
@@ -198,7 +200,7 @@ Synthesized[Tree, int] minDefault =
   < 1000000 // as large as possible, but doesn't scale: solution http://stackoverflow.com/questions/19524735/are-there-constants-for-infinity
   //, minComputeFun
   , int(Tree t, list[int] fromChildren) {
-      println("input compute: <t>: <fromChildren>");
+      //println("input compute: <t>: <fromChildren>");
       switch(t) { // TODO how to get actual leaf value out of this?
         case Leaf leaf          : return toInt("<leaf>");
         case tree: MyTree       : return min(fromChildren);
@@ -239,13 +241,13 @@ Synthesized[Tree, MyTree(int)] repMinDefault =
   < MyTree(int i) { return (MyTree)`1000000`; } // as large as possible, but doesn't scale: solution http://stackoverflow.com/questions/19524735/are-there-constants-for-infinity
   //, minComputeFun
   , MyTree(int)(Tree t, list[MyTree(int)] fromChildren) {
-      println("input compute: <t>: <fromChildren>");
+      //println("input compute: <t>: <fromChildren>");
       switch(t) { // TODO how to get actual leaf value out of this?
         case Leaf leaf          : return MyTree(int i) { return parse(#MyTree, "<i>"); }; // TODO: How to write this down nicely
         case (MyTree)`(<MyTree left>, <MyTree right>)`    : return MyTree(int i) {
           //iprintln(fromChildren);
-          leftTree = left.repMin.attr(i); 
-          rightTree = right.repMin.attr(i); 
+          MyTree leftTree = left.repMin.attr(i); 
+          MyTree rightTree = right.repMin.attr(i); 
           return parse(#MyTree, "(<leftTree>, <rightTree>)"); 
         };
         case tree: MyTree       : return fromChildren[0];
@@ -270,14 +272,14 @@ test bool repMinTest() {
   
   println("found min: <min>");
   
-  println(synthesized);
-  println(synthesized2);
+  //println(synthesized);
+  //println(synthesized2);
   
   
   MyTree(int) treeBuilder = synthesized2.repMin.attr;
   
   MyTree result = treeBuilder(min);
-  println(result);
+  //println(result);
   
   return eq(result, (MyTree)`(1, (1, 1))`);
 }
@@ -309,7 +311,8 @@ test bool repMinTest() {
 // TODO real usage case, how would I want to use it?
 data Tree(int min2 = 0);
 
-test bool agUsage() {
+//test
+bool agUsage() {
   MyTree tree = clean((MyTree)`(3, (1, 10))`);
 
   MyTree method(MyTree current, MyTree parent)  {

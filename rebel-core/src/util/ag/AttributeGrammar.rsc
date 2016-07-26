@@ -34,7 +34,7 @@ public void printKws(Tree input) {
 }
 
 public &TREE<:Tree inherit(&TREE<:Tree input) {
-  println("input: <input> kws: <getKeywordParameters(input)>");
+  //println("input: <input> kws: <getKeywordParameters(input)>");
 
   // Helper to mark if node has been handled
   set[Tree] inheritedHandled = {};
@@ -105,7 +105,7 @@ public &TREE<:Tree synthesize(&TREE<:Tree input, type[&ATTR] typeHelper, map[str
 
   // get all relevant attributes of the children of n
   MultiMap[str, Synthesized[Tree, &ATTR]] getSynthesizedAttributes(Tree n) { 
-    println("<n>");
+    //println("<n>");
     	children = childrenOf(n);
     	//println("children: <children>");
         // filter out literals (TODO is this enough for all situations?)
@@ -116,10 +116,10 @@ public &TREE<:Tree synthesize(&TREE<:Tree input, type[&ATTR] typeHelper, map[str
     	list[map[str, Synthesized[Tree, &ATTR]]] childAttributes = [ {
     	  // explicit set kw params
     	  map[str,value] kws = getKeywordParameters(child);
-    	  println("\tfound on child <child>: <(kw : attr.attr | kw <- kws, Synthesized[Tree, &ATTR] attr := kws[kw])>");
+    	  //println("\tfound on child <child>: <(kw : attr.attr | kw <- kws, Synthesized[Tree, &ATTR] attr := kws[kw])>");
     	  map[str, Synthesized[Tree, &ATTR]] synthAttrs = 
     	    (kw : attrValue | str kw <- getKeywordParameters(child), Synthesized[Tree, &ATTR] attrValue := kws[kw]);
-      println("\tsynthAttrs found on child <child>: <synthAttrs>");
+      //println("\tsynthAttrs found on child <child>: <synthAttrs>");
     	  // which are defined?
     	  map[str, Synthesized[Tree, &ATTR]] attributeNames = getDefinedSynthesizedAttributes(#&TREE);
     	  // TODO filter on `Synthesized` Type
@@ -129,7 +129,7 @@ public &TREE<:Tree synthesize(&TREE<:Tree input, type[&ATTR] typeHelper, map[str
     	  //println("misisng: <missingWithDefault>");  
     	  
     	  map[str, Synthesized[Tree, &ATTR]] result = missingWithDefault + synthAttrs;
-    	  println("\tfound for <child> synth: <[ca.attr | Synthesized[Tree, &ATTR] ca <- range(result)]>");
+    	  //println("\tfound for <child> synth: <[ca.attr | Synthesized[Tree, &ATTR] ca <- range(result)]>");
     	  result;
     	} | child <- childNodes];
     	//println("childAttributes for <n>: <[ca.attr | Synthesized[Tree, &ATTR] ca <- range(childAttributes)]>");
@@ -139,7 +139,7 @@ public &TREE<:Tree synthesize(&TREE<:Tree input, type[&ATTR] typeHelper, map[str
     	                                                                         , str k <- c
     	                                                                         , Synthesized[Tree, &ATTR] ck := c[k]);
     	
-    	println("<n> result: <result>");
+    	//println("<n> result: <result>");
     	return result;
   }
   
