@@ -89,7 +89,7 @@ Type resolveType((Expr)`<Expr lhs>.currency`, Context ctx) = (Type)`Currency` wh
 Type resolveType((Expr)`<Expr lhs>.amount`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Money`;
 Type resolveType((Expr)`<Expr lhs>.countryCode`, Context ctx) = (Type)`String` when resolveTypeCached(lhs, ctx) == (Type)`IBAN`;
 Type resolveType((Expr)`<Expr lhs>.time`, Context ctx) = (Type)`Time` when resolveTypeCached(lhs, ctx) == (Type)`DateTime`;
-Type resolveType((Expr)`<Expr lhs>.date`, Context ctx) = (Type)`Date` when bprintln(lhs), resolveTypeCached(lhs, ctx) == (Type)`DateTime`;
+Type resolveType((Expr)`<Expr lhs>.date`, Context ctx) = (Type)`Date` when resolveTypeCached(lhs, ctx) == (Type)`DateTime`;
 Type resolveType((Expr)`<Expr lhs>.<VarName rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Date` && "<rhs>" in { "day", "month", "year" };
 Type resolveType((Expr)`<Expr lhs>.<VarName rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Time` && "<rhs>" in { "hour", "minutes", "seconds" };
 Type resolveType((Expr)`<Expr lhs>.<VarName rhs>`, Context ctx) = rhsType when (Type)`<TypeName custom>` := resolveTypeCached(lhs, ctx) && isCurrentScope(custom, ctx) && rhsType := resolveTypeCached(rhs, ctx); // spec is referring to itself
