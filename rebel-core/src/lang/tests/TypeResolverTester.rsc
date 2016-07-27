@@ -46,7 +46,10 @@ test bool testResolveSpec(loc file) {
   Refs refs = resolve({orig} + imports);  
   Module inlinedSpec = inline(orig, imports, refs);
 
-  Scope specScope = root("<inlinedSpec.spec.name>", ("this.<f.name>":f.tipe | /FieldDecl f := inlinedSpec.spec.fields) + ("this":[Type]"<inlinedSpec.spec.name>"));
+  Scope specScope = root("<inlinedSpec.spec.name>", 
+    ("this.<f.name>":f.tipe | /FieldDecl f := inlinedSpec.spec.fields) + 
+    ("<spec.name>":[Type]"<spec.name>" | /(Module)`<ModuleDef _> <Import* _> <Specification spec>` := imports) +
+    ("this":[Type]"<inlinedSpec.spec.name>"));
 
   map[loc, Type] resolvedTypes = (); 
 
@@ -58,7 +61,7 @@ test bool testResolveSpec(loc file) {
         Type resolvedType = resolveTypeCached(expr, ctx);
         
         if ((Type)`$$TYPE_ERROR$$` := resolvedType) {
-          println("Error resolving type for <expr>");
+          println("Error resolving type for <expr> in <expr@\loc>");
         }
         
         resolvedTypes += (expr@\loc:resolvedType);

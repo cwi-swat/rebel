@@ -36,13 +36,13 @@ Type getTypeOfVar(str name, Scope scope) = getTypeOfVar(name, scope.parent)
   when name notin scope.vars,
     scope is nested;
     
-default Type getTypeOfVar(str name, Scope scope) { throw "Variable \'<name>\' not found in scopes"; }
+default Type getTypeOfVar(str name, Scope scope) = (Type)`$$TYPE_ERROR$$`;
 
 Type getTypeOfFunction(str name, Scope scope) = scope.functions[name]
   when scope is nested,
        name in scope.functions;
 
-default Type getTypeOfFunction(str name, Scope scope) { throw "Function \'<name>\' not found in scopes"; }
+default Type getTypeOfFunction(str name, Scope scope) = (Type)`$$TYPE_ERROR$$`;
 
 @memo
 Type resolveTypeCached(Expr exp, Context ctx) = resolveType(exp, ctx);
