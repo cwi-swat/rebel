@@ -7,15 +7,20 @@ import lang::Importer;
 import IO;
 import Traversal;
 import Node;
-import ParseTree;
+import List;
+
+import util::ag::AttributeGrammar;
 
 // M3 @decl
-anno loc Tree@decl;
+//anno loc Tree@decl;
+data Tree(loc decl = |rebel:///|);
 
 // Scope handles scoping for @decl
 alias Scope = str;
-anno Scope Module@scope;
-anno Scope Specification@scope;
+//anno Scope Module@scope;
+//anno Scope Specification@scope;
+data Tree(Scope scope = "");
+//data Specification(Scope scope = "");
 
 // decl scheme roots
 loc specScheme = |rebel+specification:///|;
@@ -37,9 +42,9 @@ Scope unsafeGetScopeFromParent() {
   //println([ getAnnotations(p)["scope"]? ? <"<p>"[..10], "<getAnnotations(p)["scope"]>"> : "false"  | p <- getTraversalContextNodes() ]);
    
    // get the closest @scope in the parent hierarchy
-  result = ("@scope not found on parent of `<parents[0]>`"
-           | getAnnotations(parent)["scope"]?
-             ? "<getAnnotations(parent)["scope"]>" : it 
+  result = ("scope not found on parent of `<parents[0]>`"
+           | getKeywordParameters(parent)["scope"]?
+             ? "<getKeywordParameters(parent)["scope"]>" : it 
            | parent <- reverse(parents)); // Reverse here to simulate fold right instead of fold left (improve for performance)
   //println("@scope for `<parents[0]>` = `<result>`");
   return result;
@@ -50,34 +55,33 @@ Scope unsafeGetScopeFromParent() {
 //  return true;     
 //}
   
- //visit
-Module annotate(Module orig) {
-  initModule = orig[@scope = ""]; 
-  
-  // first we visit the scope/context changing nodes
+//visit
+Module setDecls(Module orig) {
+  initModule = clean(orig);
+// first we visit the scope/context changing nodes
   contextVisit = top-down visit(initModule) {
-    case Module m        => m[@scope = "<m.modDef.fqn>"]
+    case Module m        => m[scope = "<m.modDef.fqn>"]
   };
   
   contextVisit2 = top-down visit(contextVisit) {
-    case Specification s => s[@scope = unsafeGetScopeFromParent() + "/<s.name>"]
+    case Specification s => s[scope = unsafeGetScopeFromParent() + "/<s.name>"]
   };
   
   return top-down visit(contextVisit2) {
     // Generic
-    case Import i        => i[@decl = importScheme + "<i.fqn>"]
-    //Libs
+    case Import i        => i[decl = importScheme + "<i.fqn>"]
+    // Libs
     case m:(Module)`<ModuleDef modDef> <Import* imports> <LibraryModules decls>` => 
-      m[@decl = modScheme + "<m.modDef.fqn>"][decls = decls[@decl = libScheme + "<modDef.fqn>"]]
-    case EventDef ed     => ed[@decl = eventScheme + unsafeGetScopeFromParent() + "<ed.name>"]
-    case FunctionDef fd  => fd[@decl = functionScheme + unsafeGetScopeFromParent() + "<fd.name>"]
-    case InvariantDef id => id[@decl = invariantScheme + unsafeGetScopeFromParent() + "<id.name>"]
+      m[decl = modScheme + "<m.modDef.fqn>"][decls = decls[decl = libScheme + "<modDef.fqn>"]]
+    case EventDef ed     => ed[decl = eventScheme + unsafeGetScopeFromParent() + "<ed.name>"]
+    case FunctionDef fd  => fd[decl = functionScheme + unsafeGetScopeFromParent() + "<fd.name>"]
+    case InvariantDef id => id[decl = invariantScheme + unsafeGetScopeFromParent() + "<id.name>"]
     // Specs
     case m:(Module)`<ModuleDef modDef> <Import* imports> <Specification spec>` => 
-      m[@decl = modScheme + "<m.modDef.fqn>"][spec = spec[@decl = specScheme + unsafeGetScopeFromParent() + "<spec.name>"]]
-    case FieldDecl fd    => fd[@decl = fieldScheme + unsafeGetScopeFromParent() + "<fd.name>"]
-    case EventRef er     => er[@decl = eventRefScheme + unsafeGetScopeFromParent() + "<er.eventRef>"]
-    case InvariantRef id => id[@decl = invariantRefScheme + unsafeGetScopeFromParent() + "<id.invariantRef>"]
-    case StateFrom sf    => sf[@decl = stateScheme + unsafeGetScopeFromParent() + "<sf.from>"]
+      m[decl = modScheme + "<m.modDef.fqn>"][spec = spec[decl = specScheme + unsafeGetScopeFromParent() + "<spec.name>"]]
+    case FieldDecl fd    => fd[decl = fieldScheme + unsafeGetScopeFromParent() + "<fd.name>"]
+    case EventRef er     => er[decl = eventRefScheme + unsafeGetScopeFromParent() + "<er.eventRef>"]
+    case InvariantRef id => id[decl = invariantRefScheme + unsafeGetScopeFromParent() + "<id.invariantRef>"]
+    case StateFrom sf    => sf[decl = stateScheme + unsafeGetScopeFromParent() + "<sf.from>"]
   };
 }
