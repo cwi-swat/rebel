@@ -2,7 +2,6 @@ module lang::TypeChecker
 
 import IO;
 import lang::ExtendedSyntax;
-import lang::Context;
 extend lang::Syntax;
 syntax Type = "$$INVALID$$";
 import Node;
@@ -14,6 +13,7 @@ import lang::Resolver;
 import lang::Normalizer;
 import lang::TypeResolver;
 
+// TODO: move stuff to Checker.rsc and use errors and success there
 data TypeError = error(loc location, str error) | success();
 
 list[TypeError] typeCheck(loc location) {
@@ -29,13 +29,15 @@ list[TypeError] typeCheck(loc location) {
 // Second pass after type resolver
 // visit nodes bottom-up (breadth-first traversal) and append map with types
 list[TypeError] typeCheck(Specification spec) {
+//  = nested(str name, map[str, Type] vars, map[str, Type] functions, Scope parent)
+
     // TODO: is the this keyword a good idea actually?
-    map[str, ScopeValue] getFieldMap() = ("<f.name>" : ScopeValue(f@\loc, f.tipe) | FieldDecl f <- spec.fields.fields) when spec.fields has fields;
-    map[str, ScopeValue] getFunctionMap() = ("<f.name>" : ScopeValue(f@\loc, f.returnType) | FunctionDef f <- spec.functions.defs) when spec.functions has defs;
+    map[str, ScopeValue] getFieldMap() = ("this.<f.name>" : f.tipe | FieldDecl f <- spec.fields.fields) when spec.fields has fields;
+    map[str, ScopeValue] getFunctionMap() = ("<f.name>" : f.returnType | FunctionDef f <- spec.functions.defs) when spec.functions has defs;
     default map[str, ScopeValue] getFieldMap() = ();
     default map[str, ScopeValue] getFunctionMap() = ();
     
-    Scope globalScope = scope(spec@\loc, getFieldMap() + getFunctionMap());
+    Scope rootScope = root(spec@\loc, getFieldMap() + getFunctionMap());
     return typeCheck(spec, globalContext("<spec.name>", globalScope));
 }
 
@@ -61,11 +63,10 @@ list[TypeError] typeCheck(Postconditions? post, Context ctx) = typeCheck(removeP
 default list[TypeError] typeCheck(Postconditions? _, Context ctx) = [];
 Statement* removePostConditionPrefix(Statement* stats) = visit (stats) { case (Expr)`new this.<VarName v>` => (Expr)`this.<VarName v>` };
 
+// This context is necessary
 TypeError typeCheck((Statement)`<Annotations _><Expr e>;`, Context ctx) {
-    try {
-        Type resolvedType = resolveTypeCached(e, ctx);
-    }
-    catch str exc: {
+    Type resolvedType = resolveTypeCached(e, ctx);
+    if (resolvedType == (Type)`$$TYPE_ERROR$$`) {
         return error(e@\loc, "Could not resolve expression <e>");
     }
     return success();

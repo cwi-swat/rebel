@@ -25,8 +25,8 @@ syntax Type = "$$TYPE_ERROR$$";
 data Context = context(Scope scp); 
 
 data Scope
-  = nested(str name, map[str, Type] vars, map[str, Type] functions, Scope parent)
-  | root(str name, map[str, Type] vars)
+  = nested(str name, map[str, Type] vars, Scope parent)
+  | root(str name, map[str, Type] vars, map[str, Type] functions)
   ;
 
 Type getTypeOfVar(str name, Scope scope) = scope.vars[name]
@@ -38,9 +38,9 @@ Type getTypeOfVar(str name, Scope scope) = getTypeOfVar(name, scope.parent)
     
 default Type getTypeOfVar(str name, Scope scope) = (Type)`$$TYPE_ERROR$$`;
 
-Type getTypeOfFunction(str name, Scope scope) = scope.functions[name]
+Type getTypeOfFunction(str name, Scope scope) = scope.parent.functions[name]
   when scope is nested,
-       name in scope.functions;
+       name in scope.parent.functions;
 
 default Type getTypeOfFunction(str name, Scope scope) = (Type)`$$TYPE_ERROR$$`;
 

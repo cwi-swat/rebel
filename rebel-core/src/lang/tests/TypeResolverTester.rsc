@@ -46,12 +46,13 @@ test bool testResolveSpec(loc file) {
   Refs refs = resolve({orig} + imports);  
   Module inlinedSpec = inline(orig, imports, refs);
 
+  map[loc, Type] resolvedTypes = ();
+  map[str, Type] functions = ("<f.name>" : f.returnType | /FunctionDef f := inlinedSpec.spec.functions);
   Scope specScope = root("<inlinedSpec.spec.name>", 
     ("this.<f.name>":f.tipe | /FieldDecl f := inlinedSpec.spec.fields) + 
     ("<spec.name>":[Type]"<spec.name>" | /(Module)`<ModuleDef _> <Import* _> <Specification spec>` := imports) +
-    ("this":[Type]"<inlinedSpec.spec.name>"));
+    ("this":[Type]"<inlinedSpec.spec.name>") , functions); 
 
-  map[loc, Type] resolvedTypes = (); 
 
   for (EventDef evnt <- inlinedSpec.spec.events.events) {
     Context ctx = context(buildEventScope(evnt, inlinedSpec.spec.functions, specScope));
@@ -75,5 +76,4 @@ test bool testResolveSpec(loc file) {
 Scope buildEventScope(EventDef evnt, FunctionDefs functions, Scope parent) =
   nested("<evnt.name>",
           ("<p.name>":p.tipe | Parameter p <- evnt.transitionParams),
-          ("<f.name>":f.returnType | /(Expr)`<VarName ref>(<{Expr ","}* _>)` := evnt, FunctionDef f <- functions.defs, "<f.name>" == "<ref>"),
           parent);
