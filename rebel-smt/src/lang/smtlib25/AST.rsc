@@ -105,6 +105,11 @@ data Formula
 
 // End of theory of Real numbers
 
+// data for the theory of String
+data Sort = string();
+
+data Literal = strVal(str s);
+
 // data for the theory of FixedSizeBitVectors
 
 data Sort 
@@ -194,7 +199,7 @@ data Option
 	;
 
 data Info
-	= custom(str name)
+	= customInfo(str name)
 	;
 
 data Attribute

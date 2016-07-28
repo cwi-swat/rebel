@@ -178,6 +178,13 @@ syntax Constructor
 	;
 // End of syntax for Algabraic Data Types
 
+// Syntax for the theory of String
+syntax Sort
+  = @category="Type" string: "String"
+  ;
+  
+syntax Literal = strVal: String s;
+// End of syntax for String
 
 syntax Logic 
 	= horn:		"HORN"
@@ -198,7 +205,7 @@ syntax Option
 	;
 
 syntax Info
-	= custom: 	":" AttributeValue name
+	= customInfo: 	":" AttributeValue name
 	;
 
 syntax Attribute

@@ -68,6 +68,7 @@ str compile(list[SortedVar] params) = ("" | "<it> (<param.name> <compile(param.s
 str compile(list[Sort] sorts) = ("" | "<it> <compile(sort)>" | sort <- sorts); 
 str compile(\int()) = "Int";
 str compile(\bool())= "Bool";
+str compile(string()) = "String";
 str compile(array(Sort idx, Sort elems))= "(Array <compile(idx)> <compile(elems)>)";
 str compile(custom(str name)) = name;
 str compile(combined(list[Sort] sorts)) = "(<compile(sorts)>)";
@@ -75,6 +76,7 @@ str compile(combined(list[Sort] sorts)) = "(<compile(sorts)>)";
 // Literals
 str compile(boolVal(b)) = b ? "True" : "False";
 str compile(intVal(i)) = "<i>";  
+str compile(strVal(s)) = "\"<s>\"";
 
 // Formula
 str compile(list[Formula] exprs) = ("" | "<it> <compile(exp)>" | exp <- exprs);

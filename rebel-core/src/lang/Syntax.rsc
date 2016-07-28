@@ -195,8 +195,8 @@ syntax DateTime
 syntax Annotations = Annotation* annos;	
 
 syntax Annotation 
-	= @category="Comment" key: "@" "key" name
-	| @category="Comment" ref: "@" "ref" name "=" FullyQualifiedName spc
+	= @category="Comment" key: "@" "key"
+	| @category="Comment" ref: "@" "ref" "=" FullyQualifiedName spc
 	| @Foldable @category="Comment" doc:"@" VarName name TagString tagString
 	;
 

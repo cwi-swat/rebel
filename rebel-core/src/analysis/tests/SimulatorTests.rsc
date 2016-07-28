@@ -29,8 +29,9 @@ void testInitializeEntity() {
         var("receiveDate", [Type]"Date", [Date]"13 Jul 2016"),
         var("amount", [Type]"Money", [Money]"EUR 60.00")
       ],
-      state(0,[])
-    );
+      imports
+    ) +
+    declareSmtSpecLookup(imports);
     
   for (c <- smt) { 
     println(compile(c));
