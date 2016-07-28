@@ -26,21 +26,21 @@ import Map;
 import IO;
 
 test bool testResolveType() =
-	resolveType([Literal]"100") == (Type)`Integer` 
-	&& resolveType([Literal]"True") == (Type)`Boolean` 
-	&& resolveType([Literal]"\"some String\"") == (Type)`String` 
-	&& resolveType([Literal]"50%") == (Type)`Percentage` 
-	&& resolveType([Literal]"1 Apr 2016") == (Type)`Date` 
-	&& resolveType([Literal]"now") == (Type)`Time` 
-	&& resolveType([Literal]"Quarter") == (Type)`Period` 
-	&& resolveType([Literal]"Quarterly") == (Type)`Frequency` 
-	&& resolveType([Literal]"EUR 100.00") == (Type)`Money` 
-	&& resolveType([Literal]"EUR") == (Type)`Currency` 
-	&& resolveType([Literal]"2 Month") == (Type)`Term` 
-	&& resolveType([Literal]"NL12INGB0001234567") == (Type)`IBAN`
+	resolveType([Expr]"100", context(root("",(),()))) == (Type)`Integer` && 
+  resolveType([Expr]"True", context(root("",(),()))) == (Type)`Boolean` &&
+	resolveType([Expr]"\"some String\"", context(root("",(),()))) == (Type)`String` && 
+	resolveType([Expr]"50%", context(root("",(),()))) == (Type)`Percentage` &&
+	resolveType([Expr]"1 Apr 2016", context(root("",(),()))) == (Type)`Date` &&
+	resolveType([Expr]"now", context(root("",(),()))) == (Type)`DateTime` &&
+	resolveType([Expr]"Quarter", context(root("",(),()))) == (Type)`Period` && 
+	resolveType([Expr]"Quarterly", context(root("",(),()))) == (Type)`Frequency` && 
+	resolveType([Expr]"EUR 100.00", context(root("",(),()))) == (Type)`Money` &&
+	resolveType([Expr]"EUR", context(root("",(),()))) == (Type)`Currency` &&
+	resolveType([Expr]"2 Month", context(root("",(),()))) == (Type)`Term` &&
+	resolveType([Expr]"NL12INGB0001234567", context(root("",(),()))) == (Type)`IBAN` 
 	;
 
-test bool testResolveSpec(loc file) {
+bool testResolveSpec(loc file) {
   Module orig = parseModule(file);
   set[Module] imports = loadImports(orig);
   Refs refs = resolve({orig} + imports);  
@@ -61,7 +61,7 @@ test bool testResolveSpec(loc file) {
       case Expr expr: {
         Type resolvedType = resolveTypeCached(expr, ctx);
         
-        if ((Type)`$$TYPE_ERROR$$` := resolvedType) {
+        if ((Type)`$$INVALID_TYPE$$` := resolvedType) {
           println("Error resolving type for <expr> in <expr@\loc>");
         }
         
@@ -70,7 +70,7 @@ test bool testResolveSpec(loc file) {
     }
   }
  
-  return /(Type)`$$TYPE_ERROR$$` !:= range(resolvedTypes);
+  return /(Type)`$$INVALID_TYPE$$` !:= range(resolvedTypes);
 }
 
 Scope buildEventScope(EventDef evnt, FunctionDefs functions, Scope parent) =
