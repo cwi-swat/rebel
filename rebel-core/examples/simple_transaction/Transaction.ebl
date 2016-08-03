@@ -1,6 +1,7 @@
 module simple_transaction.Transaction
 
 import simple_transaction.Library
+import simple_transaction.Account
 
 @doc{
 	This is a specification of a toy Transaction.
@@ -10,9 +11,9 @@ specification Transaction {
 	fields {
 		id: Integer @key
 		amount: Money
-		from: IBAN
-		to: IBAN
-		createdOn: Date
+		from: IBAN @ref=Account
+		to: IBAN @ref=Account
+		createdOn: DateTime
 		bookedOn: Date
 	}
 	

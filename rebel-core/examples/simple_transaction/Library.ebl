@@ -122,7 +122,7 @@ event start(amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
 }
 event book() {
 	preconditions {
-		this.bookOn == now;	
+		this.bookOn == now.date;	
 	}
 	sync {
 		@doc{Synchronize with the withdraw event of the from account. Can only succeed if the account is in the 'opened' state}
