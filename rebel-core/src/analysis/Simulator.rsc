@@ -16,7 +16,7 @@ data TransitionResult
 
 data Variable = var(str name, Type tipe, value val);
 data State = state(int nr, list[EntityInstance] instances);
-data EntityInstance = instance(str entityType, value id, list[Variable] vals);  
+data EntityInstance = instance(str entityType, value id, bool initialized, list[Variable] vals);  
 
 data Setup = setup(map[str, int] maxAllowedInstances);
 
@@ -36,12 +36,12 @@ TransitionResult transition(str entity, str id, str transitionToFire, list[Varia
 
 list[Command] declareSmtSpecLookup(set[Module] mods) {
   list[Command] smt =[];
-  
-  for (/Specification spc := mods) {
+
+  for (/normalized(_, _, TypeName name, _, Fields fields, _, _, _, _, _, _) := mods) {
     // lookup @key fields
-    list[Sort] sortsOfKey = [toSort(tipe) | /(FieldDecl)`<VarName _>: <Type tipe> @key` := spc.fields];
-    smt += declareFunction("spec_<spc.name>", [custom("State")] + sortsOfKey, custom("<spc.name>"));  
-    smt += declareFunction("spec_<spc.name>_initialized", [custom("<spc.name>")], \bool());
+    list[Sort] sortsOfKey = [toSort(tipe) | /(FieldDecl)`<VarName _>: <Type tipe> @key` := fields];
+    smt += declareFunction("spec_<name>", [custom("State")] + sortsOfKey, custom("<name>"));  
+    smt += declareFunction("spec_<name>_initialized", [custom("<name>")], \bool());
   }
   
   return smt;

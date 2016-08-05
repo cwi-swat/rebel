@@ -91,12 +91,13 @@ invariant positiveBalance {
 	Nonfunctionals:
 	* Happens very often; 1 in 3 events is of this type
 }
-event start(amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
+event start(id: Integer, amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
 	preconditions {
 		@doc{From account must exist.}
 		initialized Account[from];
 		@doc{To account must exist.}
 		initialized Account[to];
+		
 		amount > EUR 0.00;
 	}
 	postconditions {

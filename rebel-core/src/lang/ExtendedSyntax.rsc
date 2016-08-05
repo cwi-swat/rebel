@@ -16,7 +16,7 @@ module lang::ExtendedSyntax
 extend lang::Syntax;
 
 syntax Specification = 
-	Annotations annos SpecModifier? modifier "specification" TypeName name Extend? extend "{" Fields fields FunctionDefs functions EventRefs eventRefs EventDefs events InvariantRefs invariantRefs InvariantDefs invariants LifeCycle lifeCycle "}";
+	normalized: Annotations annos SpecModifier? modifier "specification" TypeName name Extend? extend "{" Fields fields FunctionDefs functions EventRefs eventRefs EventDefs events InvariantRefs invariantRefs InvariantDefs invariants LifeCycle lifeCycle "}";
 	
 syntax StateFrom =
 	Int nr ":" LifeCycleModifier? mod VarName from StateTo* destinations; 

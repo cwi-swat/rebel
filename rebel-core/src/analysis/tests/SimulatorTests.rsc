@@ -15,13 +15,20 @@ import lang::smtlib25::AST;
 import IO;
 
 void testInitializeEntity() {
-  Module spc = parseModule(|project://ing-specs/src/booking/sepa/ct/OnUsCreditTransfer.ebl|);
-  set[Module] imports = loadImports(spc);
-  Refs refs = resolve({spc} + imports);
-  Module normalizedSpc = normalize(spc, imports, refs);
+  Module spc = parseModule(|project://rebel-core/examples/simple_transaction/Transaction.ebl|);
   
-  list[Command] smt = declareSmtTypes(normalizedSpc + imports) +
-    declareSmtVariables("<normalizedSpc.spec.name>", 
+  set[Module] imports = loadImports(spc);
+  
+  for (/Specification spc := imports + spc) {
+    println(spc.name);
+  }
+  
+  Refs refs = resolve({spc} + imports);
+  
+  set[Module] normalizedSpecs = normalizeAllSpecs(imports + spc, refs);
+  
+  list[Command] smt = declareSmtTypes(normalizedSpecs) +
+    declareSmtVariables("Transaction", 
       "create", [
         var("ordering", [Type]"IBAN", [IBAN]"NL34INGB0000000001"),
         var("beneficiary", [Type]"IBAN", [IBAN]"NL34INGB0000000002"),
@@ -31,7 +38,7 @@ void testInitializeEntity() {
       ],
       imports
     ) +
-    declareSmtSpecLookup(imports);
+    declareSmtSpecLookup(normalizedSpecs);
     
   for (c <- smt) { 
     println(compile(c));
@@ -49,3 +56,12 @@ void testInitializeEntity() {
   //  normalizedSpc + imports
   //); 
 }
+
+set[Module] normalizeAllSpecs(set[Module] mods, Refs refs) =
+  {normalize(m, mods, refs) | Module m <- mods, /Specification spc := m, canBeNormalized(spc), bprintln("Normalizing <spc.name>")};
+
+bool canBeNormalized(Specification spc) = true 
+  when /(SpecModifier)`abstract` !:= spc,
+       /(SpecModifier)`external` !:= spc; 
+
+default bool canBeNormalized(Specification _) = false;

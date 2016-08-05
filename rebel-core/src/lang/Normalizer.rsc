@@ -239,8 +239,8 @@ set[EventDef] createEventMapping(set[EventDef] events) {
 			};
 		} else {
 			e = visit(e) {
-				case (EventDef)	`event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
-					(EventDef)	`event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
+				case (EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
+					(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
 								'  <Preconditions? pre> 
 								'  postconditions {
 								'    <Statement labeledEvent>
@@ -305,8 +305,8 @@ set[EventDef] desugarStates(set[EventDef] events, set[StateFrom] states) {
 
 	Statement createInlinedPostconditionLifeCycleStatement(EventDef e) = [Statement] "new this._state == _toState;";
 
-	EventDef addTransitionToParam((EventDef) `event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* origParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }`) =
-		(EventDef)	`event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* origParams>, <Parameter transitionParam>) {
+	EventDef addTransitionToParam((EventDef) `<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* origParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }`) =
+		(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* origParams>, <Parameter transitionParam>) {
 					'  <Preconditions? pre>
 					'  <Postconditions? post>
 					'  <SyncBlock? sync>
@@ -328,8 +328,8 @@ set[EventDef] desugarStates(set[EventDef] events, set[StateFrom] states) {
 			} 	 
 		} else {
 			e = visit(e) {
-				case (EventDef)	`event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
-					(EventDef)	`event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
+				case (EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
+					(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
 								'  preconditions {
 								'    <Statement inlinedLifeCycle>
 								'  } 
@@ -351,8 +351,8 @@ set[EventDef] desugarStates(set[EventDef] events, set[StateFrom] states) {
 			}	
 		} else {
 			e = visit(e) {
-				case (EventDef)	`event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
-					(EventDef)	`event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
+				case (EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
+					(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
 								'  <Preconditions? pre>
 								'  postconditions {
 								'    <Statement inlinedLifeCycle>

@@ -54,7 +54,8 @@ syntax InvariantDef = Annotations annos "invariant" FullyQualifiedVarName name "
 
 // Specification rules
 
-syntax Specification = Annotations annos SpecModifier? modifier "specification" TypeName name Extend? extend "{" Fields? fields EventRefs? events InvariantRefs? invariants LifeCycle? lifeCycle "}";
+syntax Specification = 
+  spec:Annotations annos SpecModifier? modifier "specification" TypeName name Extend? extend "{" Fields? fields EventRefs? events InvariantRefs? invariants LifeCycle? lifeCycle "}";
 
 syntax Extend = "extends" FullyQualifiedName parent;
 
