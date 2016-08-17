@@ -77,26 +77,31 @@ str compile(combined(list[Sort] sorts)) = "(<compile(sorts)>)";
 str compile(boolVal(b)) = b ? "True" : "False";
 str compile(intVal(i)) = "<i>";  
 str compile(strVal(s)) = "\"<s>\"";
+str compile(adt(str consName, list[Formula] vals)) = "(<consName> <intercalate(" ", [compile(f) | Formula f <- vals])>)";
 
 // Formula
 str compile(list[Formula] exprs) = ("" | "<it> <compile(exp)>" | exp <- exprs);
-str compile(var(name)) = "<name>";
+str compile(var(name)) = "<compile(name)>";
 str compile(lit(lit)) = compile(lit);
-str compile(functionCall(functionName, params)) = "(<functionName> <("" | "<it> <compile(param)>" | param <- params)>)";
+str compile(functionCall(functionName, params)) = "(<compile(functionName)> <("" | "<it> <compile(param)>" | param <- params)>)";
 str compile(forall(vars, term)) = "(forall (<compile(vars)>) <compile(term)>)";
 str compile(exists(vars, term)) = "(exists (<compile(vars)>) <compile(term)>)";
 str compile(attributed(term, attributes)) = "(! <compile(term)> <compile(attributes)>)";
 
 str compile(cons(str name, list[Formula] values)) = "(<name> <intercalate(" ", [compile(val) | val <- values])>)";
  
+// QualifiedId
+str compile(as(str name, Sort sort)) = "(as <name> <compile(sort)>)";
+str compile(simple(str name)) = name;
+ 
 // From core
 str compile(\not(val)) = "(not <compile(val)>)";
 str compile(implies(lhs, rhs)) = "(=\> <compile(lhs)> <compile(rhs)>)";
-str compile(and(lhs, rhs)) = "(and <compile(lhs)> <compile(rhs)>)";
-str compile(or(lhs, rhs)) = "(or <compile(lhs)> <compile(rhs)>)";
-str compile(xor(lhs, rhs)) = "(xor <compile(lhs)> <compile(rhs)>)";
+str compile(and(list[Formula] clauses)) = "(and <intercalate(" ", [compile(c) | c <- clauses])>)";
+str compile(or(list[Formula] clauses)) = "(or <intercalate(" ", [compile(c) | c <- clauses])>)";
+str compile(xor(list[Formula] clauses)) = "(xor <intercalate(" ", [compile(c) | c <- clauses])>)";
 str compile(eq(lhs, rhs)) = "(= <compile(lhs)> <compile(rhs)>)";
-str compile(distinct(lhs, rhs)) = "(distinct <compile(lhs)> <compile(rhs)>)";
+str compile(distinct(list[Formula] clauses)) = "(distinct <intercalate(" ", [compile(c) | c <- clauses])>)";
 str compile(ite(condition, whenTrue, whenFalse)) = "(ite <compile(condition)> <compile(whenTrue)> <compile(whenFalse)>)";   
 
 // From ints

@@ -98,6 +98,9 @@ event start(id: Integer, amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
 		@doc{To account must exist.}
 		initialized Account[to];
 		
+		@doc{From and to account should differ}
+		to != from;
+		
 		amount > EUR 0.00;
 	}
 	postconditions {

@@ -197,9 +197,9 @@ private set[JsExternalMachine] processExternalMachines(EventDef evnt, Module inl
 	
 private set[JsTransition] processLinksToExternalMachines(str id, EventDef evnt) {
 	set[JsTransition] result = 
-		{jsTransToExternal(id, "<specName>", "<syncedEvnt>") | /(Expr)`<FullyQualifiedName specName>.<VarName syncedEvnt>(<{Expr ","}* _>)` := evnt} +
-		{jsTransToExternal(id, "<specName>", "<syncedEvnt>") | /(Expr)`<FullyQualifiedName specName>[<Expr _>].<VarName syncedEvnt>(<{Expr ","}* _>)` := evnt} +
-		{jsTransToExternal(id, "<specName>") | /(Parameter)`<VarName name> : <TypeName specName>` := evnt.transitionParams};
+		{jsTransToExternal(id, "<specName>", "<syncedEvnt>") | /(SyncStatement)`<Annotations _> <TypeName specName>[<Expr _>].<VarName syncedEvnt>(<{Expr ","}* params>);` := evnt} +
+		{jsTransToExternal(id, "<specName>", "<syncedEvnt>") | /(SyncStatement)`<Annotations _> not <TypeName specName>[<Expr _>].<VarName syncedEvnt>(<{Expr ","}* params>);` := evnt} +
+		{jsTransToExternal(id, "<specName>") | /(Expr)`initialized <TypeName specName>[<Expr _>]` := evnt};
 	
 	result += {jsTransToExternal(id, "<specName>") | /(Expr)`<FullyQualifiedName specName>` := evnt, /jsTransToExternal(_,"<specName>",_) !:= result};
 	
@@ -225,7 +225,14 @@ private default JsState processState((StateFrom)`<LifeCycleModifier? _> <VarName
 
 private list[JsStatement] processPreconditions(EventDef e) = [processToText(stat) | /Statement stat := e.pre];
 private list[JsStatement] processPostconditions(EventDef e) = [processToText(stat) | /Statement stat := e.post];
-private list[JsStatement] processSyncBlock(EventDef e) = [processToText(stat) | /Statement stat := e.sync];
+private list[JsStatement] processSyncBlock(EventDef e) = [processToText(stat) | /SyncStatement stat := e.sync];
+
+private JsStatement processToText((SyncStatement)`@doc<TagString doc> <TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>);`) =
+  jsDocAndCode("<doc.contents>", "<specName>[<id>].<event>(<params>)");
+
+private JsStatement processToText((SyncStatement)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>);`) =
+  jsCodeOnly("<specName>[<id>].<event>(<params>)");
+
 
 private JsStatement processToText((Statement)`@doc <TagString doc> <Expr e>;`) = jsDocAndCode("<doc.contents>", "<e>");
 private default JsStatement processToText(Statement stat) = jsCodeOnly("<stat>");

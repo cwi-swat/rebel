@@ -177,7 +177,12 @@ data DataTypeDefinition
 data Constructor
 	= cons(str name)
 	| combinedCons(str name, list[SortedVar] vars)
-	;
+  ;
+
+data Literal
+  = adt(str consName, list[Formula] vals)
+  ; 
+
 // End of syntax for Algabraic Data Types
 
 data Logic 

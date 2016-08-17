@@ -82,7 +82,7 @@ syntax Parameter = VarName name ":" Type tipe DefaultValue? defaultValue;
 syntax DefaultValue = "=" Expr val;
 
 syntax SyncStatement
-  = Annotations? doc "not"? TypeName specName "[" Expr id "]" "." VarName event "(" {Expr ","}* params ")" ";"
+  = Annotations doc "not"? TypeName specName "[" Expr id "]" "." VarName event "(" {Expr ","}* params ")" ";"
   ;
 
 syntax Statement  
