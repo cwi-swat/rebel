@@ -8,12 +8,11 @@ import simple_transaction.Account
 	Nonfunctionals:
 	* Happens rarely; 1 in 50  events is of this type
 }
-event openAccount(accountNumber: IBAN, initialDeposit: Money) {
+event openAccount(initialDeposit: Money) {
 	preconditions {
 		initialDeposit >= EUR 0.00;
 	}
 	postconditions {
-		new this.accountNumber == accountNumber;
 		new this.balance == initialDeposit;
 	} 
 }
@@ -91,7 +90,7 @@ invariant positiveBalance {
 	Nonfunctionals:
 	* Happens very often; 1 in 3 events is of this type
 }
-event start(id: Integer, amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
+event start(amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
 	preconditions {
 		@doc{From account must exist.}
 		initialized Account[from];
@@ -101,7 +100,7 @@ event start(id: Integer, amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
 		@doc{From and to account should differ}
 		to != from;
 		
-		amount > EUR 0.00;
+		amount.amount > EUR 0.00;
 	}
 	postconditions {
 		new this.amount == amount;
@@ -111,7 +110,7 @@ event start(id: Integer, amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
 		@doc{The created on date is set to the current date}
 		new this.createdOn == now;
 		
-		new this.bookOn == bookOn;
+		new this.bookedOn == bookOn;
 	}
 }
 

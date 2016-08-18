@@ -15,12 +15,12 @@ data TransitionResult
 	= failed(str reason)
 	| successful(State new)
 	;
+	
+data Context = ctx(str spec, str event);
 
 data Variable = var(str name, Type tipe, value val);
-data EntityInstance = instance(str entityType, list[lang::Syntax::Literal] id, bool initialized, list[Variable] vals);  
+data EntityInstance = instance(str entityType, list[lang::Syntax::Literal] id, list[Variable] vals);  
 data State = state(int nr, DateTime now, list[EntityInstance] instances);
-
-data Setup = setup(map[str, int] maxAllowedInstances);
 
 TransitionResult initialize(str entity, str transitionToFire, list[Variable] transitionParams, State current, set[Module] spcs) {  
   list[Command] smt = declareSmtTypes(spcs) + 
@@ -37,13 +37,17 @@ TransitionResult transition(str entity, str id, str transitionToFire, list[Varia
 }  
 
 list[Command] declareSmtSpecLookup(set[Module] mods) {
-  list[Command] smt =[];
+  list[Command] smt = [];
 
-  for (/normalized(_, _, TypeName name, _, Fields fields, _, _, _, _, _, _) := mods) {
+  for (/normalized(_, _, TypeName name, _, Fields fields, _, _, _, _, _, LifeCycle lc) := mods) {
     // lookup @key fields
-    list[Sort] sortsOfKey = [toSort(tipe) | /(FieldDecl)`<VarName _>: <Type tipe> @key` := fields];
+    list[Sort] sortsOfKey = [translateSort(tipe) | /(FieldDecl)`<VarName _>: <Type tipe> @key` := fields];
+    
     smt += declareFunction("spec_<name>", [custom("State")] + sortsOfKey, custom("<name>"));  
-    smt += declareFunction("spec_<name>_initialized", [custom("<name>")], \bool());
+    // define the initialized function
+    // 1. get all the states nr's which represent initialized states
+    set[int] initializedStateNrs = {toInt("<sf.nr>") | /StateFrom sf := lc, /(LifeCycleModifier)`initial` !:= sf};
+    smt += defineFunction("spec_<name>_initialized", [sortedVar("entity", custom("<name>"))], \bool(), \or([eq(functionCall(simple("field_<name>__state"), [var(simple("entity"))]), lit(intVal(nr))) | int nr <- initializedStateNrs]));
   }
   
   return smt;
@@ -64,9 +68,9 @@ list[Command] declareSmtTypes(set[Module] specs) {
 
 list[Command] declareSmtVariables(str entity, str transitionToFire, list[Variable] transitionParams, set[Module] spcs) {
   // declare functions for all entity fields
-  list[Command] smt = [declareFunction("field_<spc.name>_<f.name>", [custom("<spc.name>")], toSort(f.tipe)) | /Specification spc := spcs, /FieldDecl f := spc.fields];
+  list[Command] smt = [declareFunction("field_<spc.name>_<f.name>", [custom("<spc.name>")], translateSort(f.tipe)) | /Specification spc := spcs, /FieldDecl f := spc.fields];
   
-  smt += [declareFunction("eventParam_<entity>_<transitionToFire>_<v.name>", [custom("State")], toSort(v.tipe)) | Variable v <- transitionParams];
+  smt += [declareFunction("eventParam_<entity>_<transitionToFire>_<v.name>", [custom("State")], translateSort(v.tipe)) | Variable v <- transitionParams];
   
   return smt; 
 }
@@ -76,116 +80,126 @@ list[Command] translateState(State state) {
   list[Command] smt = [declareConst("current", custom("State")), declareConst("next", custom("State"))];
   
   // Assert the current value for 'now'
-  smt += [declareFunction("now", [custom("State")], custom("DateTime")), \assert(eq(functionCall(simple("now"), [var(simple("current"))]), lit(toLit(state.now))))];
-  
-  // Add whether the entities are initialized or not
-  smt += [\assert(not(functionCall(simple("spec_<ei.entityType>_initialized"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("current")), *[lit(toLit(i)) | lang::Syntax::Literal i <- ei.id]])]))) | EntityInstance ei <- state.instances, !ei.initialized] + 
-         [\assert(functionCall(simple("spec_<ei.entityType>_initialized"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("current")), *[lit(toLit(i)) | lang::Syntax::Literal i <- ei.id]])])) | EntityInstance ei <- state.instances, ei.initialized];;
-  
+  smt += [declareFunction("now", [custom("State")], custom("DateTime")), \assert(eq(functionCall(simple("now"), [var(simple("next"))]), translateLit(state.now)))];
+    
   // Assert all the current values of the entities
-  smt += [\assert(eq(functionCall(simple("field_<ei.entityType>_<v.name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("current")), *[lit(toLit(i)) | lang::Syntax::Literal i <- ei.id]])]), lit(toLit(v.val)))) | EntityInstance ei <- state.instances, ei.initialized, Variable v <- ei. vals];
+  smt += [\assert(eq(functionCall(simple("field_<ei.entityType>_<v.name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("current")), *[translateLit(i) | lang::Syntax::Literal i <- ei.id]])]), translateLit(v.val))) | EntityInstance ei <- state.instances, Variable v <- ei. vals];
   
   return smt; 
 }
 
 list[Command] translateTransitionParams(str entity, str transitionToFire, list[Variable] params) =
-  [\assert(eq(functionCall(simple("eventParam_<entity>_<transitionToFire>_<p.name>"), [var(simple("next"))]), lit(toLit(p.val)))) | Variable p <- params]; 
+  [\assert(eq(functionCall(simple("eventParam_<entity>_<transitionToFire>_<p.name>"), [var(simple("next"))]), translateLit(p.val))) | Variable p <- params]; 
 
-list[Command] translateEventToSingleAsserts(EventDef evnt) {
-  return [];
+list[Command] translateEventToSingleAsserts(str entity, EventDef evnt) {
+  return [\assert(translateStat(s, ctx(entity, "<evnt.name>"))) | /Statement s := evnt] +
+         [\assert(translateSyncStat(s, ctx(entity, "<evnt.name>"))) | /SyncStatement s := evnt];
 }
 
-Formula translateStat((Statement)`(<Statement s>)`) = translateStat(s);
-Formula translateStat((Statement)`<Annotations _> <Expr e>;`) = translateExp(e);
+Formula translateSyncStat(SyncStatement s, Context ctx) = lit(boolVal(true()));
 
-Formula translateExpr((Expr)`this.<VarName field>`) = field;
-Formula translateExpr((Expr)`<Expr expr>.<VarName field>`) = field;
+Formula translateStat((Statement)`(<Statement s>)`, Context ctx) = translateStat(s, ctx);
+Formula translateStat((Statement)`<Annotations _> <Expr e>;`, Context ctx) = translateExpr(e, ctx);
 
-Formula translateExpr((Expr)`(<Expr e>)`) = translateExpr(e);
-Formula translateExpr((Expr)`<Literal l>`) = lit(translateLit(l));
-Formula translateExpr((Expr)`<Ref r>`) = var(simple("<ref>"));
-Formula translateExpr((Expr)`<VarName function>(<{Expr ","}* params>)`) = functionCall(simple("<function>"), [translateExpr(p) | Expr p <- params]);
-Formula translateExpr((Expr)`<Expr lhs>.<VarName field>`) = functionCall(simple("<field>"), [translateExpr(lhs)]); 
- 
-  //| "{" Expr lower ".." Expr upper"}"
-  //| left Expr var!accessor "[" Expr indx "]"
+Formula translateExpr((Expr)`new <Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<spc>"), [var(simple("next")), translateExpr(id, ctx)]);
+Formula translateExpr((Expr)`new <Expr spc>[<Expr id>].<VarName field>`, Context ctx) = functionCall(simple("field_<ctx.spec>_<field>"), [functionCall(simple("spec_<spc>"), [var(simple("next")), translateExpr(id, ctx)])]);
+
+Formula translateExpr((Expr)`<Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<spc>"), [var(simple("current")), translateExpr(id, ctx)]);
+Formula translateExpr((Expr)`<Expr spc>[<Expr id>].<VarName field>`, Context ctx) = functionCall(simple("field_<ctx.spec>_<field>"), [functionCall(simple("spec_<spc>"), [var(simple("current")), translateExpr(id, ctx)])]);
+
+Formula translateExpr((Expr)`initialized <Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<spc>_initialized"), [translateExpr((Expr)`<Expr spc>[<Expr id>]`, ctx)]); 
+
+Formula translateExpr((Expr)`<Expr lhs>.<VarName field>`, Context ctx) = functionCall(simple("<field>"), [translateExpr(lhs, ctx)]); 
+
+Formula translateExpr((Expr)`(<Expr e>)`, Context ctx) = translateExpr(e, ctx);
+
+Formula translateExpr((Expr)`<Literal l>`, Context ctx) = translateLit(l);
+Formula translateExpr((Expr)`<Ref r>`, Context ctx) = functionCall(simple("eventParam_<ctx.spec>_<ctx.event>_<r>"), [var(simple("next"))]);
+Formula translateExpr((Expr)`<VarName function>(<{Expr ","}* params>)`, Context ctx) = functionCall(simple("<function>"), [translateExpr(p, ctx) | Expr p <- params]);
+
+Formula translateExpr((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = add(translateExpr(lhs, ctx), tranlsateExpr(rhs, ctx));
+Formula translateExpr((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = sub(translateExpr(lhs, ctx), tranlsateExpr(rhs, ctx));
+Formula translateExpr((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = mul(translateExpr(lhs, ctx), tranlsateExpr(rhs, ctx));
+Formula translateExpr((Expr)`<Expr lhs> / <Expr rhs>`, Context ctx) = div(translateExpr(lhs, ctx), tranlsateExpr(rhs, ctx));
+Formula translateExpr((Expr)`<Expr lhs> % <Expr rhs>`, Context ctx) = \mod(translateExpr(lhs, ctx), tranlsateExpr(rhs, ctx));
+
+Formula translateExpr((Expr)`-<Expr expr>`, Context ctx) = neg(translateExpr(expr, ctx));
+
+Formula translateExpr((Expr)`not <Expr expr>`, Context ctx) = not(translateExpr(expr, ctx));
+Formula translateExpr((Expr)`<Expr lhs> \< <Expr rhs>`, Context ctx) = lt(translateExpr(lhs, ctx), tranlsateExpr(rhs, ctx));
+Formula translateExpr((Expr)`<Expr lhs> \<= <Expr rhs>`, Context ctx) = lte(translateExpr(lhs, ctx), translateExpr(rhs, ctx));
+Formula translateExpr((Expr)`<Expr lhs> \> <Expr rhs>`, Context ctx) = gt(translateExpr(lhs, ctx), translateExpr(rhs, ctx));
+Formula translateExpr((Expr)`<Expr lhs> \>= <Expr rhs>`, Context ctx) = gte(translateExpr(lhs, ctx), translateExpr(rhs, ctx));
+
+Formula translateExpr((Expr)`<Expr lhs> == <Expr rhs>`, Context ctx) = eq(translateExpr(lhs, ctx), translateExpr(rhs, ctx));
+Formula translateExpr((Expr)`<Expr lhs> != <Expr rhs>`, Context ctx) = not(eq(translateExpr(lhs, ctx), translateExpr(rhs, ctx)));
+
+Formula translateExpr((Expr)`<Expr lhs> && <Expr rhs>`, Context ctx) = and([translateExpr(lhs, ctx), translateExpr(rhs, ctx)]);
+Formula translateExpr((Expr)`<Expr lhs> || <Expr rhs>`, Context ctx) = or([translateExpr(lhs, ctx), translateExpr(rhs, ctx)]);
+
+  //| "{" Expr lower ".." Expr upper"}"   
   //| "(" {MapElement ","}* mapElems ")"
   //| staticSet: "{" {Expr ","}* setElems "}"
   //| "{" Expr elem "|" Expr loopVar "\<-" Expr set "}"
   //| "{" Expr init "|" Statement reducer "|" Expr loopVar "\<-" Expr set "}" 
-  //> new: "new" Expr expr
-  //| "not" Expr expr
-  //| "-" Expr
-  //> left  ( Expr lhs "*" Expr rhs
-  //    | isMember: Expr lhs "in" Expr rhs
-  //    | Expr lhs "/" Expr rhs
-  //    | Expr lhs "%" Expr rhs
-  //    )
-  //> left  ( Expr lhs "+" Expr rhs
-  //    | subtract: Expr lhs "-" Expr rhs
-  //    )
-  //> non-assoc ( smallerThan: Expr lhs "\<" Expr rhs
-  //    | smallerThanEquals: Expr lhs "\<=" Expr rhs
-  //    | greaterThan: Expr lhs "\>" Expr rhs
-  //    | greaterThanEquals: Expr lhs "\>=" Expr rhs
-  //    | equals: Expr lhs "==" Expr rhs
-  //    | notEqual: Expr lhs "!=" Expr rhs
-  //    )
-  //> left and: Expr lhs "&&" Expr rhs
-  //> left Expr lhs "||" Expr rhs
+  //| isMember: Expr lhs "in" Expr rhs
   //> right ( Expr cond "?" Expr whenTrue ":" Expr whenFalse
   //  | Expr cond "-\>" Expr implication
-  //  )
-  //| "initialized" Expr
   //| "finalized" Expr
   //| Expr lhs "instate" Expr rhs
-Sort toSort((Type)`Currency`) = \int();
-Sort toSort((Type)`Date`) = custom("Date");
-Sort toSort((Type)`Time`) = custom("Time");
-Sort toSort((Type)`DateTime`) = custom("DateTime");
-Sort toSort((Type)`IBAN`) = custom("IBAN");
-Sort toSort((Type)`Money`) = custom("Money");
-Sort toSort((Type)`Integer`) = \int();
-Sort toSort((Type)`Frequency`) = \int();
-default Sort toSort(Type t) { throw "Sort conversion for <t> not yet implemented"; }
+  
+default Formula translateExpr(Expr exp, Context ctx) { throw "Translation for expr \'<exp>\' not yet implemented"; }
+  
+Sort translateSort((Type)`Currency`) = \int();
+Sort translateSort((Type)`Date`) = custom("Date");
+Sort translateSort((Type)`Time`) = custom("Time");
+Sort translateSort((Type)`DateTime`) = custom("DateTime");
+Sort translateSort((Type)`IBAN`) = custom("IBAN");
+Sort translateSort((Type)`Money`) = custom("Money");
+Sort translateSort((Type)`Integer`) = \int();
+Sort translateSort((Type)`Frequency`) = \int();
+default Sort translateSort(Type t) { throw "Sort conversion for <t> not yet implemented"; }
 
-Literal toLit(value v) = toLit(l) when lang::Syntax::Literal l := v;
+Formula translateLit(value v) = translateLit(l) when lang::Syntax::Literal l := v;
 
-Literal toLit((Literal)`<Int i>`) = toLit(i);
-Literal toLit((Literal)`<IBAN i>`) = toLit(i);
+Formula translateLit((Literal)`<Int i>`) = translateLit(i);
+Formula translateLit((Literal)`<IBAN i>`) = translateLit(i);
 
-Literal toLit((Literal)`<Money m>`) = toLit(m);
+Formula translateLit((Literal)`<Money m>`) = functionCall(simple("amount"), [translateLit(m)]);
+Formula translateLit((Literal)`<DateTime tm>`) = translateLit(tm);
 
-Literal toLit(Money m) = adt("consMoney", [strVal("<m.cur>"), toLit(m.amount)]);
-Literal toLit(MoneyAmount ma) = intVal(toInt("<ma.whole>") * 100 + toInt("<ma.decimals>"));
+Formula translateLit(Money m) = lit(adt("consMoney", [lit(strVal("<m.cur>")), translateLit(m.amount)]));
+Formula translateLit(MoneyAmount ma) = lit(intVal(toInt("<ma.whole>") * 100 + toInt("<ma.decimals>")));
 
-Literal toLit(DateTime dt) = adt("consDateTime", [toLit(dt.date), toLit(dt.time)]);
-Literal toLit(Date d) = adt("consDate", [toLit(d.day), toLit(d.month),toLit(year)]) when d has year, /Int year := d.year;
-Literal toLit(Date d) = adt("consDate", [toLit(d.day), toLit(d.month), toLit(0)]) when !(d has year); 
-Literal toLit(Time t) = adt("consTime", [toLit(toInt("<t.hour>")), toLit(toInt("<t.minutes>")), toLit(toInt("<sec>"))]) when t has sewconds, /Int sec := t.seconds; 
-Literal toLit(Time t) = adt("consTime", [toLit(toInt("<t.hour>")), toLit(toInt("<t.minutes>")), toLit(0)]) when !(t has seconds) ; 
-Literal toLit(IBAN i) = adt("consIBAN", [toLit("<i.countryCode>"), toLit(toInt("<i.checksum>")), toLit("<i.accountNumber>")]);
+Formula translateLit((DateTime)`now`) = functionCall(simple("now"), [var(simple("next"))]);
+Formula translateLit(DateTime dt) = lit(adt("consDateTime", [translateLit(dt.date), translateLit(dt.time)]));
 
-Literal toLit((Month)`Jan`) = intVal(1); 
-Literal toLit((Month)`Feb`) = intVal(2);
-Literal toLit((Month)`Mar`) = intVal(3);
-Literal toLit((Month)`Apr`) = intVal(4);
-Literal toLit((Month)`May`) = intVal(5);
-Literal toLit((Month)`Jun`) = intVal(6); 
-Literal toLit((Month)`Jul`) = intVal(7);
-Literal toLit((Month)`Aug`) = intVal(8);
-Literal toLit((Month)`Sep`) = intVal(9);
-Literal toLit((Month)`Oct`) = intVal(10);
-Literal toLit((Month)`Nov`) = intVal(11);
-Literal toLit((Month)`Dec`) = intVal(12);
+Formula translateLit(Date d) = lit(adt("consDate", [translateLit(d.day), translateLit(d.month),translateLit(year)])) when d has year, /Int year := d.year;
+Formula translateLit(Date d) = lit(adt("consDate", [translateLit(d.day), translateLit(d.month), translateLit(0)])) when !(d has year); 
+Formula translateLit(Time t) = lit(adt("consTime", [translateLit(toInt("<t.hour>")), translateLit(toInt("<t.minutes>")), translateLit(toInt("<sec>"))])) when t has sewconds, /Int sec := t.seconds; 
+Formula translateLit(Time t) = lit(adt("consTime", [translateLit(toInt("<t.hour>")), translateLit(toInt("<t.minutes>")), translateLit(0)])) when !(t has seconds) ; 
+Formula translateLit(IBAN i) = lit(adt("consIBAN", [translateLit("<i.countryCode>"), translateLit(toInt("<i.checksum>")), translateLit("<i.accountNumber>")]));
 
-Literal toLit(Int i) = intVal(toInt("<i>"));
-Literal toLit(int i) = intVal(i);
+Formula translateLit((Month)`Jan`) = lit(intVal(1)); 
+Formula translateLit((Month)`Feb`) = lit(intVal(2));
+Formula translateLit((Month)`Mar`) = lit(intVal(3));
+Formula translateLit((Month)`Apr`) = lit(intVal(4));
+Formula translateLit((Month)`May`) = lit(intVal(5));
+Formula translateLit((Month)`Jun`) = lit(intVal(6)); 
+Formula translateLit((Month)`Jul`) = lit(intVal(7));
+Formula translateLit((Month)`Aug`) = lit(intVal(8));
+Formula translateLit((Month)`Sep`) = lit(intVal(9));
+Formula translateLit((Month)`Oct`) = lit(intVal(10));
+Formula translateLit((Month)`Nov`) = lit(intVal(11));
+Formula translateLit((Month)`Dec`) = lit(intVal(12));
 
-Literal toLit(String s) = strVal("<s>");
-Literal toLit(str s) = strVal(s);
+Formula translateLit(Int i) = lit(intVal(toInt("<i>")));
+Formula translateLit(int i) = lit(intVal(i));
 
-default Literal toLit(value l) { throw "toLit(..) not implemented for <l>"; }
+Formula translateLit(String s) = lit(strVal("<s>"));
+Formula translateLit(str s) = lit(strVal(s));
+
+default Literal translateLit(value l) { throw "translateLit(..) not implemented for <l>"; }
 
 list[Command] declareRebelTypesAsSmtSorts() {   
   set[tuple[str,Sort]] rebelTypes = {<"Currency", \int()>,

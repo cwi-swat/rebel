@@ -74,7 +74,7 @@ str compile(custom(str name)) = name;
 str compile(combined(list[Sort] sorts)) = "(<compile(sorts)>)";
 
 // Literals
-str compile(boolVal(b)) = b ? "True" : "False";
+str compile(boolVal(b)) = b ? "true" : "false";
 str compile(intVal(i)) = "<i>";  
 str compile(strVal(s)) = "\"<s>\"";
 str compile(adt(str consName, list[Formula] vals)) = "(<consName> <intercalate(" ", [compile(f) | Formula f <- vals])>)";
