@@ -20,13 +20,18 @@ import ParseTree;
 import util::Maybe;
 import List;
 import IO;
+import Set;
 
-Module flatten(Module current, set[Module] imports) {
-	set[Module] parents = findParents(current, imports);
+import Message;
+
+alias FlattenerResult = tuple[set[Message] msgs, Module flattenedModule];
+
+FlattenerResult flatten(Module current, set[Module] imports) {
+	tuple[set[Message], set[Module]] parents = findParents(current, imports);
 	
-	set[Import] allImports = {imp | /Import imp := parents + current}; 
+	set[Import] allImports = {imp | /Import imp := parents<1>}; 
 	
-	return visit(current) {
+	Module flattenedMod = visit(current) {
 		case m:(Module)`<ModuleDef modDef> <Import* _> <Specification spec>` => 
 			mergedImports
 			when 
@@ -45,22 +50,27 @@ Module flatten(Module current, set[Module] imports) {
 				InvariantRefs mergedInvariantRefs := (initInvariantRefs(invariants) | mergeInvariantRefs(it, inv) | /InvariantRefs ir := parents, /FullyQualifiedVarName inv := ir),
 				LifeCycle mergedLifeCycle := (initLifeCycle(lifeCycle) | mergeLifeCycle(it, from) | /StateFrom* from := parents)
  	};
-			
+
+  return <parents<0>,flattenedMod>; 			
 }
 
-set[Module] findParents(Module current, set[Module] modules) {
+tuple[set[Message] msgs, set[Module] parents] findParents(Module current, set[Module] modules) {
 	if (/Extend ext := current) {
-		for(/Import imp := current, "<imp.fqn.modName>" == "<ext.parent>") {
-			
-			for(m <- modules, "<m.modDef.fqn>" == "<imp.fqn>") {
-				return {m} + findParents(m, modules);
-			}
-			
-			return {};
-			
-		}
+    list[Import] importsWithDef = [imp | Import imp <- current.imports, "<imp.fqn.modName>" == "<ext.parent>"];
+    
+    if (importsWithDef == []) {
+      return <{error("Extended specification can not be found in imports", ext.parent@\loc)}, {}>;
+    } else if (size(importsWithDef) > 1) {
+      return <{error("Multiple modules of extended specification type in import", ext.parent@\loc)}, {}>;
+    }
+    
+    list[Module] modsWithDef = [m | Module m <- modules, "<m.modDef.fqn>" == "<importsWithDef[0].fqn>"];
+    if (size(modsWithDef) != 1) { throw "Somehow the imported extended specification can not be found while the importer could find it..."; }
+    
+    parents = findParents(modsWithDef[0], modules);
+		return <parents<0>, current + parents<1>>;
 	} else {
-		return {};
+		return <{}, {current}>;
 	}
 }
 

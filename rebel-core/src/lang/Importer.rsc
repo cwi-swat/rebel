@@ -19,25 +19,32 @@ import lang::Parser;
 import String;
 import IO;
 import List;
-
+import Message;
 import ParseTree;
 
-set[Module] loadImports(Module m) = loadImports(m, {}, resolveBaseDir(m));
+alias ImporterResult = tuple[set[Message] msgs, set[Module] mods]; 
 
-private set[Module] loadImports(Module m, set[str] imported, loc baseDir) {
+ImporterResult loadImports(Module m) = loadImports(m, {}, resolveBaseDir(m));
+
+private ImporterResult loadImports(Module m, set[str] imported, loc baseDir) {
+	set[Message] msgs = {};
 	set[Module] importedModules = {m};
 		
 	for (imp <- m.imports, "<imp.fqn>" notin imported) {
 		try {	
 			Module current = parseModule(findFile(imp.fqn, baseDir));
 			imported += "<current.modDef.fqn>";
-			importedModules += loadImports(current, imported, baseDir);
+			
+			result = loadImports(current, imported, baseDir);
+			
+      msgs += result<0>;
+			importedModules += result<1>;
 		} 
-		catch ParseError(loc l): println("ParseError while parsing: <l>"); 
-		catch IO(str msg): println("Unable to load import: <msg>");
+		catch ParseError(loc l): msgs += error("ParseError while parsing: <l>", imp@\loc); 
+		catch IO(str msg): msgs += error("Unable to load import: <msg>", imp@\loc);
 	}
 	
-	return importedModules;
+	return <msgs, importedModules>;
 }
 
 private loc resolveBaseDir(Module m) {

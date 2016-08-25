@@ -23,6 +23,7 @@ data Command
 	| push(int nr)
 	| pop(int nr)
 	| exit()
+	| comment(str com)
 	; 
 
 data Sort

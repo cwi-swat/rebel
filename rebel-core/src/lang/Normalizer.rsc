@@ -24,9 +24,27 @@ import String;
 import ParseTree;
 import ListRelation;
 
-Module normalize(Module origSpec, set[Module] imports, Refs refs) = desugar(inline(origSpec, imports, refs), imports);
+import Message;
 
-Module inline(Module origSpec, set[Module] modules, Refs refs) {
+alias NormalizeResult = tuple[set[Message] msgs, Module normalizedMod];
+
+NormalizeResult phase1(Module orig, set[Module] imports, Refs refs) {
+  if (orig has Specification) {
+    // Module is a specification
+    ; 
+  } else {
+    // Module is a library module
+    return phase1NormalizeLibraryModule(orig);
+  }
+}
+
+NormalizeResult phase1NormalizeLibraryModule(Module orig) {
+  
+}
+
+NormalizeResult normalize(Module origSpec, set[Module] imports, Refs refs) = desugar(inline(origSpec, imports, refs), imports);
+
+NormalizeResult inline(Module origSpec, set[Module] modules, Refs refs) {
 	Module flattenedSpec = flatten(origSpec, modules);
 
 	// 1. find all referenced events, they are already in the eventRefs relation
@@ -70,7 +88,7 @@ Module inline(Module origSpec, set[Module] modules, Refs refs) {
 	};	
 }
 
-Module desugar(Module inlinedSpec, set[Module] modules) {
+NormalizeResult desugar(Module inlinedSpec, set[Module] modules) {
 	set[EventDef] events = {e | /EventDef e := inlinedSpec};
 	set[FieldDecl] fields = {f | /FieldDecl f := inlinedSpec};
 	
@@ -128,7 +146,7 @@ set[Module] importedModules(Module moi, set[Module] allMods) {
 
 set[EventDef] resolveReferenceEvents(Module flattenedSpec, set[Module] imports, Ref eventRefs) =
 	{evnt | <loc ref, loc def> <- eventRefs, /EventRef evntRef := flattenedSpec, ref == evntRef@\loc, /EventDef evnt := imports, evnt@\loc == def};
-
+ 
 //set[FunctionDef] resolveReferencedFunctions(set[Module] allMods, set[EventDef] referencedEvents, Ref functionRefs) =
 //	set[loc] eventLocs = {evnt@\};
 //	return {func | <loc ref, loc def> <- functionRefs, ref};
@@ -190,26 +208,40 @@ set[Import] inlineImports(Module spc, set[Module] modules) {
 	return ({} | it + {imp} + getImports(m) | Import imp <- getImports(spc), m <- modules, "<m.modDef.fqn>" == "<imp.fqn>");
 }
 
-//set[EventDef] qualifyEventNames(set[EventDef] events, set[Module] modules) {
-//	EventDef replaceName((EventDef)	`<Annotations annos> event <FullyQualifiedVarName orig> <EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync>}`, Module m) = 
-//		(EventDef)	`<Annotations annos> event <FullyQualifiedVarName new> <EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>) {
-//					'  <Preconditions? pre> 
-//					'  <Postconditions? post>
-//					'  <SyncBlock? sync> 
-//					'}`
-//		when FullyQualifiedName fqn := m.modDef.fqn,
-//			 VarName eventName := orig.name,
-//			 FullyQualifiedVarName new := (FullyQualifiedVarName)`<FullyQualifiedName fqn>.<VarName eventName>`;
-//
-//	return {replaceName(e, m) | Module m <- modules, EventDef e <- events, e.name@\loc.top == m@\loc.top };		
-//}
-//
-//tuple[set[FunctionDef], set[EventDefs], set[InvariantDef]] qualifyFunctionNames(set[FunctionDef] functions, set[EventDef] events, set[InvariantDef] invariants, Ref functionRefs) {
-//	//FunctionDef
-//	//for (FunctionDef f <- functions) {
-//	//	
-//	//}
-//}
+set[EventDef] addParamNameToSyncedVariables(set[EventDef] events, set[Module] specs) {
+  
+  SyncStatement addParamNames((SyncStatement)`<Annotations doc><TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>);`) {
+    newParams = params;
+    
+    // find the specification and event definition of the synchronized event
+    if (/Specification spc := specs, "<spc.name>" == "<specName>", /EventRef evntRef := spc, "<evntRef.eventRef>" == "<event>") {
+      list[str] args = ["<arg>" | Expr arg <- params];
+      list[str] eventParamNames = ["<p>" | Parameter p <- evnt.transitionParams];
+      
+      if (size(args) != size(eventParamNames)) { throw "Synchronized event \'<event>\' does not have the same arity as event definition in \'<specName>\'"; }
+      
+      list[str] namedArgs = ["<eventParamNames[i]> = <args[i]>" | int i <- index(args)];
+      
+      newParams = [{Expr ","}*]"<intercalate(", ", namedArgs)>";  
+    }     
+    
+    return (SyncStatement)`<Annotations doc><TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* newParams>);`;
+  }  
+  
+  EventDef addParamNames(EventDef orig) {
+    if (/SyncBlock _ !:= orig) {
+      return orig;
+    }
+    
+    return visit(orig) {
+      case SyncStatement sst => addParamNames(sst)
+    }
+  }
+  
+  events = visit(events) {
+    case EventDef evnt => addParamNames(evnt)
+  }
+}
 
 set[EventDef] addFrameConditions(set[EventDef] events, set[FieldDecl] fields) {
 	EventDef addFrameConditionsToEvent(EventDef e) {

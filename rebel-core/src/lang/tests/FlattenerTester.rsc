@@ -20,11 +20,18 @@ import lang::Importer;
 import lang::Syntax;
 
 import IO;
+import Message;
 
 Module testFlattenModule(loc file) {
 	Module modul = parseModule(file);
 	
-	return flatten(modul, loadImports(modul));
+	tuple[set[Message], set[Module]] imports = loadImports(modul);
+	
+	tuple[set[Message], Module] result = flatten(modul, imports<1>);
+	
+	iprintln(imports<0> + result<0>);
+	
+	return result<1>;
 }
 
-Module testFlattenModule() = testFlattenModule(|project://rebel-core/tests/account/saving/SimpleSavings.ebl|);
+Module testFlattenModule() = testFlattenModule(|project://rebel-core/examples/account/saving/SimpleSavings.ebl|);

@@ -9,6 +9,8 @@ import Set;
 import String;
 import List;
 
+import lang::TypeResolver;
+
 alias RebelLit = lang::Syntax::Literal;
 
 data TransitionResult
@@ -16,25 +18,31 @@ data TransitionResult
 	| successful(State new)
 	;
 	
-data Context = ctx(str spec, str event);
+data Context = context(str spec, str event);
 
 data Variable = var(str name, Type tipe, value val);
 data EntityInstance = instance(str entityType, list[lang::Syntax::Literal] id, list[Variable] vals);  
 data State = state(int nr, DateTime now, list[EntityInstance] instances);
 
-TransitionResult initialize(str entity, str transitionToFire, list[Variable] transitionParams, State current, set[Module] spcs) {  
-  list[Command] smt = declareSmtTypes(spcs) + 
-                      declareSmtVariables(entity, transitionToFire, transitionParams, spcs) +
-                      declareSmtSpecLookup(spcs);
+list[Command] transition(str entity, str transitionToFire, list[Variable] transitionParams, State current, set[Module] normalizedSpecs) {	
+  //1. Find the event definition to fire
+  EventDef eventToRaise = findEventDef(transitionToFire, normalizedSpecs);
   
-  return failed("Not yet completed implementation"); 
+  // Collect all the synced events and their entity types
+  
+  
+  list[Command] smt = declareSmtTypes(normalizedSpecs) +
+                      declareSmtVariables(entity, transitionToFire, transitionParams, normalizedSpecs) +
+                      declareSmtSpecLookup(normalizedSpecs) +
+                      translateState(current) +
+                      translateTransitionParams(entity, transitionToFire, transitionParams) +
+                      translateEventToSingleAsserts(entity, eventToRaise);
+  
+  return smt; 
 }  
 
-TransitionResult transition(str entity, str id, str transitionToFire, list[Variable] transitionParams, State current, set[Module] spcs) {	
-  list[Command] smt = declareSmtTypes(specs);
-  
-  return failed("Not yet completed implementation"); 
-}  
+EventDef findEventDef(str eventName, set[Module] spcs) = evnt when /EventDef evnt := spcs, "<evnt.name>" == eventName;
+EventDef findEventDef(str eventName, set[Module] spcs) { throw "Event with name \'<eventName>\' not found in specs"; }
 
 list[Command] declareSmtSpecLookup(set[Module] mods) {
   list[Command] smt = [];
@@ -91,10 +99,15 @@ list[Command] translateState(State state) {
 list[Command] translateTransitionParams(str entity, str transitionToFire, list[Variable] params) =
   [\assert(eq(functionCall(simple("eventParam_<entity>_<transitionToFire>_<p.name>"), [var(simple("next"))]), translateLit(p.val))) | Variable p <- params]; 
 
-list[Command] translateEventToSingleAsserts(str entity, EventDef evnt) {
-  return [\assert(translateStat(s, ctx(entity, "<evnt.name>"))) | /Statement s := evnt] +
-         [\assert(translateSyncStat(s, ctx(entity, "<evnt.name>"))) | /SyncStatement s := evnt];
-}
+list[Command] translateEventToSingleAsserts(str entity, EventDef evnt) =
+  [\assert(translateStat(s, context(entity, "<evnt.name>"))) | /Statement s := evnt] +
+  [\assert(translateSyncStat(s, context(entity, "<evnt.name>"))) | /SyncStatement s := evnt];
+
+Command translateEventToFunction(str entity, EventDef evnt) =
+  defineFunction("event_<entity>_<evnt.name>", [sortedVar("current", custom("State")), sortedVar("next", custom("State"))], \bool(),
+    \and([translateStat(s, context(entity, "<evnt.name>")) | /Statement s := evnt] + 
+         [translateSyncStat(s, context(entity, "<evnt.name>")) | /SyncStatement s := evnt])
+  );
 
 Formula translateSyncStat(SyncStatement s, Context ctx) = lit(boolVal(true()));
 

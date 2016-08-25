@@ -1,6 +1,0 @@
-module account.WashAccount
-
-import account.AccountLib
-import account.Account 
-
-specification WashAccount extends Account {}

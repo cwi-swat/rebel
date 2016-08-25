@@ -39,6 +39,7 @@ str compile(pop(nr)) = "(pop <nr>)";
 str compile(exit()) = "(exit)";
 str compile(declareDataTypes(list[str] typeNames, list[DataTypeDefinition] definitions)) 
   = "(declare-datatypes (<intercalate(" ", [n | n <- typeNames])>) ( <("" | "<it> ( <compile(dtd)> )" | dtd <- definitions)> ))";
+str compile(comment(str com)) = "; <com>";
 default str compile(command) = "(unknown command \'<command>\')";
 
 str compile(dataTypeDef(str typeName, list[Constructor] cons)) = "<typeName> <intercalate(" ", ["(<compile(c)>)" | c <- cons])>";

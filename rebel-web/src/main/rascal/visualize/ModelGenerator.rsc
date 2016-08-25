@@ -227,12 +227,11 @@ private list[JsStatement] processPreconditions(EventDef e) = [processToText(stat
 private list[JsStatement] processPostconditions(EventDef e) = [processToText(stat) | /Statement stat := e.post];
 private list[JsStatement] processSyncBlock(EventDef e) = [processToText(stat) | /SyncStatement stat := e.sync];
 
-private JsStatement processToText((SyncStatement)`@doc<TagString doc> <TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>);`) =
-  jsDocAndCode("<doc.contents>", "<specName>[<id>].<event>(<params>)");
+private JsStatement processToText((SyncStatement)`<Annotations annos><TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>);`) =
+  (/(Annotation)`@doc<TagString doc>` := annos) ? jsDocAndCode("<doc.contents>", "<specName>[<id>].<event>(<params>)") : jsCodeOnly("<specName>[<id>].<event>(<params>)");
 
-private JsStatement processToText((SyncStatement)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>);`) =
-  jsCodeOnly("<specName>[<id>].<event>(<params>)");
-
+private JsStatement processToText((SyncStatement)`<Annotations annos> not <TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>);`) =
+  (/(Annotation)`@doc<TagString doc>` := annos) ? jsDocAndCode("<doc.contents>", "<specName>[<id>].<event>(<params>)") : jsCodeOnly("<specName>[<id>].<event>(<params>)");
 
 private JsStatement processToText((Statement)`@doc <TagString doc> <Expr e>;`) = jsDocAndCode("<doc.contents>", "<e>");
 private default JsStatement processToText(Statement stat) = jsCodeOnly("<stat>");

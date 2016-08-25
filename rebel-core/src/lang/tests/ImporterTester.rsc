@@ -20,6 +20,7 @@ import lang::Importer;
 
 import IO;
 import Set;
+import Message;
 
 bool importAllTestFiles() = importAllFilesInDir(|project://rebel-core/tests|); 
 
@@ -31,15 +32,16 @@ bool importAllFilesInDir(loc dir) {
 			successful = successful && importAllFilesInDir(file);
 		}
 		else {
-			try {
-				if (file.extension == "ebl") {
-					Module res = parseModule(file);
-					set[Module] imports = loadImports(res);
-					println("Resolved all imports of \'<res.modDef.fqn>\', nr of imports: <size(imports)>");
-				}
-			} catch ex: {
-				println("Somthing went wrong during importing: <ex>");
-				successful = false;
+			if (file.extension == "ebl") {
+				Module res = parseModule(file);
+				tuple[set[Message], set[Module]] result = loadImports(res);
+
+        if (result<0> == {}) {
+				  println("Resolved all imports of \'<res.modDef.fqn>\', nr of imports: <size(result<1>)>");
+				} else {
+  				iprintln(result<0>);
+	   			successful = false;
+	   		}
 			}
 		}
 	}
@@ -47,4 +49,4 @@ bool importAllFilesInDir(loc dir) {
 	return successful;
 }
 
-set[Module] testImport(loc file) = loadImports(parseModule(file));
+ImporterResult testImport(loc file) = loadImports(parseModule(file));

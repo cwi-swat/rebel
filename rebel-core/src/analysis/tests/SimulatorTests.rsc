@@ -46,17 +46,11 @@ void testInitializeEntity() {
         var("_toState", [Type]"Integer", [Int]"1"),
         var("amount", [Type]"Money", [Money]"EUR 5.00"),
         var("from", [Type]"IBAN", [IBAN]"NL34ING001"),
-        var("to", [Type]"IBAN", [IBAN]"NL34ING003"),
+        var("to", [Type]"IBAN", [IBAN]"NL34ING002"),
         var("bookOn", [Type]"Date", [Date]"13 Jul 2016")
       ];
    
-  list[Command] smt = declareSmtTypes(normalizedSpecs) +
-                      declareSmtVariables("Transaction", "start", transitionParams, normalizedSpecs) +
-                      declareSmtSpecLookup(normalizedSpecs) +
-                      translateState(current) +
-                      translateTransitionParams("Transaction", "start", transitionParams) +
-                      translateEventToSingleAsserts("Transaction", find("start", normalizedSpecs)) +
-                      [checkSatisfiable(), getModel()];
+  list[Command] smt = transition("Transaction", "start", transitionParams, current, normalizedSpecs);
     
   writeFile(|project://smtlib2/examples/sim2_gen.smt2|, intercalate("\n", [compile(s) | s <- smt]));   
 }
