@@ -24,27 +24,28 @@ import ParseTree;
 
 alias ImporterResult = tuple[set[Message] msgs, set[Module] mods]; 
 
-ImporterResult loadImports(Module m) = loadImports(m, {}, resolveBaseDir(m));
+ImporterResult loadImports(Module m) = loadImports(m, resolveBaseDir(m));
 
-private ImporterResult loadImports(Module m, set[str] imported, loc baseDir) {
+private ImporterResult loadImports(Module initial, loc baseDir) {
 	set[Message] msgs = {};
-	set[Module] importedModules = {m};
-		
-	for (imp <- m.imports, "<imp.fqn>" notin imported) {
-		try {	
-			Module current = parseModule(findFile(imp.fqn, baseDir));
-			imported += "<current.modDef.fqn>";
-			
-			result = loadImports(current, imported, baseDir);
-			
-      msgs += result<0>;
-			importedModules += result<1>;
-		} 
-		catch ParseError(loc l): msgs += error("ParseError while parsing: <l>", imp@\loc); 
-		catch IO(str msg): msgs += error("Unable to load import: <msg>", imp@\loc);
-	}
+	map[str,Module] importedModules = ();
 	
-	return <msgs, importedModules>;
+	void recursiveLoad(Module modul) {
+    importedModules += ("<modul.modDef.fqn>":modul);
+	
+    for (imp <- modul.imports, "<imp.fqn>" notin importedModules<0>) {
+      try { 
+        Module current = parseModule(findFile(imp.fqn, baseDir));
+        recursiveLoad(current);
+      }  
+      catch ParseError(loc l): msgs += error("ParseError while parsing: <l>", imp@\loc); 
+      catch IO(str msg): msgs += error("Unable to load import: <msg>", imp@\loc);
+	  }
+	}	
+	
+	recursiveLoad(initial);
+	
+	return <msgs, importedModules<1>>;
 }
 
 private loc resolveBaseDir(Module m) {

@@ -17,6 +17,7 @@ import lang::Syntax;
 import lang::Parser;
 import lang::Importer;
 import lang::Resolver;
+import lang::Builder;
 import Checker;
 
 //import execution::simulation::Simulation;
@@ -40,11 +41,16 @@ import String;
 import DateTime;
 
 import util::Benchmark;
+import util::Maybe;
 
 //import execution::documentation::DescriptionFileReader;
 //import execution::documentation::IDEDocAnnotator;
 
 anno rel[loc, loc] Tree@hyperlinks; 
+
+str buildDir = "bin";
+
+loc getOutputLoc(loc srcFile)  = |<srcFile.scheme>://<srcFile.authority>/<buildDir>/rebel|;
 
 void main() {
 	REBEL_LANGUAGE = "Rebel Language";
@@ -53,12 +59,9 @@ void main() {
 	
 	contribs = {
 		annotator(Module (Module m) {
-			set[Module] imports = loadImports(m);
-			Refs refs = resolve(m + imports);
-      		msgs = check(m, imports, refs);
-
-	      	return m[@messages=msgs][@hyperlinks=getAllHyperlinks(m@\loc, refs)];
-    	}),
+		  <msgs, built> = load(m@\loc.top, getOutputLoc(m@\loc.top), modulPt = just(m), log = println);
+	    return m[@messages=msgs][@hyperlinks=getAllHyperlinks(m@\loc, built.refs)];
+    }),
 		popup(
 			menu("Rebel actions", [
 				group("Simulation", [
@@ -127,7 +130,7 @@ void reset(){
 	main();
 }
 
-private Ref getAllHyperlinks(loc currentUnit, Refs allRefs) =
+private Reff getAllHyperlinks(loc currentUnit, Refs allRefs) =
 	getHyperlinks(currentUnit, 
 		allRefs.imports + 
 		allRefs.eventRefs + 
@@ -136,8 +139,8 @@ private Ref getAllHyperlinks(loc currentUnit, Refs allRefs) =
 		allRefs.lifeCycleRefs + 
 		allRefs.stateRefs +
 		allRefs.keywordRefs +
-		allRefs.inheritance + 
-		allRefs.specRefs); 
+		allRefs.inheritance +
+		allRefs.syncedEventRefs); 
 
-private Ref getHyperlinks(loc currentUnit, Ref refs) =
+private Reff getHyperlinks(loc currentUnit, Reff refs) =
 	{<from, to> | <from, to> <- refs, currentUnit.top == from.top};

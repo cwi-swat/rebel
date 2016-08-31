@@ -15,6 +15,13 @@ module lang::ExtendedSyntax
 
 extend lang::Syntax;
   
+start syntax Module
+  = ModuleDef modDef Import* imports UsedBy+ usedbys Specification spec
+  | ModuleDef modDef Import* imports UsedBy+ usedbys LibraryModule* decls
+  ;
+  
+syntax UsedBy = "usedby" FullyQualifiedName fqn;    
+ 
 syntax Specification = 
 	normalized: Annotations annos SpecModifier? modifier "specification" TypeName name Extend? extend "{" Fields fields FunctionDefs functions EventRefs eventRefs EventDefs events InvariantRefs invariantRefs InvariantDefs invariants LifeCycle lifeCycle "}";
 	

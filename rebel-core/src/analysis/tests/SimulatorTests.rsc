@@ -2,11 +2,8 @@ module analysis::tests::SimulatorTests
 
 import analysis::Simulator;
 
-import lang::Parser;
-import lang::Importer;
 import lang::Resolver;
-import lang::Flattener;
-import lang::Normalizer;
+import lang::Builder;
 import lang::ExtendedSyntax;
 
 import lang::smtlib25::Compiler;
@@ -16,16 +13,11 @@ import IO;
 import List;
 
 void testInitializeEntity() {
-  Module spc = parseModule(|project://rebel-core/examples/simple_transaction/Transaction.ebl|);
+  loc file = |project://rebel-core/examples/simple_transaction/Transaction.ebl|; 
   
-  set[Module] imports = loadImports(spc);
-  Refs refs = resolve({spc} + imports);
-  
-  set[Module] normalizedSpecs = normalizeAllSpecs(imports + spc, refs);
+  <_, normalizedBuilts> = loadAll(file, |project://rebel-core/bin/rebel|, log = println);
+  set[Module] normalizedSpecs = {b<0> | Built b <- normalizedBuilts, b<0> has spec};
 
-  for (Module ns <- normalizedSpecs) {
-    println(ns);
-  }
 
   // Build up the current state, all possible entities must be present, even if they are not initialized
   State current = state(

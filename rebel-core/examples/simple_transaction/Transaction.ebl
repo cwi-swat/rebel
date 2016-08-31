@@ -14,13 +14,13 @@ specification Transaction {
 		from: IBAN @ref=Account
 		to: IBAN @ref=Account
 		createdOn: DateTime
-		bookedOn: Date
+		bookedOn: Date 
 	}
 	
 	events {
 		start[]
 		book[]
-		fail[]
+		fail[] 
 	}
 	
 	lifeCycle {

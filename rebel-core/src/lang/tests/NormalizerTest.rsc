@@ -19,20 +19,39 @@ import lang::Resolver;
 import lang::Flattener;
 
 import lang::Normalizer;
-import lang::Syntax;
+import lang::ExtendedSyntax;
 
 import IO;
-import ValueIO;
-import util::ValueUI;
+import Message;
 
-Module testNormalizeSpec(loc file) = normalize(spc, imports, refs)
-	when	Module spc := parseModule(file),
-			set[Module] imports := loadImports(spc),
-			Refs refs := resolve({spc} + imports);
+Module testNormalizeSpec(loc file) { 
+  Module spc = parseModule(file);
+  ImporterResult importResult = loadImports(spc);
+  Refs refs = resolve({spc} + importResult<1>);
+  
+  FlattenerResult flattenResult = flatten(spc, importResult<1>);
+  NormalizeResult result = phase1(flattenResult.flattenedModule, importResult<1>, refs);
+  
+  for (Message msg <- flattenResult<0> + importResult<0> + result<0>) {
+    println(msg);
+  }
 
-Module testNormalizeSpec() = testNormalizeSpec(|project://rebel-core/tests/account/saving/SimpleSavings.ebl|);
+  return result<1>;
+}
 
-Module testInlining(loc file) = inline(spc, imports, refs)
-	when	Module spc := parseModule(file),
-			set[Module] imports := loadImports(spc),
-			Refs refs := resolve({spc} + imports);
+Module testNormalizeSpec() = testNormalizeSpec(|project://rebel-core/examples/account/saving/SimpleSavings.ebl|);
+
+Module testInlining(loc file) {
+  Module spc = parseModule(file);
+  ImporterResult importResult = loadImports(spc);
+  Refs refs = resolve({spc} + importResult<1>);
+  
+  FlattenerResult flattenResult = flatten(spc, importResult<1>);
+  NormalizeResult result =  inline(flattenResult.flattenedModule, importResult<1>, refs);
+  
+  for (Message msg <- flattenResult<0> + importResult<0> + result<0>) {
+    println(msg);
+  }
+  
+  return result<1>;
+}

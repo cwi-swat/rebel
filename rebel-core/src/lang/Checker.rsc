@@ -11,7 +11,7 @@ Redistribution and use in source and binary forms, with or without modification,
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 }
 @contributor{Jouke Stoel - jouke.stoel@cwi.nl - CWI}
-module Checker
+module lang::Checker
 
 import lang::Syntax;
 import lang::Resolver;
@@ -38,22 +38,18 @@ set[Message] check(Module current, set[Module] imports, Refs refs) =
 	//checkReferencedSpecifications(current, refs.specRefs) + 
 	//checkUnresolvedRaisedEvents(current, refs.eventRefs);
 		
-set[Message] checkUnresolvedImports(Module current, Ref resolvedImports) =
+set[Message] checkUnresolvedImports(Module current, Reff resolvedImports) =
 	{error("Imported module not found or error while parsing imported module", imp.fqn@\loc) | /Import imp <- current.imports, resolvedImports[imp.fqn@\loc] == {}};
 
-set[Message] checkUnresolvedEvents(Module current, Ref resolvedRefs) =
-	{error("Event not found", e@\loc) | /Specification spc := current, /(SpecModifier)`abstract` !:= spc, /EventRef e := current, resolvedRefs[e@\loc] == {}};
-	
-//set[Message] checkUnresolvedRaisedEvents(Module current, Ref eventRefs) =
-//	{error("Raised event not found in specification", e.origin) | /e:raise(_,_,_,_) := current, eventRefs[e.origin] == {}}; 	
-	
+set[Message] checkUnresolvedEvents(Module current, Reff resolvedRefs) =
+	{error("Event not found", e@\loc) | /Specification spc := current, /(SpecModifier)`abstract` !:= spc || /(SpecModifier)`external` !:= spc, /EventRef e := current, resolvedRefs[e@\loc] == {}};
+		
 set[Message] checkExternalSpecIsEmpty(Module current) =
 	{error("External specification can not contain field declarations", fd@\loc) | /(SpecModifier)`external` := current, /Fields fd := current} +
-	{error("External specification can not contain event references", ev@\loc) | /(SpecModifier)`external` := current, /EventRefs ev := current} +
 	{error("External specification can not contain invariant references", inv@\loc) | /(SpecModifier)`external` := current, /InvariantRefs inv := current} +
 	{error("External specification can not contain a life cycle", lc@\loc) | /(SpecModifier)`external` := current, /LifeCycle lc := current}; 	
 	
-set[Message] checkUnresolvedFunctions(Module modules, Ref resolvedRefs) {
+set[Message] checkUnresolvedFunctions(Module modules, Reff resolvedRefs) {
 	set[Message] checkReferencedFunctions(Statements* stats) = 
 		{error("Function not found", fc@\loc) | /fc:(Expr)`<VarName _>(<{Expr ","}* _>)` := stats, resolvedRefs[fc@\loc] == {}}; 
 	
@@ -75,13 +71,13 @@ set[Message] checkUnresolvedFunctions(Module modules, Ref resolvedRefs) {
 	return errors;	
 }
 
-set[Message] checkUnresolvedInvariants(Module current, Ref resolvedInvariants) =
+set[Message] checkUnresolvedInvariants(Module current, Reff resolvedInvariants) =
 	{error("Invariant not found", inv@\loc) | /InvariantRefs invs := current, /VarName inv := invs, resolvedInvariants[inv@\loc] == {}};
 
-set[Message] checkUnresolvedLifeCycleEvents(Module current, Ref resolvedLifeCycleEvents) =
+set[Message] checkUnresolvedLifeCycleEvents(Module current, Reff resolvedLifeCycleEvents) =
 	{error("Event not found", evnt@\loc) | /StateVia via := current, /VarName evnt := via, resolvedLifeCycleEvents[evnt@\loc] == {}};
 
-set[Message] checkUnresolvedLifeCycleStates(Module current, Ref resolvedStates) =
+set[Message] checkUnresolvedLifeCycleStates(Module current, Reff resolvedStates) =
 	{error("State not found", to.to@\loc) | /StateTo to := current, resolvedStates[to.to@\loc] == {}};	
 
 //set[Message] checkIncompatibleEventIncluded(Module current, set[Module] imports, Ref eventRefs, Ref inheritance) {

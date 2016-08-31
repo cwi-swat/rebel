@@ -86,35 +86,19 @@ Fields mergeFields((Fields) `fields { <FieldDecl* l> }`, FieldDecl d) =
 	(Fields) `fields { 
              '  <FieldDecl* l>
              '  <FieldDecl d>
-             '}`;
-
-//Fields mergeFields(Fields? lhs, FieldDecl d) = 
-//	(Fields)	`fields {
-//			 	'  <FieldDecl d>
-//			 	'}`
-//	when /Fields _ !:= lhs;
-//
-//Fields mergeFields(Fields? lhs, FieldDecl d) = 
-//	mergeFields(orig, d)
-//	when /Fields orig := lhs;
+             '}`
+  when /d !:= l;
+default Fields mergeFields(Fields f, FieldDecl _) = f; 
 
 EventRefs initEventRefs(EventRefs? e) = /EventRefs ee := e ? ee : (EventRefs)`events {}`;  
 
-EventRefs mergeEventRefs((EventRefs)`events { <EventRef* orig> }`, EventRef ref) =
+EventRefs mergeEventRefs((EventRefs)`events { <EventRef* orig> }`, EventRef er) =
 	(EventRefs) `events {
-				'  <EventRef* orig>
-				'  <EventRef ref>
-				'}`;	
-
-//EventRefs mergeEventRefs(EventRefs? refs, EventRef ref) =
-//	(EventRefs) `events {
-//				'  <EventRef ref>
-//				'}`
-//	when /EventRefs _ !:= refs;
-//
-//EventRefs mergeEventRefs(EventRefs? refs, EventRef ref) =
-//	mergeEventRefs(orig, ref)
-//	when /EventRefs orig := refs;
+				      '  <EventRef* orig>
+				      '  <EventRef er>
+				      '}`
+  when /er !:= orig;     
+default EventRefs mergeEventRefs(EventRefs ers, EventRef _) = ers;				 	
 
 InvariantRefs initInvariantRefs(InvariantRefs? i) = /InvariantRefs ii := i ? ii : (InvariantRefs)`invariants {}`;
 
@@ -124,47 +108,27 @@ InvariantRefs mergeInvariantRefs((InvariantRefs)`invariants { <FullyQualifiedVar
 					'  <FullyQualifiedVarName new>
 					'}`;	
 
-//InvariantRefs mergeInvariantRefs(InvariantRefs? refs, FullyQualifiedVarName new) =
-//	(InvariantRefs) `invariants {
-//					'  <VarName new>
-//					'}`
-//	when !(/InvariantRefs _ := refs);
-//
-//InvariantRefs mergeInvariantRefs(InvariantRefs? refs, FullyQualifiedVarName new) =
-//	mergeInvariantRefs(orig, new)
-//	when /InvariantRefs orig := refs;
-
 LifeCycle initLifeCycle(LifeCycle? lc) = /LifeCycle lcc := lc ? lcc : (LifeCycle)`lifeCycle {}`;
 
-//LifeCycle mergeLifeCycle(LifeCycle? orig, StateFrom* new) =
-//	(LifeCycle)	`lifeCycle {
-//				'  <StateFrom* new>
-//				'}`
-//	when !(/LifeCycle _ := orig);
-//
-//LifeCycle mergeLifeCycle(LifeCycle? orig, StateFrom* new) =
-//	mergeLifeCycle(lc, new)
-//	when /LifeCycle lc := orig;
-		 
-LifeCycle mergeLifeCycle(LifeCycle orig, StateFrom* new) =
+LifeCycle mergeLifeCycle(LifeCycle orig, StateFrom* newStates) =
 	(LifeCycle)	`lifeCycle {
-				'  <StateFrom* mergedStates>
-				'}`
+				      '  <StateFrom* mergedStates>
+				      '}`
 	when 
 		/StateFrom* origStates := orig,
-		StateFrom* mergedStates := (origStates | mergeStates(it, n) | n <- new);	
+		StateFrom* mergedStates := (origStates | mergeStates(it, n) | n <- newStates);	
 	
-StateFrom* mergeStates(StateFrom* orig, new:(StateFrom)`<LifeCycleModifier? _> <VarName from> <StateTo* destinations>`) =
-	(LifeCycle) 	`lifeCycle {
-					'	<StateFrom* orig>
-					'	<StateFrom new>}`.from
+StateFrom* mergeStates(StateFrom* orig, newState:(StateFrom)`<LifeCycleModifier? _> <VarName from> <StateTo* destinations>`) =
+	(LifeCycle) `lifeCycle {
+					    '	<StateFrom* orig>
+					    '	<StateFrom newState>}`.from
 	when 
 		!existingState(from, orig);
 
-StateFrom* mergeStates(StateFrom* orig, new:(StateFrom)`<LifeCycleModifier? _> <VarName from> <StateTo* destinations>`) = 
-	(LifeCycle) 	`lifeCycle {
-					'	<StateFrom* merged>
-					'}`.from
+StateFrom* mergeStates(StateFrom* orig, (StateFrom)`<LifeCycleModifier? _> <VarName from> <StateTo* destinations>`) = 
+	(LifeCycle) `lifeCycle {
+					    '	<StateFrom* merged>
+					    '}`.from
 	 when
 	 	existingState(from, orig),
 	 	StateFrom* merged := visit (orig) {
@@ -178,7 +142,7 @@ bool existingState(VarName state, StateFrom* states) =
 StateFrom mergeStateTo(StateFrom orig, StateTo* newDestinations) = 
 	merged
 	when
-		StateFrom merged := (orig | mergeStateTo(it, new) | new <- newDestinations);
+		StateFrom merged := (orig | mergeStateTo(it, newDest) | newDest <- newDestinations);
 		
 default StateFrom mergeStateTo(StateFrom orig, StateTo* newDestinations) = orig;
 

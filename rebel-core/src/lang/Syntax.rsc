@@ -76,13 +76,18 @@ syntax StateTo = "-\>" VarName to ":" StateVia via;
 syntax StateVia = {VarName ","}+ refs;
 	
 // Generic rules
-syntax ConfigParameter = VarName name "=" Expr val; 
+syntax ConfigParameter = VarName name "=" Expr val;  
 
 syntax Parameter = VarName name ":" Type tipe DefaultValue? defaultValue;
 syntax DefaultValue = "=" Expr val;
 
 syntax SyncStatement
-  = Annotations doc "not"? TypeName specName "[" Expr id "]" "." VarName event "(" {Expr ","}* params ")" ";"
+  = Annotations doc SyncExpr expr ";" 
+  ;
+  
+syntax SyncExpr
+  = not: "not" SyncExpr expr
+  | syncEvent: TypeName specName "[" Expr id "]" "." VarName event "(" {Expr ","}* params ")" 
   ;
 
 syntax Statement  

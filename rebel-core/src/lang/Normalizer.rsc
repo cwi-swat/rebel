@@ -25,47 +25,33 @@ import ParseTree;
 import ListRelation;
 
 import Message;
+import util::Maybe;
 
 alias NormalizeResult = tuple[set[Message] msgs, Module normalizedMod];
 
-NormalizeResult phase1(Module orig, set[Module] imports, Refs refs) {
-  if (orig has Specification) {
-    // Module is a specification
-    ; 
-  } else {
-    // Module is a library module
-    return phase1NormalizeLibraryModule(orig);
-  }
-}
+NormalizeResult inline(Module flattenedSpc, set[Module] modules, Refs refs) {
+ 	// Find all referenced events
+	tuple[set[Message], set[EventDef]] resolvedEventsResult = resolveReferenceEvents(flattenedSpc, modules, refs.eventRefs);
+	set[EventDef] events = resolvedEventsResult<1>;
 
-NormalizeResult phase1NormalizeLibraryModule(Module orig) {
-  
-}
-
-NormalizeResult normalize(Module origSpec, set[Module] imports, Refs refs) = desugar(inline(origSpec, imports, refs), imports);
-
-NormalizeResult inline(Module origSpec, set[Module] modules, Refs refs) {
-	Module flattenedSpec = flatten(origSpec, modules);
-
-	// 1. find all referenced events, they are already in the eventRefs relation
-	set[EventDef] events = resolveReferenceEvents(flattenedSpec, modules, refs.eventRefs);
+  // Find all referenced invariants
+  tuple[set[Message], set[InvariantDef]] resolvedInvariantsResult = resolveReferencedInvariants(flattenedSpc, modules, refs.invariantRefs);
 	
-	// 2. Merge the config values into the config params of the events	
-	events = mergeConfig(events, flattenedSpec.spec, refs.keywordRefs);
+	// Merge the config values into the config params of the events	
+	tuple[set[Message], set[EventDef]] mergedConfigResult = mergeConfig(events, flattenedSpc.spec, refs.keywordRefs);
+	events = mergedConfigResult<1>;
 	
-	// 3. Inline all configured parameters
+	// Inline all configured parameters
 	events = inlineConfigurationParameters(events);
 
-	// 4. Inline all the referenced functions 
-	set[FunctionDef] functions = {func | <_, loc def> <- refs.functionRefs, /FunctionDef func := modules, func@\loc == def}; 
+  // Find all the referenced functions 
+  tuple[set[Message], set[FunctionDef]] resolvedFunctionsResult = resolveReferencedFunctions(modules, events, refs.functionRefs); 
+  set[FunctionDef] functions = resolvedFunctionsResult<1>;
 
-	// 5. Inline all referenced invariants
-	set[InvariantDef] invariants = {inv | <_, loc def> <- refs.invariantRefs, /InvariantDef inv := modules, inv@\loc == def};
-
-	// 6. Inline all the imports all directly imported files
-	set[Import] allImports = inlineImports(flattenedSpec, modules);
+	// Inline all the imports all directly imported files
+	set[Import] allImports = inlineImports(flattenedSpc, modules);
 	
-	return visit(flattenedSpec) {
+	Module inlined = visit(flattenedSpc) { 
 		case m:(Module)`<ModuleDef modDef> <Import* imports> <Specification spec>` => 
 			mergedImports
 			when 
@@ -84,44 +70,44 @@ NormalizeResult inline(Module origSpec, set[Module] modules, Refs refs) {
 				when
 					FunctionDefs funcs := ((FunctionDefs)`functionDefs {}` | merge(it, f) | f <- functions),
 					EventDefs ev := ((EventDefs)`eventDefs {}` | merge(it, e) | e <- events),
-					InvariantDefs invs := ((InvariantDefs)`invariantDefs {}` | merge(it, i) | i <- invariants)					
-	};	
+					InvariantDefs invs := ((InvariantDefs)`invariantDefs {}` | merge(it, i) | i <- resolvedInvariantsResult<1>)					
+	};
+	
+	return <resolvedEventsResult<0> + resolvedFunctionsResult<0> + mergedConfigResult<0>, inlined>;	
 }
 
-NormalizeResult desugar(Module inlinedSpec, set[Module] modules) {
-	set[EventDef] events = {e | /EventDef e := inlinedSpec};
-	set[FieldDecl] fields = {f | /FieldDecl f := inlinedSpec};
+NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs) {
+	set[EventDef] events = {e | EventDef e <- inlinedSpc.spec.events.events};
+	set[FieldDecl] fields = {f | FieldDecl f <- inlinedSpc.spec.fields.fields};
+  set[StateFrom] states = {s | /LifeCycle lc := inlinedSpc.spec.lifeCycle, StateFrom s <- lc.from};
 	
-	// 1. Add frame conditions to the post conditions
+	// Add frame conditions to the post conditions
 	events = addFrameConditions(events, fields);			
 	
-	// 2. Label the events with a number and add the step to the specification
-	// 2.1 add the _step field to the field list
+	// Label the events with a number and add the step to the specification
 	fields += (FieldDecl)`_step : Integer`;
-	// 2.2 give each event a unique nr
-	events = createEventMapping(events);
-	
-	set[StateFrom] states = {s | /StateFrom s := inlinedSpec.spec.lifeCycle};
-	
-	// 6. Desugar the lifecycle into the events pre- and post conditions
-	// 6.1 add the _state field to the field list
+		
+	// Desugar the lifecycle into the events pre- and post conditions
+	// add the _state field to the field list
 	fields += (FieldDecl)`_state : Integer`;
-	// 6.2 give each state a unique nr
-	states = createStateMapping(states);
-	// 6.3  desugar the life cycle information by strengthening the preconditions of the events with this information
-	events = desugarStates(events, states);
-	
-	//// 7. Fully Qualify event, fucntion and invariant names and their references,
-	//events = qualifyEventNames(events, modules); 
+
+	// Desugar the life cycle information by strengthening the preconditions of the events with this information
+	tuple[set[Message], set[EventDef], set[StateFrom]] desugaringStatesResult = desugarStates(events, states);
+	events = desugaringStatesResult<1>;
+	states = desugaringStatesResult<2>;
 	
 	// 8. Add the identity fields as transition parameters of the event
 	events = {addIdentityAsTransitionParams(fields, e) | EventDef e <- events};
 	
 	// 9. Replace all the references to this with the name of the specification
-	events = {replaceReferencesToThisWithSpecificationName(e, "<inlinedSpec.spec.name>", fields) | EventDef e <- events};
+	tuple[set[Message], set[EventDef]] thisReplacingResult = replaceReferencesToThisWithSpecificationName(events, inlinedSpc.spec.eventRefs, "<inlinedSpc.spec.name>", fields);
+	events = thisReplacingResult<1>;
 	
+	// Find all synchronized events and add parameter names to the call
+  tuple[set[Message], set[EventDef]] syncedEventResult = addParamNameToSyncedVariables(events, modules, refs.syncedEventRefs, refs.eventRefs);
+  events = syncedEventResult<1>;
 	
-	return visit(inlinedSpec) {
+	Module normalized = visit(inlinedSpc) {
 		case (Specification)`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { <Fields _> <FunctionDefs funcs> <EventRefs eventRefs> <EventDefs _> <InvariantRefs invariantRefs> <InvariantDefs invs> <LifeCycle lifeCycle>}` =>
 			(Specification)	`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { 
 							'	<Fields mergedFields> 
@@ -136,7 +122,9 @@ NormalizeResult desugar(Module inlinedSpec, set[Module] modules) {
 					Fields mergedFields := ((Fields)`fields {}` | merge(it, f) | f <- fields),
 					EventDefs mergedEv := ((EventDefs)`eventDefs {}` | merge(it, e) | e <- events),
 					LifeCycle mergedLc := ((LifeCycle)`lifeCycle {}` | merge(it, sf) | StateFrom sf <- states) 										
-	};	
+	};
+	
+	return <desugaringStatesResult<0> + thisReplacingResult<0> + syncedEventResult<0>, normalized>;	
 }
 
 set[Module] importedModules(Module moi, set[Module] allMods) {
@@ -144,23 +132,84 @@ set[Module] importedModules(Module moi, set[Module] allMods) {
 	return {imp | imp <- allMods, "<imp.modDef.fqn>" in impModNames};
 }
 
-set[EventDef] resolveReferenceEvents(Module flattenedSpec, set[Module] imports, Ref eventRefs) =
-	{evnt | <loc ref, loc def> <- eventRefs, /EventRef evntRef := flattenedSpec, ref == evntRef@\loc, /EventDef evnt := imports, evnt@\loc == def};
- 
-//set[FunctionDef] resolveReferencedFunctions(set[Module] allMods, set[EventDef] referencedEvents, Ref functionRefs) =
-//	set[loc] eventLocs = {evnt@\};
-//	return {func | <loc ref, loc def> <- functionRefs, ref};
-//}
+private set[EventDef] allEventDefs(set[Module] mods) =
+  {e | Module m <- mods, m has decls, /EventDef e <- m.decls};
+
+tuple[set[Message], set[EventDef]] resolveReferenceEvents(Module flattenedSpec, set[Module] imports, Reff eventRefs) {
+  set[EventDef] events = {};
+  set[Message] msgs = {};
+  
+  for (/EventRef evntRef := flattenedSpec) {
+    if (EventDef evnt <- allEventDefs(imports), {evnt@\loc} == eventRefs[evntRef@\loc]) {
+      events += evnt;
+    } else {
+      msgs += error("Unable to find referenced event", evntRef@\loc);
+    }
+  }
+  
+  return <msgs, events>;  
+}
+
+tuple[set[Message], set[FunctionDef]] resolveReferencedFunctions(set[Module] modules, set[EventDef] referencedEvents, Reff functionRefs) {
+  set[FunctionDef] resolvedFunctions = {};
+  set[Message] msgs = {};
+  
+  for (EventDef evnt <- referencedEvents, /f:(Expr)`<VarName _>(<{Expr ","}* _>)` := evnt) {
+    if (functionRefs[f@\loc] != {}, FunctionDef function <- allFunctionDefs(modules), {function@\loc} == functionRefs[f@\loc]) {
+      resolvedFunctions += function; 
+    } else {
+      msgs += error("Referrenced function can not be found", f@\loc);
+    }
+  }
+  
+	return <msgs, resolvedFunctions>;
+}
+
+tuple[set[Message], set[InvariantDef]] resolveReferencedInvariants(Module spc, set[Module] modules, Reff invariantRefs) {
+  set[InvariantDef] resolvedInvariants = {};
+  set[Message] msgs = {};
+  
+  for (/InvariantRefs invRefs := spc, FullyQualifiedVarName invRef <- invRefs.invariants) {
+    if (/InvariantDef inv := modules, {inv@\loc} == invariantRefs[invRef@\loc]) {
+      resolvedInvariants += inv; 
+    } else {
+      msgs += error("Referrenced invariant can not be found", invRef@\loc);
+    }
+  }
+  
+  return <msgs, resolvedInvariants>;
+}
 
 EventDef addIdentityAsTransitionParams(set[FieldDecl] fields, EventDef evnt)
   = (evnt | addTransitionParam(evnt, (Parameter)`<VarName paramName>: <Type tipe>`) | (FieldDecl)`<VarName field>: <Type tipe> @key` <- fields, VarName paramName := [VarName]"_<field>"); 
 
-EventDef replaceReferencesToThisWithSpecificationName(EventDef evnt, str specName, set[FieldDecl] fields) {
+tuple[set[Message], set[EventDef]] replaceReferencesToThisWithSpecificationName(set[EventDef] events, EventRefs eventRefs, str specName, set[FieldDecl] fields) {
+  set[Message] msgs = {};
+    
+  bool hasField(VarName name) = true
+    when FieldDecl f <- fields, "<f.name>" == "<name>";
+  default bool hasField(VarName name) = false;
+  
+  EventRef findEventRef(EventDef evnt) = er
+    when EventRef er <- eventRefs.events, "<er.eventRef>" == "<evnt.name>";
+  bool addMsg(VarName n, EventDef evnt) { msgs += error("Event references field with name \'<n>\' but this field is not declared in the specification", findEventRef(evnt)@\loc); return true; }
+
+  set[EventDef] altered = {};
+  
   list[str] idFields = ["_<field>" | (FieldDecl)`<VarName field> : <Type _> @key` <- fields];
   
-  return visit(evnt) {
-    case (Expr)`this.<VarName n>` => [Expr]"<specName>[<intercalate(",", idFields)>].<n>"
+  if (idFields == []) {
+    msgs += error("No id field declared", getOneFrom(fields)@\loc);
+  } else {
+    for (EventDef evnt <- events) {
+      altered += visit(evnt) {
+        case (Expr)`this.<VarName n>` => [Expr]"<specName>[<intercalate(",", idFields)>].<n>" when hasField(n)
+        case (Expr)`this.<VarName n>` => (Expr)`this.<VarName n>` when !hasField(n), addMsg(n, evnt)
+      }
+    }
   }
+  
+  return <msgs, altered>;
 }
 
 Module mergeImports((Module)`<ModuleDef modDef> <Import* imports> <Specification spec>` , Import new) = 
@@ -201,49 +250,73 @@ LifeCycle merge((LifeCycle)`lifeCycle { <StateFrom* orig> }`, StateFrom new) =
 
 set[Import] inlineImports(Module spc, set[Module] modules) {
 	set[Import] getImports(Module m) = {imp | /Import imp := m};
-	
-	//set[Import] origImport = getImports(spc);
-	//set[Import] direcTransitive = ({} | )
-		
+			
 	return ({} | it + {imp} + getImports(m) | Import imp <- getImports(spc), m <- modules, "<m.modDef.fqn>" == "<imp.fqn>");
 }
 
-set[EventDef] addParamNameToSyncedVariables(set[EventDef] events, set[Module] specs) {
+tuple[set[Message], set[EventDef]] addParamNameToSyncedVariables(set[EventDef] events, set[Module] modules, Reff syncEventRefs, Reff eventRefs) {
+  set[Message] msgs = {};
   
-  SyncStatement addParamNames((SyncStatement)`<Annotations doc><TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>);`) {
-    newParams = params;
+  SyncExpr merge((SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)`, Expr newParam) =
+    (SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>, <Expr newParam>)`;
+  
+  SyncExpr addParamNames(orig:(SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)`) {
+    SyncExpr result = orig;
     
-    // find the specification and event definition of the synchronized event
-    if (/Specification spc := specs, "<spc.name>" == "<specName>", /EventRef evntRef := spc, "<evntRef.eventRef>" == "<event>") {
+    if (syncEventRefs[event@\loc] != {}, eventRefs[syncEventRefs[event@\loc]] != {}, {loc eventLoc} := eventRefs[syncEventRefs[event@\loc]], just(EventDef evntDef) := findEventDef(eventLoc, modules)) {
       list[str] args = ["<arg>" | Expr arg <- params];
-      list[str] eventParamNames = ["<p>" | Parameter p <- evnt.transitionParams];
+      list[str] eventParamNames = ["<p>" | Parameter p <- evntDef.transitionParams];
       
-      if (size(args) != size(eventParamNames)) { throw "Synchronized event \'<event>\' does not have the same arity as event definition in \'<specName>\'"; }
-      
-      list[str] namedArgs = ["<eventParamNames[i]> = <args[i]>" | int i <- index(args)];
-      
-      newParams = [{Expr ","}*]"<intercalate(", ", namedArgs)>";  
-    }     
+      if (size(args) != size(eventParamNames)) { 
+        msgs += error("Synchronized event does not have the same arity as event definition in \'<specName>\'", event@\loc); 
+      } else {
+        list[Expr] namedArgs = [[Expr]"<eventParamNames[i]> = <args[i]>" | int i <- index(args)];
+
+        result = ((SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>()` | merge(it, arg) | Expr arg <- namedArgs);
+      }      
+    } else {
+      msgs += error("Unable to locate synchronized event", event@\loc);       
+    }   
     
-    return (SyncStatement)`<Annotations doc><TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* newParams>);`;
+    return result;
   }  
   
   EventDef addParamNames(EventDef orig) {
-    if (/SyncBlock _ !:= orig) {
+    if (/SyncBlock _ !:= orig.sync) {
       return orig;
     }
     
     return visit(orig) {
-      case SyncStatement sst => addParamNames(sst)
+      case SyncExpr se => addParamNames(se)
     }
   }
   
-  events = visit(events) {
-    case EventDef evnt => addParamNames(evnt)
-  }
+  events = {addParamNames(evnt) | EventDef evnt <- events};
+  
+  return <msgs, events>;
 }
 
 set[EventDef] addFrameConditions(set[EventDef] events, set[FieldDecl] fields) {
+	EventDef mergePost(EventDef evnt, Statement fc) 
+	  =  visit(evnt) {
+	       case (Postconditions) `postconditions { <Statement* origPostCon> }` => 
+              (Postconditions)  `postconditions {
+                                ' <Statement* origPostCon>
+                                ' <Statement fc>
+                                '}`
+    } when /Statement* _ := evnt.post;          
+	
+	EventDef mergePost((EventDef)`<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>){<Preconditions? pre> <Postconditions? post> <SyncBlock? sync>}`, Statement fc) 
+	  =  (EventDef)
+	       `<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>) {
+	       '  <Preconditions? pre> 
+	       '  postconditions {
+         '    <Statement fc>
+         '  }
+         '  <SyncBlock? sync>
+         '}`
+       when /Statment* _ !:= post;
+	
 	EventDef addFrameConditionsToEvent(EventDef e) {
 		set[VarName] fieldNames = {field.name | FieldDecl field <- fields};
 		// Remove all the fields which are referenced
@@ -254,18 +327,8 @@ set[EventDef] addFrameConditions(set[EventDef] events, set[FieldDecl] fields) {
 		
 		// Create the framecondition statements 
 		set[Statement] frameConditions = {(Statement)`new this.<VarName f> == this.<VarName f>;` | field <- fields, field.name in fieldNames, VarName f := field.name};
-		 
-		// Add the frameconditions to the postconditions of the event
-		for (fc <- frameConditions, /Statement* origPostCon := e.post) {
-			e = visit (e) {
-				case Postconditions p => (Postconditions) 	`postconditions {
-									 						'	<Statement* origPostCon>
-									 						'	<Statement fc>
-									 						'}`
-			}
-		}
-			
-		return e; 
+	 	
+		return (e | mergePost(it, fc) | Statement fc <- frameConditions); 
 	}	
 	
 	return {addFrameConditionsToEvent(e) | e <- events};
@@ -329,76 +392,129 @@ EventDef addTransitionParam((EventDef) `<Annotations annos> event <FullyQualifie
               '}`;  
   
 
-set[EventDef] desugarStates(set[EventDef] events, set[StateFrom] states) {
-	int eventNr(VarName eventName) = stepNr
-		when 
-			/(EventDef)`<Annotations _> event <FullyQualifiedVarName name> <EventConfigBlock? _>(<{Parameter ","}* _>) { <Preconditions? _> <Postconditions? post> <SyncBlock? _>}` := events && "<name.name>" == "<eventName>",
-			/(Statement)`new this._step == <Int i>;` := post,
-			int stepNr := toInt("<i>");
+tuple[set[Message], set[EventDef], set[StateFrom]] desugarStates(set[EventDef] events, set[StateFrom] states) {
+	 EventDef labelEvent(EventDef e, int index) {
+    Int i = [Int]"<index>";     
 
-	int eventNr(FullyQualifiedVarName eventName) = eventNr(eventName.name);
-	
-	default int eventNr(value tipe) { throw "Not implemented: <tipe>"; }				
-				
-	int stateNr(StateTo to) = stateNr
-		when 
-			/(StateFrom)`<Int i>: <LifeCycleModifier? _> <VarName from> <StateTo* _>` := states,
-			"<from>" == "<to.to>",
-			int stateNr := toInt("<i>");			
+    Statement labeledEvent = (Statement)`new this._step == <Int i>;`;
 
-	int stateNr(StateFrom from) = toInt("<from.nr>");
+    if (/Statement* origPostCon := e.post) {
+      return visit(e) {
+        case Postconditions p =>
+          (Postconditions)`postconditions {
+                  '  <Statement* origPostCon>
+                  '  <Statement labeledEvent>
+                  '}`
+      };
+    } else {
+      return visit(e) {
+        case (EventDef) `<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
+          (EventDef)  `<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
+                '  <Preconditions? pre> 
+                '  postconditions {
+                '    <Statement labeledEvent>
+                '  }
+                '  <SyncBlock? sync> 
+                '}`
+      }     
+    }
+  }  
+  
+  StateFrom labelState((StateFrom)`<LifeCycleModifier? modi> <VarName from> <StateTo* destinations>`, int index) {
+    Int i = [Int]"<index>";
+
+    return (StateFrom)`<Int i>: <LifeCycleModifier? modi> <VarName from> <StateTo* destinations>`;  
+  }
+  
+	set[Message] msgs = {};
 	
+	map[str, int] stateMapping = ();
+	int i = 1;
+	set[StateFrom] labeledStates = {};
+	for (StateFrom sf <- states) {
+	  stateMapping += ("<sf.from>" : i);
+	  labeledStates += labelState(sf, i);
+	  i += 1;
+	}
+	
+	map[str, int] eventMapping = ();
+  i = 0;
+  set[EventDef] labeledEvents = {};
+  for (EventDef e <- events) {
+    eventMapping += ("<e.name>" : i);
+    labeledEvents += labelEvent(e, i);
+    i += 1;
+  }
+  		
+  bool inEventMap(VarName name) {
+    if ("<name>" notin eventMapping) {
+      msgs += error("Undeclared event", name@\loc);
+      return false;
+    } else {
+      return true;
+    }
+  }		
+  
+  bool inStateMap(VarName name) {
+    if ("<name>" notin stateMapping) {
+      msgs += error("Undeclared event", name@\loc);
+      return false;
+    } else {
+      return true;
+    }
+  }
+    		
 	map[int, lrel[int, int]] eventStateMapping = (
 		() | 
-		eNr notin it ?
-			it + (eNr
-			 : [<stateNr(from), stateNr(to)>]) :
-			it + (eNr : it[eNr] + [<stateNr(from), stateNr(to)>]) 
-		| StateFrom from <- states, /StateTo to := from, /VarName via := to.via, int eNr := eventNr(via));
+		eventMapping["<via>"] notin it ?
+			it + (eventMapping["<via>"] : [<stateMapping["<from.from>"], stateMapping["<to.to>"]>]) :
+			it + (eventMapping["<via>"] : it[eventMapping["<via>"]] + [<stateMapping["<from.from>"], stateMapping["<to.to>"]>]) 
+		| StateFrom from <- states, StateTo to <- from.destinations, VarName via <- to.via.refs, inEventMap(via) && inStateMap(from.from) && inStateMap(to.to));
 
 	Statement createInlinedPreconditionLifeCycleStatement(EventDef e) =
 		[Statement] "<intercalate(" || ", statements)>;"
-		when int eventNr := eventNr(e.name),
-			 list[str] statements := ["(this._state == <from> && _toState == <to>)" | <int from, int to> <- eventStateMapping[eventNr]]; 		
-
-	Statement createInlinedPostconditionLifeCycleStatement(EventDef e) = [Statement] "new this._state == _toState;";
+		when int eventNr := eventMapping["<e.name>"],
+			   list[str] statements := ["(this._state == <from> && _toState == <to>)" | <int from, int to> <- eventStateMapping[eventNr]]; 		
 
 	EventDef addTransitionToParam(EventDef orig) = addTransitionParam(orig, (Parameter)`_toState : Integer`);
 
+  Statement postCon = [Statement] "new this._state == _toState;";
+
 	EventDef desugarLifeCycle(EventDef e) {
 		e = addTransitionToParam(e);	
-		
-		if (/Statement* origPreCon := e.pre) { 
-			e = visit(e) { 
-				case Preconditions p => 
-					(Preconditions) `preconditions {
-									'  <Statement* origPreCon>
-									'  <Statement inlinedLifeCycle>
-									'}`
-					when Statement inlinedLifeCycle := createInlinedPreconditionLifeCycleStatement(e)
-			} 	 
-		} else {
-			e = visit(e) {
-				case (EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
-					(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
-								'  preconditions {
-								'    <Statement inlinedLifeCycle>
-								'  } 
-								'  <Postconditions? post>
-								'  <SyncBlock? sync> 
-								'}`
-					when Statement inlinedLifeCycle := createInlinedPreconditionLifeCycleStatement(e)
-			}			
-		}
-		
+
+    if ("<e.name>" in eventMapping, eventMapping["<e.name>"] in eventStateMapping) {
+  		if (/Statement* origPreCon := e.pre) { 
+  			e = visit(e) { 
+  				case Preconditions p => 
+  					(Preconditions) `preconditions {
+  									'  <Statement* origPreCon>
+  									'  <Statement inlinedLifeCycle>
+  									'}`
+  					when Statement inlinedLifeCycle := createInlinedPreconditionLifeCycleStatement(e)
+  			} 	 
+  		} else {
+  			e = visit(e) {
+  				case (EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
+  					(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
+  								'  preconditions {
+  								'    <Statement inlinedLifeCycle>
+  								'  } 
+  								'  <Postconditions? post>
+  								'  <SyncBlock? sync> 
+  								'}`
+  					when Statement inlinedLifeCycle := createInlinedPreconditionLifeCycleStatement(e)
+  			}			
+  		}
+    }
+    		
 		if (/Statement* origPostCon := e.post) {
 			e = visit(e) { 
 				case Postconditions p => 
 					(Postconditions) `postconditions {
 									'  <Statement* origPostCon>
-									'  <Statement inlinedLifeCycle>
+									'  <Statement postCon>
 									'}`
-					when Statement inlinedLifeCycle := createInlinedPostconditionLifeCycleStatement(e)		
 			}	
 		} else {
 			e = visit(e) {
@@ -406,11 +522,10 @@ set[EventDef] desugarStates(set[EventDef] events, set[StateFrom] states) {
 					(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
 								'  <Preconditions? pre>
 								'  postconditions {
-								'    <Statement inlinedLifeCycle>
+								'    <Statement postCon>
 								'  } 
 								'  <SyncBlock? sync> 
 								'}`
-					when Statement inlinedLifeCycle := createInlinedPostconditionLifeCycleStatement(e)
 			}			
 
 		}
@@ -418,7 +533,11 @@ set[EventDef] desugarStates(set[EventDef] events, set[StateFrom] states) {
 		return e;
 	}
 	
-	return {desugarLifeCycle(e) | e <- events}; 
+	if (-1 in eventStateMapping) {
+	 return <msgs, events, states>;
+	} else {
+  	return <msgs, {desugarLifeCycle(e) | e <- labeledEvents}, labeledStates>;
+  } 
 }
 	
 
@@ -428,31 +547,61 @@ set[EventDef] inlineConfigurationParameters(set[EventDef] events) {
 			case (Expr)`<Ref ref>` => (Expr)`<Expr resolvedField>`
 				when /(Parameter)`<VarName f>: <Type tipe> = <Expr resolvedField>` := e.configParams,
 					 /(Ref)`<VarName field>` := ref, 
-					 f == field
+					 "<f>" == "<field>"
 				
 			case (Expr)`<VarName function>(<{Expr ","}* params>)` => (Expr)`<VarName resolvedFunction>(<{Expr ","}* params>)`
-				when /(Parameter)`<VarName f>: <Type tipe> = <Expr resolvedFunction>` := e.configParams && f == function
+				when /(Parameter)`<VarName f>: <Type tipe> = <Expr resolvedFunction>` := e.configParams && "<f>" == "<function>"
 		}
 	};
 	
 	return {rewriteEvent(e) | e <- events};
 }
 
-set[EventDef] mergeConfig(set[EventDef] events, Specification spc, Ref keywordRefs) {
-	for (<loc ref, loc def> <- keywordRefs, /ConfigParameter overriddenConfig := spc, overriddenConfig@\loc == ref) {
-		//rewrite event param
-		events = visit(events) {
-			case p:(Parameter)`<VarName name> : <Type tipe> = <Expr _>` => (Parameter)`<VarName name> : <Type tipe> = <Expr newVal>`
-				when 
-					def == p@\loc,
-					Expr newVal := overriddenConfig.val
-
-			case p:(Parameter)`<VarName name> : <Type tipe>` => (Parameter)`<VarName name> : <Type tipe> = <Expr newVal>`
-				when 
-					def == p@\loc,
-					Expr newVal := overriddenConfig.val
-		}
-	}
-	
-	return events;
+tuple[set[Message], set[EventDef]] mergeConfig(set[EventDef] events, Specification spc, Reff keywordRefs) {
+  Maybe[Expr] findConfigParameterValue(loc def) {
+    if (<def, loc ref> <- keywordRefs, /EventRef er := spc.events, ConfigParameter overriddenConfig <- er.config, overriddenConfig@\loc == ref) {
+      return just(overriddenConfig.val);
+    } else {
+      return nothing();
+    } 
+  }
+  
+  Maybe[loc] findEventRef(loc configParam) = just(er@\loc)
+    when 
+      EventDef evnt <- events, 
+      configParam <= evnt@\loc, 
+      /EventRef er := spc.events, 
+      "<er.eventRef>" == "<evnt.name>";
+  default Maybe[loc] findEventRef(loc configParam) = nothing();  
+  
+  set[Message] msgs = {};
+  bool addMsg(Message m) { msgs += m; return true; }
+  
+  //rewrite event params
+  set[EventDef] mergedEvents = {};
+  for (EventDef evnt <- events) {
+  	evnt.configParams = visit(evnt.configParams) {
+  	  // When the config parameter already has a default value it is not necessary to have a override
+      case p:(Parameter)`<VarName name> : <Type tipe> = <Expr _>` => (Parameter)`<VarName name> : <Type tipe> = <Expr newVal>`
+        when 
+          just(loc _) := findEventRef(p@\loc),
+          just(Expr newVal) := findConfigParameterValue(p@\loc)
+  
+      // When the config parameter does not have a default value a override needs to be given
+      case p:(Parameter)`<VarName name> : <Type tipe>` => (Parameter)`<VarName name> : <Type tipe> = <Expr newVal>`
+  			when 
+          just(loc _) := findEventRef(p@\loc),
+          just(Expr newVal) := findConfigParameterValue(p@\loc)
+  
+      case p:(Parameter)`<VarName name> : <Type tipe>` => (Parameter)`<VarName name> : <Type tipe>`
+        when 
+          just(loc eventRef) := findEventRef(p@\loc),
+          nothing() := findConfigParameterValue(p@\loc),
+          addMsg(error("No value assigned to configuration parameter", eventRef))
+  	};
+  	
+  	mergedEvents += evnt;
+  }
+  	
+	return <msgs,mergedEvents>;
 }

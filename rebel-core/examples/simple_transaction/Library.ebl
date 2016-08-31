@@ -125,7 +125,7 @@ event start(amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
 }
 event book() {
 	preconditions {
-		this.bookOn == now.date;	
+		this.bookedOn == now.date;	
 	}
 	sync {
 	   // implicitly checks for initialized state

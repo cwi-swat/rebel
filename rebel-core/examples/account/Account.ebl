@@ -11,8 +11,8 @@ abstract specification Account {
 	events {
 		block[]
 		unblock[]
-	  	close[]
-	  	destroy[]
+	  close[]
+	  destroy[]
 	}
 	
 	lifeCycle {

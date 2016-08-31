@@ -17,21 +17,22 @@ import lang::Syntax;
 
 import IO;
 import ParseTree;
+import util::Maybe;
 
-data Refs = refs(Ref imports, 
-				 Ref eventRefs, 
-				 Ref functionRefs, 
-				 Ref invariantRefs, 
-				 Ref lifeCycleRefs, 
-				 Ref stateRefs, 
-				 Ref keywordRefs, 
-				 Ref inheritance, 
-				 Ref specRefs);
-				   
-alias Ref = rel[loc from, loc to];
+data Refs = refs(Reff imports, 
+				         Reff eventRefs, 
+				         Reff functionRefs, 
+				         Reff invariantRefs, 
+				         Reff lifeCycleRefs, 
+				         Reff stateRefs, 
+				         Reff keywordRefs, 
+				         Reff inheritance,
+				         Reff syncedEventRefs);
+				    
+alias Reff = rel[loc from, loc to];
 
 Refs resolve(set[Module] modules) =
-	refs(resolveImports(modules), 
+	   refs(resolveImports(modules), 
 		 resolveEventReferences(modules),
 		 resolveFunctionReferences(modules),
 		 resolveInvariantReferences(modules),
@@ -39,23 +40,18 @@ Refs resolve(set[Module] modules) =
 		 resolveLifeCycleStateReferences(modules),
 		 resolveKeywordReferences(modules),	
 		 resolveInheritance(modules),
-		 resolveSpecRefs(modules));
+		 resolveSyncedEventReferences(modules));
 
-Ref resolveImports(set[Module] modules) {
-	moduleNames = ("<m.modDef.fqn>":m@\loc | m <- modules);
-	return {<i.fqn@\loc, moduleNames["<i.fqn>"]> | current <- modules, /Import i := current.imports, "<i.fqn>" in moduleNames};
-}
-
-private set[Module] importedModules(Module moi, set[Module] allMods) {
-	set[str] impModNames = {"<imp.fqn>" | imp <- moi.imports};
-	return {imp | imp <- allMods, "<imp.modDef.fqn>" in impModNames};
-}
-
-Ref resolveEventReferences(set[Module] modules) {	
-	Ref refs = {};
+Reff resolveImports(set[Module] modules) {
+  moduleNames = ("<m.modDef.fqn>":m@\loc | m <- modules);
+  return {<i.fqn@\loc, moduleNames["<i.fqn>"]> | current <- modules, /Import i := current.imports, "<i.fqn>" in moduleNames};
+} 
+   
+Reff resolveEventReferences(set[Module] modules) {	
+	Reff refs = {};
 	for (m <- modules, /Specification s := m) {
 		set[Module] imports = importedModules(m, modules);
-		defs = ("<def.name>" : def@\loc | /EventDef def := imports);
+		defs = ("<def.name>" : def@\loc | EventDef def <- allEventDefs(imports));
 		
 		refs += {<ref@\loc, defs["<ref.eventRef>"]> | /EventRef ref := m, "<ref.eventRef>" in defs};
 	}
@@ -63,7 +59,7 @@ Ref resolveEventReferences(set[Module] modules) {
 	return refs;
 }
 
-Ref resolveFunctionReferences(set[Module] modules) {
+Reff resolveFunctionReferences(set[Module] modules) {
 	map[str,loc] buildFunctionDef(EventConfigBlock? config) =
 		("<name>" : name@\loc | /(Parameter)`<VarName name> : <Type _> -\> <Type _>` := config) +
 		("<name>" : name@\loc | /(Parameter)`<VarName name> : <Type _> -\> <Type _> = <Expr _>` := config);
@@ -71,19 +67,19 @@ Ref resolveFunctionReferences(set[Module] modules) {
 	map[str, loc] buildFunctionRefMapInKeywordParams(EventRef er) =
 		("<val>" : val@\loc | /(ConfigParameter)`<VarName name> = <Expr val>` := er);
 
-	Ref refs = {};
+	Reff refs = {};
 	
 	for (m <- modules) {
 		set[Module] imports = {m} + importedModules(m, modules);
-		defs = ("<def.name>" : def@\loc | /FunctionDef def := imports);
+		defs = ("<def.name>" : def@\loc | FunctionDef def <- allFunctionDefs(imports));
 
-		// Find all the function calls
-		refs += {<ref@\loc, defs["<func>"]> | /ref:(Expr)`<VarName func>(<{Expr ","}* _>)` := imports, "<func>" in defs};
+    // Find all the function calls
+    refs += {<f@\loc, defs["<func>"]> | f:(Expr)`<VarName func>(<{Expr ","}* _>)` <- allFunctionCalls(imports), "<func>" in defs};
 		
 		// Find the block scoped function pointers in event config	
 		for (/EventDef e := m) {
 			scopedDefs = buildFunctionDef(e.configParams);
-			refs += {<ref@\loc, scopedDefs["<func>"]> | /ref:(Expr)`<VarName func>(<{Expr ","}* _>)` := e, "<func>" in scopedDefs};  
+			refs += {<r@\loc, scopedDefs["<func>"]> | /r:(Expr)`<VarName func>(<{Expr ","}* _>)` := e, "<func>" in scopedDefs};  
 				
 			// also the default values of the config parameters could point to a function
 			refs += {<val@\loc, defs["<val>"]> | /(Parameter)`<VarName _> : <Type _> -\> <Type _> = <Expr val>` := e.configParams, "<val>" in defs};
@@ -99,67 +95,67 @@ Ref resolveFunctionReferences(set[Module] modules) {
 	return refs;
 }
 
-Ref resolveKeywordReferences(set[Module] modules) {
-	Ref refs = {};
+Reff resolveKeywordReferences(set[Module] modules) {
+	Reff refs = {};
 	
-	for (m <- modules, /Specification s := m) {
+	for (m <- modules, m has spec) {
 		set[Module] imports = importedModules(m, modules);
-		defs = ("<def.name>" : def | /EventDef def := imports);
+		defs = ("<def.name>" : def | EventDef def <- allEventDefs(imports));
 	
-		for (/EventRef er := m, "<er.eventRef>" in defs) {
-			refs += {<p@\loc, cp@\loc> | /ConfigParameter p := er, /Parameter cp := defs["<er.eventRef>"].configParams, "<p.name>" == "<cp.name>" }; 			
+		for (/EventRef er := m.spec.events, "<er.eventRef>" in defs) {
+			refs += {<p@\loc, cp@\loc> | ConfigParameter cp <- er.config, /EventConfigBlock ecb := defs["<er.eventRef>"].configParams, Parameter p <- ecb.params, "<p.name>" == "<cp.name>" }; 			
 		}
 	}
 
 	return refs;
 }
 
-Ref resolveInvariantReferences(set[Module] modules) {
-	Ref refs = {};
+Reff resolveInvariantReferences(set[Module] modules) {
+	Reff refs = {};
 	
 	for (m <- modules, /Specification s := m) {
-		set[Module] imports = importedModules(m, modules);
-		map[str, loc] defs = ("<def.name>" : def@\loc | /InvariantDef def := imports);
-		refs += {<inv@\loc, defs["<inv>"]> | /InvariantRefs ref := s, /VarName inv := ref, "<inv>" in defs };
+		set[Module] libMods = allLibraryModules(importedModules(m, modules));
+		map[str, loc] defs = ("<def.name>" : def@\loc | Module lib <- libMods, /InvariantDef def <- lib.decls);
+		refs += {<inv@\loc, defs["<inv>"]> | /InvariantRefs ref := s, /FullyQualifiedVarName inv := ref, "<inv>" in defs };
 	}
 	
 
 	return refs;
 }
 
-Ref resolveLifeCycleEventReferences(set[Module] modules) {
-	Ref refs = {};
+Reff resolveLifeCycleEventReferences(set[Module] modules) {
+	Reff refs = {};
 	
 	for (m <- modules) {
-		if (/Specification s := m) {
+		if (m has spec) {
 			set[Module] chain = {m} + findParents(m, modules); 
-			map[str, loc] defs = ("<def.eventRef>" : def@\loc | /EventRef def := chain);
+			map[str, loc] defs = ("<def.eventRef>" : def@\loc | EventRef def <- allEventRefs(chain));
 			
-			refs += {<event@\loc, defs["<event>"]> | /StateVia ref := m, /VarName event := ref, "<event>" in defs};
+			refs += {<event@\loc, defs["<event>"]> | /LifeCycle lc := m.spec.lifeCycle, StateFrom sf <- lc.from, StateTo st <- sf.destinations, VarName event <- st.via.refs, "<event>" in defs};
 		}
 	}
-	
+	 
 	return refs;
 }
 
-Ref resolveLifeCycleStateReferences(set[Module] modules) {
-	Ref refs = {};
+Reff resolveLifeCycleStateReferences(set[Module] modules) {
+	Reff refs = {};
 	
-	for (m <- modules, /Specification s := m) {
-		set[Module] chain = {m} + findParents(m, modules); 
-		map[str, loc] defs = ("<st.from>" : st.from@\loc | /StateFrom st := chain);
+	for (current <- modules, current has spec) {
+		set[Module] chain = {current} + findParents(current, modules); 
+		map[str, loc] defs = ("<sf.from>" : sf.from@\loc | Module m <- chain, /LifeCycle lc := m.spec.lifeCycle, StateFrom sf <- lc.from);
 		
-		refs += {<ref.to@\loc, defs["<ref.to>"]> | /StateTo ref := m, "<ref.to>" in defs};
+		refs += {<st.to@\loc, defs["<st.to>"]> | Module m <- chain, /LifeCycle lc := m.spec.lifeCycle, StateFrom sf <- lc.from, StateTo st <- sf.destinations, "<st.to>" in defs};
 	}
-	
+	 
 	return refs;
 }
 
-Ref resolveInheritance(set[Module] modules) {
-	Ref refs = {};
+Reff resolveInheritance(set[Module] modules) {
+	Reff refs = {};
 	
-	for (m <- modules, 
-		/Extend ext := m, 
+	for (m <- allSpecificationModules(modules), 
+		/Extend ext := m.spec.\extend, 
 		/Import imp := m, 
 		"<imp.fqn.modName>" == "<ext.parent>",
 		m2 <- modules, 
@@ -170,30 +166,60 @@ Ref resolveInheritance(set[Module] modules) {
 	return refs; 	
 }
 
-Ref resolveSpecRefs(set[Module] modules) {
-	map[str,loc] specNames = 
-		("<spc.name>":spc@\loc | /Specification spc := modules);
-	
-	set[str] importedSpecModules(Module modul) =  
-		{"<imp.fqn.modName>" | /Import imp := modul.imports, "<imp.fqn.modName>" in specNames};		
+Reff resolveSyncedEventReferences(set[Module] modules) {
+  Reff ref = {};
 
-	Ref refs = {};
-
-	for (m <- modules) {
-		set[str] impSpecModules = importedSpecModules(m);
-
-		for (/EventDef evnt := m,  /ref:(Ref)`<FullyQualifiedName name>` := evnt, "<name>" in impSpecModules) {
-			refs += {<ref@\loc, specNames["<name>"]>};
-		}
-	}
-	
-	return refs;
+  set[Module] libModules = allLibraryModules(modules);
+  
+  for (Module libMod <- libModules, /EventDef evnt := libMod.decls, /SyncBlock sb := evnt.sync, SyncStatement syncStat <- sb.stats, /(SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)` := syncStat) {
+    if(Module m <- allSpecificationModules(importedModules(libMod, modules)), m.spec.name == specName, /EventRef er := m.spec.events, "<er.eventRef>" == "<event>") {
+      ref += <event@\loc, er@\loc>;
+    }
+  } 
+  
+  return ref;
 }
 
-Ref resolveSyncedEventRefs(set[Module] modules) {
-	//	
+Maybe[EventDef] findEventDef(loc eventLoc, set[Module] modules) {
+  if (Module m <- modules, eventLoc.top == m@\loc.top, m has decls, /EventDef evnt := m.decls, evnt@\loc == eventLoc) {
+    return just(evnt);
+  }
+  
+  return nothing(); 
+} 
+
+@memo
+private set[Module] importedModules(Module moi, set[Module] allMods) {
+  set[str] impModNames = {"<imp.fqn>" | imp <- moi.imports};
+  return {imp | imp <- allMods, "<imp.modDef.fqn>" in impModNames};
 }
 
+@memo 
+private set[Module] allLibraryModules(set[Module] mods) =
+  {m | Module m <- mods, m has decls};
+  
+@memo
+set[Module] allSpecificationModules(set[Module] mods) =
+  {m | Module m <- mods, m has spec};
+
+@memo
+set[EventDef] allEventDefs(set[Module] mods) =
+  {e | Module m <- allLibraryModules(mods), /EventDef e <- m.decls};
+
+@memo
+set[EventRef] allEventRefs(set[Module] mods) =
+  {er | Module m <- allSpecificationModules(mods), /EventRef er <- m.spec.events};
+
+@memo
+set[FunctionDef] allFunctionDefs(set[Module] mods) =
+  {f | Module m <- allLibraryModules(mods), /FunctionDef f <- m.decls};
+
+set[Expr] allFunctionCalls(set[Module] mods) =
+  {fc | EventDef evnt <- allEventDefs(mods), /fc:(Expr)`<VarName func>(<{Expr ","}* _>)` := evnt.pre} +
+  {fc | EventDef evnt <- allEventDefs(mods), /fc:(Expr)`<VarName func>(<{Expr ","}* _>)` := evnt.post} +
+  {fc | FunctionDef f <- allFunctionDefs(mods), /fc:(Expr)`<VarName func>(<{Expr ","}* _>)` := f.statement}; 
+
+@memo
 private set[Module] findParents(Module current, set[Module] modules) {
 	if (/Extend ext := current) {
 		if (/Import imp := current, "<imp.fqn.modName>" == "<ext.parent>") {

@@ -15,7 +15,7 @@ specification SimpleSavings extends SavingsAccount {
 	}
 	
 	lifeCycle {
-		initial init	-> opened: openAccount 
+		initial init	-> opened: openAccount
 		opened			-> opened: withdraw, deposit, interest 
 	}
 }
