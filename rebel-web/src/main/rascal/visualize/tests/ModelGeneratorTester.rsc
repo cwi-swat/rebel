@@ -19,5 +19,5 @@ import visualize::ADT;
 import util::Maybe;
 
 
-Maybe[JsSpec] generate() = generate(|project://rebel-core/tests/account/saving/SimpleSavings.ebl|);
+Maybe[JsSpec] generate() = generate(|project://rebel-core/examples/simple_transaction/Transaction.ebl|);
 Maybe[JsSpec] generate(loc file) = generateJsStructureOfInternals(file);

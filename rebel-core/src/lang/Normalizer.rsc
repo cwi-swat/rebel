@@ -99,10 +99,10 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs) {
 	// 8. Add the identity fields as transition parameters of the event
 	events = {addIdentityAsTransitionParams(fields, e) | EventDef e <- events};
 	
-	// 9. Replace all the references to this with the name of the specification
-	tuple[set[Message], set[EventDef]] thisReplacingResult = replaceReferencesToThisWithSpecificationName(events, inlinedSpc.spec.eventRefs, "<inlinedSpc.spec.name>", fields);
-	events = thisReplacingResult<1>;
-	
+  // 9. Replace all the references to this with the name of the specification
+  tuple[set[Message], set[EventDef]] thisReplacingResult = replaceReferencesToThisWithSpecificationName(events, inlinedSpc.spec.eventRefs, "<inlinedSpc.spec.name>", fields);
+  events = thisReplacingResult<1>;
+
 	// Find all synchronized events and add parameter names to the call
   tuple[set[Message], set[EventDef]] syncedEventResult = addParamNameToSyncedVariables(events, modules, refs.syncedEventRefs, refs.eventRefs);
   events = syncedEventResult<1>;
@@ -281,13 +281,15 @@ tuple[set[Message], set[EventDef]] addParamNameToSyncedVariables(set[EventDef] e
     return result;
   }  
   
+  default SyncExpr addParamNames(SyncExpr exp) { throw "Adding parameters to \'<exp>\' not yet implemented"; }
+  
   EventDef addParamNames(EventDef orig) {
     if (/SyncBlock _ !:= orig.sync) {
       return orig;
     }
     
     return visit(orig) {
-      case SyncExpr se => addParamNames(se)
+      case se:(SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)` => addParamNames(se)
     }
   }
   
@@ -315,14 +317,13 @@ set[EventDef] addFrameConditions(set[EventDef] events, set[FieldDecl] fields) {
          '  }
          '  <SyncBlock? sync>
          '}`
-       when /Statment* _ !:= post;
+       when /Statement* _ !:= post;
 	
 	EventDef addFrameConditionsToEvent(EventDef e) {
 		set[VarName] fieldNames = {field.name | FieldDecl field <- fields};
 		// Remove all the fields which are referenced
 		visit(e.post) {
 			case (Expr)`new this.<VarName field>`: fieldNames -= field;
-			//case (Expr)`new this.<VarName field>[<Expr _>]`: fieldNames -= field;
 		}
 		
 		// Create the framecondition statements 

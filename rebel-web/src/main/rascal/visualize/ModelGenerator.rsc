@@ -13,12 +13,13 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 @contributor{Jouke Stoel - jouke.stoel@cwi.nl - CWI}
 module visualize::ModelGenerator
 
-import lang::Parser;
-import lang::Flattener;
-import lang::Importer;
-import lang::Resolver;
-import lang::Normalizer;
+//import lang::Parser;
+//import lang::Flattener;
+//import lang::Importer;
+//import lang::Resolver;
+//import lang::Normalizer;
 import lang::ExtendedSyntax;
+import lang::Builder;
 
 import visualize::ADT; 
 import visualize::JavaScriptModelWriter;
@@ -135,15 +136,11 @@ Maybe[JsSpec] generateJsStructureOfInternals(loc file) {
 	println("Working on: <file>");
 
 	try {		
-		Module current = parseModule(file);
+		tuple[set[Message], Built] model = load(file); 
 		
-		if (/Specification spc := current) {
-			// can only generate for specifications
-			set[Module] imports = loadImports(current);
-			Refs refs = resolve(current + imports);
-			
-			Module inlined = inline(current, imports, refs);			
-			
+		if (/Specification spc := model<1>.inlinedMod) {
+		  Module inlined = model<1>.inlinedMod;
+		
 			return just(jsSpec(
 					"<inlined.modDef.fqn>", 
 					"<inlined.modDef.fqn.modName>",

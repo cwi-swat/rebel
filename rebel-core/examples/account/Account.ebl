@@ -18,9 +18,9 @@ abstract specification Account {
 	lifeCycle {
 		initial init
 		opened 	-> blocked: block
-				-> closed: close
+				    -> closed: close
 		blocked	-> opened: unblock
-				-> closed: close
+				    -> closed: close
 		closed	-> destroyed: destroy
 		final destroyed
 	}

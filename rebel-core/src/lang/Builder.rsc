@@ -23,17 +23,20 @@ alias Log = void(str);
 
 void noLog(str x) {}
 
-alias Phase1Result = tuple[set[Message] msgs, Module phase1Module, set[Module] imports, Refs refs];
-
 //data Built 
 //  = buildSpec(Module inlinedMod, Module normalizedMod, Refs refs)
 //  | buildLib(Module normalizedMod, Refs refs)
 //  ;
 
 alias Built = tuple[Module inlinedMod, Module normalizedMod, Refs refs];
+alias UsedBy = set[loc];
+
+private str buildDir = "bin";
+
+loc getOutputLoc(loc srcFile)  = |<srcFile.scheme>://<srcFile.authority>/<buildDir>/rebel|;
 
 tuple[set[Message], Built] load(loc modLoc, 
-  loc outputDir, 
+  loc outputDir = getOutputLoc(modLoc), 
   Maybe[Module] modulPt = nothing(), 
   bool clean = false, 
   Log log = noLog) {
@@ -41,6 +44,7 @@ tuple[set[Message], Built] load(loc modLoc,
   Module orig = (just(Module m) := modulPt) ? m : parseModule(modLoc);
   
   <msgs, allNormalizedBuilds> = loadAll(modLoc, outputDir, modulPt = modulPt, clean = clean, log = log);
+  
   if (Built m <- allNormalizedBuilds, m.normalizedMod.modDef.fqn == orig.modDef.fqn) {
     return <msgs, m>;
   } else {
@@ -61,10 +65,10 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
   }
   
   map[FullyQualifiedName, tuple[bool, Built]] done = ();
+  map[loc, Module] parsed = ();
   
   tuple[set[Message], Built, set[Module]] build(Module modul) {
-    ImporterResult importResult = loadImports(modul); //, {"<i.modDef.fqn>" | i <- imported});
-    //imported += importResult<1>;    
+    ImporterResult importResult = loadImports(modul, cachedParse);
     Refs refs = resolve({modul} + importResult<1>);
     
     if (modul has spec) {
@@ -98,13 +102,43 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
   loc normalizedFile(Module src) = toOutputPath(outputDir, src)[extension = "nebl"];
   @memo
   loc builtFile(Module src) = toOutputPath(outputDir, src)[extension = "bebl"];
+  @memo
+  loc usedByFile(Module src) = toOutputPath(outputDir, src)[extension = "ub"];
       
+  @memo      
   loc toOutputPath(loc base, Module m) = (base + "<("" | "<it><p>/" | /VarName p := m.modDef.fqn)><m.modDef.fqn.modName>")[extension="ebl"];  
   
-  @memo
-  Module cachedParse(loc src) = parseModule(src);
+  set[loc] loadUsedBy(Module src) = (exists(usedByFile(src))) ? readTextValueFile(#UsedBy, usedByFile(src)) : {};
+      
+  set[Module] loadUsedByModules(Module src) { 
+    set[loc] usedBy = loadUsedBy(src);
+      
+    return {cachedParse(u.top) | u <- usedBy};      
+  }
   
-  bool changedOnDisk(Module m) = m != cachedParse(modLoc);
+  void addToUsedBy(Module src, loc dep) {
+    set[loc] usedBy = loadUsedBy(src);
+    usedBy += dep;
+    writeTextValueFile(usedByFile(src), usedBy);
+  }
+  
+  void removeFromUsedBy(Module src, loc dep) {
+    set[loc] usedBy = loadUsedBy(src);
+    usedBy -= dep;
+    writeTextValueFile(usedByFile(src), usedBy);
+  }
+  
+  Module cachedParse(loc src) { 
+    if (src in parsed) {
+      return parsed[src];
+    } else {
+      Module m = parseModule(src);
+      parsed += (src : m);
+      return m;
+    }
+  }
+  
+  bool changedOnDisk(Module m) = <m> != <parseModule(modLoc)>;
   
   bool needsBuild(Module origMod) {
     bool buildNecessary() = 
@@ -116,7 +150,8 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
  
     if (origMod.modDef.fqn in done) {
       return false;
-    } else if (!buildNecessary()) {
+    } 
+    else if (!buildNecessary()) {
       Built buildModule = loadFromOutput(origMod);
       done += (origMod.modDef.fqn : <false, buildModule>); 
 
@@ -129,8 +164,8 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
   set[Message] msgs = {};
   
   void buildRecursive(Module orig) {
-    ilog("Preparing <orig.modDef.fqn> for build");
     indent += 1;
+    ilog("Preparing <orig.modDef.fqn> for build");
     
     if (needsBuild(orig) && orig.modDef.fqn notin done) {
       ilog("<orig.modDef.fqn.modName> needs fresh build");
@@ -139,10 +174,25 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
       
       done += (result<1>.normalizedMod.modDef.fqn : <true, result<1>>);
       msgs += result<0>;
-
-      for (Module imp <- result<2>) {
+      
+      for (Module imp <- result<2>, imp != orig) {
         buildRecursive(imp);
       }
+      
+      // Check used by dependencies as well
+      for (Module dependency <- loadUsedByModules(orig)) {
+        if ("<orig.modDef.fqn>" notin {"<imp.fqn>" | Import imp <- dependency.imports}) {
+          ilog("Dependend module <dependency.modDef.fqn.modName> is not depending on this module any more");
+          removeFromUsedBy(orig, dependency@\loc.top);
+        }
+      } 
+      
+      // Check the imports and add this module as dependency if needed
+      for (Module imp <- result<2>, imp != orig) {
+        addToUsedBy(imp, orig@\loc.top);
+      }      
+
+      ilog("Done building <orig.modDef.fqn.modName>");
     } else {
       ilog("<orig.modDef.fqn.modName> already build");
     }
@@ -151,6 +201,8 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
   }
   
   Module orig = (just(Module m) := modulPt) ? m : cachedParse(modLoc);
+  parsed += (orig@\loc.top : orig);
+
   buildRecursive(orig);
   
   for (<bool needsSave, Built built> <- done<1>) {
@@ -159,5 +211,8 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
     }
   }
   
+  ilog("Building done!");
+  
   return <msgs, {b | Built b <- done<1><1>}>;
 }
+

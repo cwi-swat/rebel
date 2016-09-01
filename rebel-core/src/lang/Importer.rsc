@@ -14,7 +14,6 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 module lang::Importer
 
 import lang::Syntax;
-import lang::Parser;
 
 import String;
 import IO;
@@ -24,9 +23,9 @@ import ParseTree;
 
 alias ImporterResult = tuple[set[Message] msgs, set[Module] mods]; 
 
-ImporterResult loadImports(Module m) = loadImports(m, resolveBaseDir(m));
+ImporterResult loadImports(Module m, Module (loc) parseModule) = loadImports(m, resolveBaseDir(m), parseModule);
 
-private ImporterResult loadImports(Module initial, loc baseDir) {
+private ImporterResult loadImports(Module initial, loc baseDir, Module (loc) parseModule) {
 	set[Message] msgs = {};
 	map[str,Module] importedModules = ();
 	

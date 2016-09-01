@@ -9,7 +9,7 @@ import account.saving.SimpleSavingsLib
 specification SimpleSavings extends SavingsAccount {
 	events {
 		openAccount[minimalDeposit=EUR 50.00]
-		withdraw[] 
+		withdraw[]
 		deposit[]
 		interest[interestCalc=singleInterest] 
 	}

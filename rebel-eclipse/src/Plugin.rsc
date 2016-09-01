@@ -48,10 +48,6 @@ import util::Maybe;
 
 anno rel[loc, loc] Tree@hyperlinks; 
 
-str buildDir = "bin";
-
-loc getOutputLoc(loc srcFile)  = |<srcFile.scheme>://<srcFile.authority>/<buildDir>/rebel|;
-
 void main() {
 	REBEL_LANGUAGE = "Rebel Language";
 
@@ -59,7 +55,7 @@ void main() {
 	
 	contribs = {
 		annotator(Module (Module m) {
-		  <msgs, built> = load(m@\loc.top, getOutputLoc(m@\loc.top), modulPt = just(m), log = println);
+		  <msgs, built> = load(m@\loc.top, modulPt = just(m), log = println);
 	    return m[@messages=msgs][@hyperlinks=getAllHyperlinks(m@\loc, built.refs)];
     }),
 		popup(

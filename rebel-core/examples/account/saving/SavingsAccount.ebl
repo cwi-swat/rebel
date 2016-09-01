@@ -4,16 +4,8 @@ import account.Account
 import account.AccountLib
 
 abstract specification SavingsAccount extends Account {
-
-	events {
-		block2[]
-	}
  
 	invariants {
 		positiveBalance
-	}	
-	
-	lifeCycle {
-		opened -> blocked: block2
-	}
+	}		
 }

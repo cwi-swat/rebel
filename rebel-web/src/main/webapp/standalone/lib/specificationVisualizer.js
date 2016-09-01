@@ -226,7 +226,7 @@ var SpecRenderer = function() {
         return items;
       }
 
-      var content = edgeNode.doc !== "" ? micromarkdown.parse(edgeNode.doc + " \n") : "";
+      var content = edgeNode.doc !== "" ? edgeNode.doc + " \n" : "";
 
       if (edgeNode.params.length > 0) {
         var items = [];

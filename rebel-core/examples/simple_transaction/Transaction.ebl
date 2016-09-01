@@ -14,18 +14,18 @@ specification Transaction {
 		from: IBAN @ref=Account
 		to: IBAN @ref=Account
 		createdOn: DateTime
-		bookedOn: Date 
+		bookedOn: Date
 	}
-	
+	 
 	events {
-		start[]
-		book[]
-		fail[] 
-	}
+		start[] 
+		book[]  
+		fail[]
+	}  
 	
 	lifeCycle {
-		initial init -> validated: start
-		validated   -> booked: book
+		initial init -> validated: start 
+		validated   -> booked: book 
 					-> failed: fail
 		final booked
 		final failed
