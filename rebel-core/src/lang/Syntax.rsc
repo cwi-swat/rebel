@@ -108,8 +108,10 @@ syntax Expr
   | left Expr var!accessor "[" Expr indx "]"
 	| "(" {MapElement ","}* mapElems ")"
 	| staticSet: "{" {Expr ","}* setElems "}"
-	| "{" Expr elem "|" Expr loopVar "\<-" Expr set "}"
-	| "{" Expr init "|" Statement reducer "|" Expr loopVar "\<-" Expr set "}" 
+	| comprehension: "{" VarName elemName ":" Expr set "|" {Expr ","}+ conditions "}"
+	| cardanality: "|" Expr set "|"
+	| universalQuantifier: "forall" VarName elemName ":" Expr set "|" {Expr ","}+ conditions
+	| existentialQuantifier: "exists" VarName elemName ":" Expr set "|" {Expr ","}+ conditions
   > new: "new" Expr expr
 	| "not" Expr expr
 	| "-" Expr

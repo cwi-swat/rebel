@@ -117,8 +117,17 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
       
   set[Module] loadUsedByModules(Module src) { 
     set[loc] usedBy = loadUsedBy(src);
+    set[Module] result = {};  
       
-    return {cachedParse(u.top) | u <- usedBy};      
+    for (loc ub <- usedBy) {
+      if (just(Module m) := cachedParse(ub.top)) {
+        result += m;
+      } else {
+        removeFromUsedBy(src, ub);
+      }
+    }  
+      
+    return result;      
   }
   
   void addToUsedBy(Module src, loc dep) {
@@ -133,13 +142,18 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
     writeTextValueFile(usedByFile(src), usedBy);
   }
   
-  Module cachedParse(loc src) { 
+  Maybe[Module] cachedParse(loc src) { 
     if (src in parsed) {
-      return parsed[src];
+      return just(parsed[src]);
     } else {
-      Module m = parseModule(src);
-      parsed += (src : m);
-      return m;
+      try {
+        Module m = parseModule(src);
+        parsed += (src : m);
+        return just(m);
+      } catch ex: {
+          ilog("Error while parsing, reason: <ex>");
+          return nothing();
+      }
     }
   }
   
@@ -205,19 +219,23 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
     indent -= 1;
   }
   
-  Module orig = (just(Module m) := modulPt) ? m : cachedParse(modLoc);
-  parsed += (orig@\loc.top : orig);
-
-  buildRecursive(orig);
+  Maybe[Module] modToBuild = (just(Module _) := modulPt) ? modulPt : cachedParse(modLoc);
+  if (just(Module orig) := modToBuild) {
+    parsed += (orig@\loc.top : orig);
   
-  for (<bool needsSave, Built built> <- done<1>) {
-    if (needsSave) {
-      saveToOutput(built);
+    buildRecursive(orig);
+    
+    for (<bool needsSave, Built built> <- done<1>) {
+      if (needsSave) {
+        saveToOutput(built);
+      }
     }
+    
+    ilog("Building done!");
+  } else {
+    ilog("Unable to build module because of Parse Errors");
   }
-  
-  ilog("Building done!");
-  
+    
   return <msgs, {b | Built b <- done<1><1>}>;
 }
 

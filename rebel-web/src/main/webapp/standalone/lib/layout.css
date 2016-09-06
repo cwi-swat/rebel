@@ -504,7 +504,7 @@ aside #specInfo table {
     position: absolute;
     padding: 5px;
     z-index: 100000;
-    overflow-x: visible;
+    /*overflow-x: visible;*/
 }
 .tipsy-inner {
     background-color: #fff;

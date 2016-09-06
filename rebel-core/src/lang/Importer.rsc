@@ -20,12 +20,13 @@ import IO;
 import List;
 import Message;
 import ParseTree;
+import util::Maybe;
 
 alias ImporterResult = tuple[set[Message] msgs, set[Module] mods]; 
 
-ImporterResult loadImports(Module m, Module (loc) parseModule) = loadImports(m, resolveBaseDir(m), parseModule);
+ImporterResult loadImports(Module m, Maybe[Module] (loc) parseModule) = loadImports(m, resolveBaseDir(m), parseModule);
 
-private ImporterResult loadImports(Module initial, loc baseDir, Module (loc) parseModule) {
+private ImporterResult loadImports(Module initial, loc baseDir, Maybe[Module] (loc) parseModule) {
 	set[Message] msgs = {};
 	map[str,Module] importedModules = ();
 	
@@ -33,12 +34,12 @@ private ImporterResult loadImports(Module initial, loc baseDir, Module (loc) par
     importedModules += ("<modul.modDef.fqn>":modul);
 	
     for (imp <- modul.imports, "<imp.fqn>" notin importedModules<0>) {
-      try { 
-        Module current = parseModule(findFile(imp.fqn, baseDir));
-        recursiveLoad(current);
-      }  
-      catch ParseError(loc l): msgs += error("ParseError while parsing: <l>", imp@\loc); 
-      catch IO(str msg): msgs += error("Unable to load import: <msg>", imp@\loc);
+      if (just(Module m) := parseModule(findFile(imp.fqn, baseDir))) {
+        recursiveLoad(m);
+      }
+      else {
+        msgs += error("Unable to import \'<imp.fqn>\'", imp@\loc);    
+      }
 	  }
 	}	
 	
