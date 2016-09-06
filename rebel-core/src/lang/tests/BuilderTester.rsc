@@ -12,7 +12,7 @@ void testLoad(bool clean = false) = testLoad(|project://rebel-core/examples/simp
 void testLoad(loc file, bool clean = false) {
   void log(str msg) = println(msg);
 
-  tuple[set[Message], Built] result = load(file, |project://rebel-core/bin/rebel|, log = log, clean = clean);
+  tuple[set[Message], Built] result = load(file, log = log, clean = clean);
   
   for (m <- result<0>) { println(m); }
 }

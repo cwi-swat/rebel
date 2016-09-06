@@ -100,7 +100,7 @@ event start(amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
 		@doc{From and to account should differ}
 		to != from;
 		
-		amount.amount > EUR 0.00;
+		amount > EUR 0.00;
 	}
 	postconditions {
 		new this.amount == amount;

@@ -56,6 +56,10 @@ void main() {
 	contribs = {
 		annotator(Module (Module m) {
 		  <msgs, built> = load(m@\loc.top, modulPt = just(m), log = println);
+		  
+		  // TEMP TEMP TEMP, print all error messages to the console because not all errors are visible in the editor
+		  iprintln(msgs);
+		  
 	    return m[@messages=msgs][@hyperlinks=getAllHyperlinks(m@\loc, built.refs)];
     }),
 		popup(

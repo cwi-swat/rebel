@@ -11,6 +11,7 @@ import lang::Checker;
 import lang::Normalizer;
 import lang::Parser;
 import lang::ExtendedSyntax;
+import lang::TypeChecker;
 
 import IO;
 import ValueIO;
@@ -28,7 +29,7 @@ void noLog(str x) {}
 //  | buildLib(Module normalizedMod, Refs refs)
 //  ;
 
-alias Built = tuple[Module inlinedMod, Module normalizedMod, Refs refs];
+alias Built = tuple[Module inlinedMod, Module normalizedMod, Refs refs, map[loc, Type] resolvedTypes];
 alias UsedBy = set[loc];
 
 private str buildDir = "bin";
@@ -76,9 +77,13 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
       NormalizeResult inliningResult =  inline(flattenResult.flattenedModule, importResult<1>, refs);
       NormalizeResult desugaringResult =  desugar(inliningResult<1>, importResult<1>, refs);
       
-      return <importResult<0> + flattenResult<0> + inliningResult<0> + desugaringResult<0>, <inliningResult<1>, desugaringResult<1>, refs>, importResult<1>>;
+      // Check types
+      TypeCheckerResult inlineTypeCheckerResult = checkTypes(inliningResult<1>, importResult<1>);
+      TypeCheckerResult desugaredTypeCheckerResult = checkTypes(inliningResult<1>, importResult<1>);
+      
+      return <importResult<0> + flattenResult<0> + inliningResult<0> + desugaringResult<0> + inlineTypeCheckerResult<0> + desugaredTypeCheckerResult<0>, <inliningResult<1>, desugaringResult<1>, refs, inlineTypeCheckerResult<1> + desugaredTypeCheckerResult<1>>, importResult<1>>;
     } else {
-      return <importResult<0>, <modul, modul, refs>, importResult<1>>;
+      return <importResult<0>, <modul, modul, refs, ()>, importResult<1>>;
     }
   } 
     

@@ -11,22 +11,25 @@ Redistribution and use in source and binary forms, with or without modification,
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 }
 @contributor{Jouke Stoel - jouke.stoel@cwi.nl - CWI}
-module lang::TypeResolver
+module lang::TypeInferrer
 
 import IO;
-extend lang::ExtendedSyntax;
 import Node;
 import ParseTree;
 import Set;
-//import lang::Context;
 
-syntax Type = "$$INVALID_TYPE$$";
+extend lang::ExtendedSyntax;
+
+syntax Type 
+  = "$$INVALID_TYPE$$"
+  | "$$SPEC_TYPE$$"
+  ;
 
 data Context = context(Scope scp); 
 
 data Scope
   = nested(str name, map[str, Type] vars, Scope parent)
-  | root(str name, map[str, Type] vars, map[str, Type] functions)
+  | root(str name, map[str, Type] vars, map[str, Type] functions, map[str, Type] referrencedSpecs)
   ;
 
 Type getTypeOfVar(str name, Scope scope) = scope.vars[name]
@@ -43,6 +46,11 @@ Type getTypeOfFunction(str name, Scope scope) = scope.parent.functions[name]
        name in scope.parent.functions;
 
 default Type getTypeOfFunction(str name, Scope scope) = (Type)`$$INVALID_TYPE$$`;
+
+Type getTypeOfSpec(str name, Scope scope) = scope.parent.referrencedSpecs[name]
+  when scope is nested,
+       name in scope.parent.referrencedSpecs;
+default Type getTypeOfSpec(str name, Scope scope) = (Type)`$$INVALID_TYPE$$`;
 
 @memo
 Type resolveTypeCached(Expr exp, Context ctx) = resolveType(exp, ctx);
@@ -62,6 +70,7 @@ default Type resolveSubtraction(Type _, Type _)           = (Type)`$$INVALID_TYP
 Type resolveAddition((Type)`Integer`,   (Type)`Integer`) = (Type)`Integer`;
 Type resolveAddition((Type)`Date`,      (Type)`Date`)    = (Type)`Term`;
 Type resolveAddition((Type)`Date`,      (Type)`Term`)    = (Type)`Date`;
+Type resolveAddition((Type)`Money`,     (Type)`Money`)   = (Type)`Money`;
 default Type resolveAddition(Type _, Type _)             = (Type)`$$INVALID_TYPE$$`;
 
 // Multiply
@@ -89,9 +98,12 @@ Type resolveType((Expr)`<Expr lhs> \> <Expr rhs>`, Context ctx) = (Type)`Boolean
 Type resolveType((Expr)`<Expr lhs> \< <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
 Type resolveType((Expr)`<Expr lhs> && <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == (Type)`Boolean` && resolveTypeCached(rhs, ctx) == (Type)`Boolean`;
 Type resolveType((Expr)`<Expr lhs> || <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == (Type)`Boolean` && resolveTypeCached(rhs, ctx) == (Type)`Boolean`;
+Type resolveType((Expr)`<Expr lhs> -\> <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == (Type)`Boolean` && resolveTypeCached(rhs, ctx) == (Type)`Boolean`;
 
 // In for structured expressions
 Type resolveType((Expr)`<Expr lhs> in <Expr rhs>`, Context ctx) = (Type)`Boolean` when (Type)`set [<Type rhsType>]` := resolveTypeCached(rhs, ctx) && rhsType == resolveTypeCached(lhs, ctx); 
+
+Type resolveType((Expr)`this`, Context ctx) = (Type)`$$SPEC_TYPE$$`;
 
 // Field access
 Type resolveType((Expr)`this.<VarName rhs>`, Context ctx) = tipe when Type tipe := getTypeOfVar("this.<rhs>", ctx.scp);
@@ -102,8 +114,7 @@ Type resolveType((Expr)`<Expr lhs>.time`, Context ctx) = (Type)`Time` when resol
 Type resolveType((Expr)`<Expr lhs>.date`, Context ctx) = (Type)`Date` when resolveTypeCached(lhs, ctx) == (Type)`DateTime`;
 Type resolveType((Expr)`<Expr lhs>.<VarName rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Date` && "<rhs>" in { "day", "month", "year" };
 Type resolveType((Expr)`<Expr lhs>.<VarName rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Time` && "<rhs>" in { "hour", "minutes", "seconds" };
-Type resolveType((Expr)`<Expr lhs>.<VarName rhs>`, Context ctx) = rhsType when (Type)`<TypeName custom>` := resolveTypeCached(lhs, ctx) && isCurrentScope(custom, ctx) && rhsType := resolveTypeCached(rhs, ctx); // spec is referring to itself
-Type resolveType((Expr)`<Expr lhs>.<VarName rhs>`, Context ctx) = rhsType when (Type)`<TypeName custom>` := resolveTypeCached(lhs, ctx) && rhsType := resolveTypeCached(rhs, ctx); // TODO perhaps append context to find rhs
+//Type resolveType((Expr)`<Expr lhs>.<VarName rhs>`, Context ctx) = rhsType when rhsType := resolveTypeCached(rhs, ctx); // TODO perhaps append context to find rhs
 
 Type resolveType((Expr)`new <Expr exp>`, Context ctx) = resolveTypeCached(exp, ctx); 
 
@@ -111,7 +122,8 @@ Type resolveType((Expr)`not <Expr _>`, Context ctx) = (Type)`Boolean`;
 Type resolveType((Expr)`initialized <Expr exp>`, Context ctx) = (Type)`Boolean`;
 Type resolveType((Expr)`finalized <Expr exp>`, Context ctx) = (Type)`Boolean`;
 
-Type resolveType((Expr)`<Expr exp>[<Expr _>]`, Context ctx) = resolveTypeCached(exp, ctx);
+Type resolveType((Expr)`<TypeName otherSpec>[<Expr _>]`, Context ctx) = resolveType((Expr)`<TypeName otherSpec>`, ctx);
+Type resolveType((Expr)`<TypeName otherSpec>`, Context ctx) = getTypeOfSpec("<otherSpec>", ctx.scp);
 
 Type resolveType((Expr)`<Expr _> instate <Expr _>`) = (Type)`Boolean`;
  
