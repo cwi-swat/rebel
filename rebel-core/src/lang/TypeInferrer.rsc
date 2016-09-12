@@ -52,6 +52,10 @@ Type getTypeOfSpec(str name, Scope scope) = scope.parent.referrencedSpecs[name]
        name in scope.parent.referrencedSpecs;
 default Type getTypeOfSpec(str name, Scope scope) = (Type)`$$INVALID_TYPE$$`;
 
+bool inScope(str name, Scope scope) = inCurrentScope(name, scope) || inScope(name, scope.parent) when (scope is nested);
+bool inScope(str name, Scope scope) = inCurrentScope(name, scope) || name in scope.referrencedSpecs;
+private bool inCurrentScope(str name, Scope scope) = name == scope.name || name in scope.vars;
+
 @memo
 Type resolveTypeCached(Expr exp, Context ctx) = resolveType(exp, ctx);
 
