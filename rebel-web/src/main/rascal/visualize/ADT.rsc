@@ -59,4 +59,4 @@ data JsSpecModifier
 data JsSpec = spec(str fqn, str name, str doc, JsSpecModifier modifier, JsInheritance inheritsFrom, 
 	set[JsInheritance] extendedBy, set[JsField] fields, set[JsEvent] events, set[JsState] states, 
 	set[JsTransition] transitions, set[JsExternalMachine] externalMachines, 
-	set[JsTransition] transitionsToExternal, set[JsTransition] transitionsFromExternal);     
+	set[JsTransition] transitionsToExternalMachines, set[JsTransition] transitionsFromExternalMachines);    

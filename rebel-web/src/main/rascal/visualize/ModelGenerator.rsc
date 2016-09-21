@@ -26,21 +26,16 @@ import ValueIO;
 import List;
 import String;
 import Map;
-import util::Maybe;
+import util::Maybe; 
 import ParseTree;
 
-Maybe[JsSpec] generateForDynamic(loc file) {
-  return generateJsStructureOfInternals(file);
-}
+Maybe[JsSpec] generateForDynamic(loc file) = generateJsStructureOfInternals(file);
 
 void generateForStatic(loc base, loc output) { 
 	// step 1, generate the internal machines
 	set[JsSpec] specs = generateJsStructuresOfInternals(base, {});
 	
-	// step 2, augment with incoming links
-	specs = {augmentWithIncomingExternalMachinesAndLinks(spc, specs) | spc <- specs};
-	
-	// step 3, link external machines
+	// step 3, remove links to external machines that are not part of the generation
 	specs = filterMissingLinks(specs);
 	
 	// step 4, generate json
@@ -67,7 +62,7 @@ set[JsSpec] filterMissingLinks(set[JsSpec] specs) {
 	
 		// a link to another specification is not included in the import
 		set[JsExternalMachine] ems = sp.externalMachines;
-		for (t <- sp.transitionsToExternal, !imported(t.toMachine, ems)) {
+		for (t <- sp.transitionsToExternalMachines, !imported(t.toMachine, ems)) {
 			// a new external machine should be added to the set without a fqn
 			ems += externalMachine("?", t.toMachine, outgoing());
 		}
@@ -78,7 +73,7 @@ set[JsSpec] filterMissingLinks(set[JsSpec] specs) {
 		}
 		
 		result += spec(sp.fqn, sp.name, sp.doc, sp.modifier, sp.inheritsFrom, sp.extendedBy, sp.fields, sp.events, 
-			sp.states, sp.transitions, ems, sp.transitionsToExternal, sp.transitionsFromExternal);	
+			sp.states, sp.transitions, ems, sp.transitionsToExternalMachines, sp.transitionsFromExternalMachines);	
 	}
 	
 	return result;
@@ -99,27 +94,6 @@ set[JsSpec] generateJsStructuresOfInternals(loc base, set[JsSpec] result) {
 	return result;
 }
 
-JsSpec augmentWithIncomingExternalMachinesAndLinks(JsSpec subject, set[JsSpec] allSpecs) {
-	str name = subject.name;
-	str fqn = subject.fqn;
-		
-	set[JsSpec] machinesWithLinksToSubject = {spc | JsSpec spc <- allSpecs, /externalMachine(fqn, name, _) := spc};
-	set[str] fqnOfIncomingLinks = {spc.fqn | spc <- machinesWithLinksToSubject};
-	set[str] fqnOfOutgoingLinks = {em.fqn | em <- subject.externalMachines};
-		
-	set[JsTransition] incomingTransitions = {transFromExternal(spc.name, fromEvent, id) | JsSpec spc <- machinesWithLinksToSubject, 
-		/transToExternal(str fromEvent, name, str toEvent) := spc.transitionsToExternal,
-		/event(str id, toEvent, _,_,_,_,_,_) := subject};
-	
-	set[JsExternalMachine] merged = {em | em <- subject.externalMachines, em.fqn notin fqnOfIncomingLinks} + 
-		{externalMachine(spc.fqn, spc.name, incoming()) | JsSpec spc <- machinesWithLinksToSubject, spc.fqn notin fqnOfOutgoingLinks} +
-		{externalMachine(spc.fqn, spc.name, both()) | JsSpec spc <- machinesWithLinksToSubject, spc.fqn in fqnOfIncomingLinks && spc.fqn in fqnOfOutgoingLinks};
-	
-	return spec(subject.fqn, subject.name, subject.doc, subject.modifier, subject.inheritsFrom, 
-		subject.extendedBy, subject.fields, subject.events, subject.states, subject.transitions, 
-		merged, subject.transitionsToExternal, incomingTransitions);
-}
-
 Maybe[JsSpec] generateJsStructureOfInternals(loc file) {
 	println("Working on: <file>");
 
@@ -127,6 +101,9 @@ Maybe[JsSpec] generateJsStructureOfInternals(loc file) {
 	
 	if (just(Built b) := model<1>, b.inlinedMod has spec) {
 	  Module inlined = b.inlinedMod;
+	
+	  set[Built] imports = loadImports(b);
+	  set[Built] referencedBy = loadSpecsRelyingOn(b);
 	
 		return just(spec(
 				"<inlined.modDef.fqn>", 
@@ -151,20 +128,24 @@ Maybe[JsSpec] generateJsStructureOfInternals(loc file) {
 					  "<e.name>" == "<via>"}, 
 				{processState(state) | /StateFrom state := inlined.spec.lifeCycle}, 
 				{trans("<from.from>", "<to.to>", "<from.from>_<via>_<to.to>") | /StateFrom from := inlined.spec.lifeCycle, /StateTo to := from.destinations, /VarName via := to.via}, 
-				processExternalMachines(b, loadImports(b) + loadSpecsRelyingOn(b)),  
-				({} | it + processLinksToExternalMachines("<from.from>_<e.name>_<to.to>", e) | /StateFrom from := inlined.spec.lifeCycle, 
+				processExternalMachines(b, imports + referencedBy),  
+				({} | it + processLinksToExternalMachines("<from.from>_<e.name>_<to.to>", e, b) | /StateFrom from := inlined.spec.lifeCycle, 
 					  /StateTo to := from.destinations,
 					  /VarName via := to.via, 
 					  /EventDef e := inlined.spec.events,
 					  "<e.name>" == "<via>"),
-				processLinksFromExternalMachines(b, loadSpecsRelyingOn(b))));
+				({} | it + processLinksFromExternalMachines("<from.from>_<er.eventRef>_<to.to>", er, b, referencedBy) | /StateFrom from := inlined.spec.lifeCycle, 
+            /StateTo to := from.destinations,
+            /VarName via := to.via, 
+            /EventRef er := inlined.spec.eventRefs,
+            "<er.eventRef>" == "<via>")));
 	} else {
 		return nothing();
 	}
 }
 
 private Maybe[EventDef] findEventDef(loc evntToFind, set[Built] builds) {
-  if (Built b <- builds, Module m := b.inlinedMod, m.modDef.fqn.modName@\loc.top > evntToFind, m has spec, EventDef evnt <- m.spec.events.events, evnt@\loc > evntToFind) {
+  if (Built b <- builds, Module m := b.inlinedMod, m has spec, EventDef evnt <- m.spec.events.events, partOf(evntToFind, evnt@\loc)) {
     return just(evnt);
   } else {
     return nothing();
@@ -172,19 +153,28 @@ private Maybe[EventDef] findEventDef(loc evntToFind, set[Built] builds) {
 } 
 
 private Maybe[EventRef] findEventRef(loc evntToFind, set[Built] builds) {
-  if (Built b <- builds, Module m := b.inlinedMod, m@\loc > evntToFind, m has spec, EventRef evnt <- m.spec.eventRefs.events, evnt@\loc == evntToFind) {
+  if (Built b <- builds, Module m := b.inlinedMod, m has spec, EventRef evnt <- m.spec.eventRefs.events, evnt@\loc == evntToFind) {
     return just(evnt);
   } else {
     return nothing();
   } 
 } 
 
-private set[JsTransition] processLinksFromExternalMachines(Built orig, set[Built] otherSpecs) =
-  {transFromExternal("<other.inlinedMod.modDef.fqn.modName>", "<callingEvnt.name>", "<syncedEvnt.eventRef>") | 
-    Built other <- otherSpecs, 
-    <loc ref, loc def> <- other.refs.syncedEventRefs, 
-    just(EventDef callingEvnt) := findEventDef(ref, otherSpecs),
-    just(EventRef syncedEvnt) := findEventRef(def, {orig})}; 
+bool inEventOfSpec(loc partOfEvent, Built b) = true
+  when <loc ref, loc def> <- b.refs.eventRefs,
+       partOf(ref, b.inlinedMod@\loc),
+       partOf(partOfEvent, def);
+default bool inEventOfSpec(loc partOfEvent, Built b) = false;
+
+private set[JsTransition] processLinksFromExternalMachines(str eventId, EventRef er, Built b, set[Built] referencedBy ) {
+  loc erLoc = er@\loc;
+  
+  return {transFromExternal("<other.inlinedMod.modDef.fqn>", "<callingEvnt.name>", eventId) | 
+    Built other <- referencedBy,
+    other.inlinedMod@\loc != b.inlinedMod@\loc,
+    <loc ref, erLoc> <- other.refs.syncedEventRefs, 
+    just(EventDef callingEvnt) := findEventDef(ref, referencedBy)}; 
+}
 
 private set[Built] loadImports(Built origin) = loadImports(origin, {});
 
@@ -226,9 +216,7 @@ private str processDoc(&T<:Tree t) = trim("<doc.contents>")
 private default str processDoc(&T<:Tree t) = "";
 
 private Maybe[Module] findSpec(loc specDef, set[Built] mods) {
-  println("Trying to find <specDef>");
-  
-  if (Built b <- mods, b.inlinedMod has spec, bprintln("Specdef of current mod = <b.inlinedMod.spec@\loc>"), b.inlinedMod.spec@\loc == specDef) {
+  if (Built b <- mods, b.inlinedMod has spec, b.inlinedMod.spec@\loc == specDef) {
     return just(b.inlinedMod);
   }
   else {
@@ -236,13 +224,9 @@ private Maybe[Module] findSpec(loc specDef, set[Built] mods) {
   }
 } 
 
+private bool partOf(loc l1, loc l2) = l1.top == l2.top && l2 >= l1;
+
 private set[JsExternalMachine] processExternalMachines(Built current, set[Built] others) {
-	bool inEventOfSpec(loc partOfEvent, Built b) = true
-	  when <loc ref, loc def> <- b.refs.eventRefs,
-	       ref < b.inlinedMod@\loc,
-	       partOfEvent < def;
-  default bool inEventOfSpec(loc partOfEvent, Built b) = false;
-  	
 	set[tuple[str,str]] og = {<"<m.modDef.fqn>", "<m.spec.name>"> | 
 	                                   <loc ref, loc def> <- current.refs.specRefs, 
 	                                   inEventOfSpec(ref, current), 
@@ -250,20 +234,25 @@ private set[JsExternalMachine] processExternalMachines(Built current, set[Built]
 	
 	set[tuple[str,str]] ic = {<"<b.inlinedMod.modDef.fqn>", "<b.inlinedMod.spec.name>"> |
 	                                   Built b <- others,
-	                                   b has spec,
+	                                   b.inlinedMod has spec,
 	                                   <loc ref, loc def> <- b.refs.specRefs,
 	                                   inEventOfSpec(ref, b),
-	                                   def < current.inlinedMod@\loc};
+	                                   partOf(def, current.inlinedMod@\loc)};
 	
 	return {externalMachine(fqn, name, outgoing()) | e:<fqn, name> <- og, e notin ic} +
 	       {externalMachine(fqn, name, incoming()) | e:<fqn, name> <- ic, e notin og} +
 	       {externalMachine(fqn, name, both())     | e:<fqn, name> <- og, e in ic};
 }
 	
-private set[JsTransition] processLinksToExternalMachines(str id, EventDef evnt) =
-		{transToExternal(id, "<specName>", "<syncedEvnt>") | /(SyncExpr)`<TypeName specName>[<Expr _>].<VarName syncedEvnt>(<{Expr ","}* params>)` := evnt} +
-		{transToExternal(id, "<specName>") | /(Expr)`<TypeName specName>[<Expr _>]` := evnt.pre} +
-		{transToExternal(id, "<specName>") | /(Expr)`<TypeName specName>[<Expr _>]` := evnt.post};
+private set[JsTransition] processLinksToExternalMachines(str id, EventDef evnt, Built b) {
+  str getFqnOfSpec(str specName) = "<imp.fqn>"
+    when Import imp <- b.inlinedMod.imports,
+         "<imp.fqn.modName>" == specName;  
+  
+  return {transToExternal(id, getFqnOfSpec("<specName>"), "<syncedEvnt>") | /(SyncExpr)`<TypeName specName>[<Expr _>].<VarName syncedEvnt>(<{Expr ","}* params>)` := evnt} +
+	       {transToExternal(id, getFqnOfSpec("<specName>")) | /(Expr)`<TypeName specName>[<Expr _>]` := evnt.pre} +
+	       {transToExternal(id, getFqnOfSpec("<specName>")) | /(Expr)`<TypeName specName>[<Expr _>]` := evnt.post};
+}
 
 private JsSpecModifier processSpecModifier(Module spc) = abstract() when /(SpecModifier)`abstract` := spc;
 private JsSpecModifier processSpecModifier(Module spc) = external() when /(SpecModifier)`external` := spc;

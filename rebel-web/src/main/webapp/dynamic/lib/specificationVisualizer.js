@@ -4,7 +4,7 @@ var SpecRenderer = function() {
   var Specification = function(fqn, name, documentation, modifier, inheritsFrom, extendedBy, fields, events, states, transitions, externalMachines, transitionsToExternalMachines, transitionsFromExternalMachines) {
     this.fqn = fqn,
     this.name = name,
-    this.documentation = documentation,
+    this.doc = documentation,
     this.modifier = modifier;
     this.inheritsFrom = inheritsFrom;
     this.extendedBy = extendedBy;
@@ -34,29 +34,22 @@ var SpecRenderer = function() {
     // Create group for specification
     var groupId = guid();
     var groupLabel = "<em>" + specification.name + "</em>";
-    if ("name" in specification.inheritsFrom) {
-      if (specification.inheritsFrom.url !== "?") {
-        groupLabel += "<span class='inheritsFrom'>inherits from <a href='#" + specification.inheritsFrom.url + "'>" + specification.inheritsFrom.name + "</a></span>";
-      } else {
-        groupLabel += "<span class='inheritsFrom'>inherits from " + specification.inheritsFrom.name + "</span>";
-      }
+    if ("extends" in specification.inheritsFrom) {
+        groupLabel += "<span class='inheritsFrom'>inherits from <a href='#" + specification.inheritsFrom.extends.fqn + "'>" + specification.inheritsFrom.extends.name + "</a></span>";
     }
 
     if (specification.extendedBy.length > 0) {
       groupLabel += "<span class='extendedBy'>extended by ";
       specification.extendedBy.forEach(function(e, index) {
-        if ("url" in e) {
-          groupLabel += "<a href='#" + e.url + "'>" + e.name + "</a>";
-        } else {
-          groupLabel += e.name;
-        }
-
-        groupLabel += index < specification.extendedBy.length - 1 ? ", " : "";
+          groupLabel += "<a href='#" + e.extends.fqn + "'>" + e.extends.name + "</a>";
+          groupLabel += index < specification.extendedBy.length - 1 ? ", " : "";
       });
     }
 
-    groupLabel =  (specification.modifier === "abstract" ? "<p>&lt;&lt;abstract&gt;&gt;</p>" :
-                  specification.modifier === "external" ? "<p>&lt;&lt;external&gt;&gt;</p>" :
+    console.log("Modifier = " + specification.modifier);
+
+    groupLabel =  ("abstract" in specification.modifier ? "<p>&lt;&lt;abstract&gt;&gt;</p>" :
+                  "external" in specification.modifier ? "<p>&lt;&lt;external&gt;&gt;</p>" :
                   "") + groupLabel;
 
     g.setNode(groupId, {
@@ -69,8 +62,8 @@ var SpecRenderer = function() {
     if (specification.fields.length > 0) {
       var fieldsId = guid();
       var fieldsLabel = "<table><thead><tr><th>Fields</th></tr></thead><tbody>";
-      specification.fields.forEach(function(field) {
-        fieldsLabel += "<tr><td>" + field.name + ":</td><td>" + field.type + "</td></tr>";
+      specification.fields.forEach(function(f) {
+        fieldsLabel += "<tr><td>" + f.field.name + ":</td><td>" + f.field.tipe + "</td></tr>";
       });
       fieldsLabel += "</tbody></table>";
 
@@ -83,59 +76,86 @@ var SpecRenderer = function() {
     }
 
     // Add states
-    specification.states.forEach(function(state) {
-      g.setNode(state.id, {label: state.label, shape: state.initial ? "initial" : state.final ? "final" : "rect" });
-      g.setParent(state.id, groupId);
+    specification.states.forEach(function(s) {
+      var name, shape, labelStyle;
+      if ("initialState" in s) {
+        name = s.initialState.name;
+        shape = "initial";
+        labelStyle = "transform: translate(0,25px)";
+      } else if ("finalState" in s) {
+        name = s.finalState.name;
+        shape = "final";
+        labelStyle = "transform: translate(0,25px)";
+      } else {
+        name = s.state.name;
+        shape = "rect";
+        labelStyle - "";
+      }
+
+      var result = g.setNode(name, {label: name, shape: shape, labelStyle: labelStyle});
+      g.setParent(name, groupId);
     });
 
     // add events
-    specification.events.forEach(function(event) {
-      g.setNode(event.id, {
-        label: event.label,
+    specification.events.forEach(function(e) {
+      g.setNode(e.event.id, {
+        label: e.event.name,
         shape: "rect",
         class: "edgeNode",
-        doc: "doc" in event ? event.doc : "",
-        config: "config" in event ? event.config : [],
-        params: "params" in event ? event.params : [],
-        preconditions: "preconditions" in event ? event.preconditions : [],
-        postconditions: "postconditions" in event ? event.postconditions : [],
-        sync: "sync" in event ? event.sync : []});
-      g.setParent(event.id, groupId);
+        doc: "doc" in e.event ? e.event.doc : "",
+        config: "config" in e.event ? e.event.config : [],
+        params: "params" in e.event ? e.event.params : [],
+        preconditions: "preconditions" in e.event ? e.event.preconditions : [],
+        postconditions: "postconditions" in e.event ? e.event.postconditions : [],
+        sync: "sync" in e.event ? e.event.sync : []});
+      g.setParent(e.event.id, groupId);
     });
 
-    function getLabelOfExternalMachine(external) {
-      var label = external.url !== "?" ? "<a href='#" + external.url + "'>" + external.label + "</a>" : external.label;
-      switch(external.referenceType) {
-        case "in": label = "<p>&lt;&lt;is referenced by&gt;&gt;</p>" + label; break;
-        case "out": label = "<p>&lt;&lt;references&gt;&gt;</p>" + label; break;
-        case "both": label = "<p>&lt;both references and is referenced by&gt;&gt;</p>" + label; break;
+    function getLabelOfExternalMachine(e) {
+      var label = "<a href='#" + e.fqn+ "'>" + e.name + "</a>";
+      if("incoming" in e.referenceType) {
+        label = "<p>&lt;&lt;is referenced by&gt;&gt;</p>" + label;
+      } else if ("outgoing" in e.referenceType) {
+        label = "<p>&lt;&lt;references&gt;&gt;</p>" + label;
+      } else {
+        label = "<p>&lt;both references and is referenced by&gt;&gt;</p>" + label;
       }
+
       return label;
     }
 
     // add external machines
-    specification.externalMachines.forEach(function(external) {
-      g.setNode(external.id, {
+    specification.externalMachines.forEach(function(e) {
+      var rt;
+      if ("incoming" in e.externalMachine.referenceType) {
+        rt = "incoming";
+      } else if ("outgoing" in e.externalMachine.referenceType) {
+        rt = "outgoing";
+      } else {
+        rt = "both";
+      }
+
+      g.setNode(e.externalMachine.fqn, {
         labelType: "html",
-        label: getLabelOfExternalMachine(external),
-        class: "externalMachine " + external.referenceType,
+        label: getLabelOfExternalMachine(e.externalMachine),
+        class: "externalMachine " + rt,
         shape: "rect"
       });
     });
 
     // Set up internal edges
-    specification.transitions.forEach(function(trans) {
-      g.setEdge(trans.from, trans.via, {label: "", arrowhead: "undirected", lineInterpolate:"basis"});
-      g.setEdge(trans.via, trans.to, {label: "", lineInterpolate:"basis"});
+    specification.transitions.forEach(function(t) {
+      g.setEdge(t.trans.from, t.trans.via, {label: "", arrowhead: "undirected", lineInterpolate:"basis"});
+      g.setEdge(t.trans.via, t.trans.to, {label: "", lineInterpolate:"basis"});
     });
 
     // set up external edges
-    specification.transitionsToExternalMachines.forEach(function(trans) {
-      g.setEdge(trans.from, trans.to, {class: "syncTo", lineInterpolate:"basis"});
+    specification.transitionsToExternalMachines.forEach(function(t) {
+      g.setEdge(t.transToExternal.from, t.transToExternal.toMachine, {class: "syncTo", lineInterpolate:"basis"});
     });
 
-    specification.transitionsFromExternalMachines.forEach(function(trans) {
-      g.setEdge(trans.fromMachine, trans.to, {class: "syncFrom", lineInterpolate:"basis"});
+    specification.transitionsFromExternalMachines.forEach(function(t) {
+      g.setEdge(t.transFromExternal.fromMachine, t.transFromExternal.to, {class: "syncFrom", lineInterpolate:"basis"});
     });
 
 
@@ -162,13 +182,10 @@ var SpecRenderer = function() {
     var render = new dagreD3.render();
 
     render.shapes().initial = function(parent, bbox, node) {
-      var w = bbox.width,
-          h = bbox.height,
-          shapeSvg = parent.insert("circle")
+      var shapeSvg = parent.insert("circle")
             .attr("cx", 0)
-            .attr("cy", 0)
+            .attr("cy", -0)
             .attr("r", 10)
-            .attr("label", "")
             .attr("class", "initial");
 
       node.intersect = function(point) {
@@ -179,9 +196,7 @@ var SpecRenderer = function() {
     };
 
     render.shapes().final = function(parent, bbox, node) {
-      var w = bbox.width,
-          h = bbox.height,
-          shapeSvg = parent.insert("g");
+      var shapeSvg = parent.insert("g");
 
       shapeSvg.insert("circle")
         .attr("cx", 0)
@@ -189,15 +204,13 @@ var SpecRenderer = function() {
         .attr("r", 10)
         .attr("stroke", "#000")
         .attr("fill-opacity", "0")
-        .attr("label", "")
         .attr("class", "final");
 
       shapeSvg.insert("circle")
           .attr("cx", 0)
           .attr("cy", 0)
           .attr("r",  8)
-          .attr("fill", "#000")
-          .attr("label", "");
+          .attr("fill", "#000");
 
       node.intersect = function(point) {
         return dagreD3.intersect.circle(node, 10, point);
@@ -218,8 +231,11 @@ var SpecRenderer = function() {
       function preprocessStatements(origItems) {
         var items = [];
         origItems.forEach(function(o) {
-            var item = ((o.doc !== undefined) ? "<p>" + micromarkdown.parse(o.doc) + "</p>" : "") +
-              ((o.code !== undefined) ? micromarkdown.parse("```" + o.code + "```") : "");
+            var code = ("codeOnly" in o) ? o.codeOnly.code : o.docAndCode.code;
+            var doc = ("docAndCode" in o) ? o.docAndCode.doc : "";
+
+            var item = (doc !== "" ? "<p>" +  micromarkdown.parse(doc) + "</p>" : "") + micromarkdown.parse("```" + code + "```");
+
             items.push(item);
         });
 
@@ -231,7 +247,7 @@ var SpecRenderer = function() {
       if (edgeNode.params.length > 0) {
         var items = [];
         edgeNode.params.forEach(function(p) {
-          items.push(micromarkdown.parse("```" + p.name + ": " + p.type + "```"));
+          items.push(micromarkdown.parse("```" + p.typeOnly.name + ": " + p.typeOnly.tipe + "```"));
         });
         content += createPart("Transition parameters", items);
       }
@@ -245,6 +261,7 @@ var SpecRenderer = function() {
     // Run the renderer. This is what draws the final graph.
     render(inner, g);
 
+    // Attach the tipsy pop-up to all edge nodes
     inner.selectAll("g.node.edgeNode")
       .attr("title", function(v) {
         return styleTooltip(g.node(v));

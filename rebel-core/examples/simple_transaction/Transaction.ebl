@@ -21,7 +21,7 @@ specification Transaction {
 		start[] 
 		book[]  
 		fail[]
-	}  
+	}
 	
 	lifeCycle {
 		initial init -> validated: start 

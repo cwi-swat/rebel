@@ -19,7 +19,7 @@ specification Account {
 		block[]
 		unblock[]
 		close[]
-	}
+	} 
 	
 	invariants {
 		positiveBalance

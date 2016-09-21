@@ -10,7 +10,7 @@
   <script src="static/lib/external/dagre-d3.js"></script>
   <script src="static/lib/external/micromarkdown.js"></script>
   <script src="static/lib/specificationVisualizer.js"></script>
-  <script src="static/lib/specificationFinder.js"></script>
+  <script src="static/lib/specificationService.js"></script>
 
   <link rel="stylesheet" href="static/lib/external/reset.css">
 
@@ -129,21 +129,7 @@ function getExtraSpecInfo() {
   }
 }
 
-var finder = new SpecificationFinder(specs);
 var noSpecFound = new SpecRenderer.Specification("$NO_SPEC_FOUND$", "No specification found", "No specficiation could be found", {}, [], [], [], [], [], []);
-
-var specOverview = finder.getFlattenedSpecTree();
-
-$( "#search" ).autocomplete({
-      source: specOverview,
-      select: function( event, ui ) {
-        window.location.hash = "#" + ui.item.value;
-      },
-      messages: {
-        noResults: '',
-        results: function() {}
-    }
-})
 
 function initializeGui() {
   mainNode.append(asideClosed());
@@ -155,13 +141,14 @@ function loadAndShowSpec() {
   var fqnOfSpec = window.location.hash.substring(1);
   if (fqnOfSpec !== "") {
 
-    currentSpec = finder.findSpec(fqnOfSpec);
-    var svg = d3.select("svg");
-    g = (currentSpec !== undefined) ? SpecRenderer.render(currentSpec, svg) : SpecRenderer.render(noSpecFound, svg);
+    SpecificationService.load(fqnOfSpec, function (wrapper) {
+      var svg = d3.select("svg");
+      g = (wrapper !== undefined) ? SpecRenderer.render(wrapper.spec, svg) : SpecRenderer.render(noSpecFound, svg);
 
-    centerSpec();
-    toggleDisplayOptions();
-    refreshExtraInfo();
+      centerSpec();
+      toggleDisplayOptions();
+      refreshExtraInfo();
+    });
   }
 }
 
