@@ -55,12 +55,16 @@ void main() {
 	
 	contribs = {
 		annotator(Module (Module m) {
-		  <msgs, built> = load(m@\loc.top, modulPt = just(m), log = println);
-		  
+		  <msgs, builtResult> = load(m@\loc.top, modulPt = just(m), log = println);
 		  // TEMP TEMP TEMP, print all error messages to the console because not all errors are visible in the editor
 		  iprintln(msgs);
 		  
-	    return m[@messages=msgs][@hyperlinks=getAllHyperlinks(m@\loc, built.refs)];
+		  Module annotatedMod = m[@messages=msgs];
+		  if (just(Built built) := builtResult) {
+		    annotatedMod = annotatedMod[@hyperlinks=getAllHyperlinks(m@\loc, built.refs)];
+		  }
+		  
+	    return annotatedMod;
     }),
 		popup(
 			menu("Rebel actions", [
@@ -140,7 +144,8 @@ private Reff getAllHyperlinks(loc currentUnit, Refs allRefs) =
 		allRefs.stateRefs +
 		allRefs.keywordRefs +
 		allRefs.inheritance +
-		allRefs.syncedEventRefs); 
+		allRefs.syncedEventRefs +
+		allRefs.specRefs); 
 
 private Reff getHyperlinks(loc currentUnit, Reff refs) =
 	{<from, to> | <from, to> <- refs, currentUnit.top == from.top};

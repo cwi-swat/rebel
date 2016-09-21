@@ -35,15 +35,15 @@ FlattenerResult flatten(Module current, set[Module] imports) {
 		case m:(Module)`<ModuleDef modDef> <Import* _> <Specification spec>` => 
 			mergedImports
 			when 
-				Module mergedImports := ((Module)`<ModuleDef modDef> <Specification spec>` | mergeImports(it, imp) | /Import imp := allImports)
+				Module mergedImports := ((Module)`<ModuleDef modDef> <Specification spec>`[@\loc=m@\loc] | mergeImports(it, imp) | /Import imp := allImports)
 				
-		case (Specification)`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { <Fields? fields> <EventRefs? events> <InvariantRefs? invariants> <LifeCycle? lifeCycle> }` => 
+		case orig:(Specification)`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { <Fields? fields> <EventRefs? events> <InvariantRefs? invariants> <LifeCycle? lifeCycle> }` => 
 			(Specification)	`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> {
 							'  <Fields mergedFields>
 							'  <EventRefs mergedEventRefs>
 							'  <InvariantRefs mergedInvariantRefs>
 							'  <LifeCycle mergedLifeCycle>
-							'}`
+							'}`[@\loc=orig@\loc]
 			when 
 				Fields mergedFields := (initFields(fields) | mergeFields(it, d) | /Fields parentFields := parents, /FieldDecl d := parentFields),
 				EventRefs mergedEventRefs := (initEventRefs(events) | mergeEventRefs(it, er) | /EventRef er := parents),
@@ -74,11 +74,11 @@ tuple[set[Message] msgs, set[Module] parents] findParents(Module current, set[Mo
 	}
 }
 
-Module mergeImports((Module)`<ModuleDef modDef> <Import* imports> <Specification spec>` , Import new) = 
+Module mergeImports(orig:(Module)`<ModuleDef modDef> <Import* imports> <Specification spec>` , Import new) = 
 	(Module)`<ModuleDef modDef> 
 			'<Import* imports>
 			'<Import new>
-			'<Specification spec>`;
+			'<Specification spec>`[@\loc=orig@\loc];
 
 Fields initFields(Fields? f) = /Fields ff := f ? ff :  (Fields)`fields {}`;
 

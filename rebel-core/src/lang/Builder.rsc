@@ -22,32 +22,32 @@ import Set;
 
 alias Log = void(str);
 
-void noLog(str x) {}
+void stdOutLog(str x) {println(x);}
 
 //data Built 
 //  = buildSpec(Module inlinedMod, Module normalizedMod, Refs refs)
 //  | buildLib(Module normalizedMod, Refs refs)
 //  ;
 
-alias Built = tuple[Module inlinedMod, Module normalizedMod, Refs refs, map[loc, Type] resolvedTypes];
+alias BuiltInternal = tuple[Module inlinedMod, Module normalizedMod, Refs refs, map[loc, Type] resolvedTypes];
+alias Built = tuple[Module inlinedMod, Module normalizedMod, Refs refs, map[loc, Type] resolvedTypes, UsedBy usedBy];
+
 alias UsedBy = set[loc];
 
 private str buildDir = "bin";
 
 loc getOutputLoc(loc srcFile)  = |<srcFile.scheme>://<srcFile.authority>/<buildDir>/rebel|;
 
-tuple[set[Message], Built] load(loc modLoc, 
+tuple[set[Message], Maybe[Built]] load(loc modLoc, 
   loc outputDir = getOutputLoc(modLoc), 
   Maybe[Module] modulPt = nothing(), 
   bool clean = false, 
-  Log log = noLog) {
-  
-  Module orig = (just(Module m) := modulPt) ? m : parseModule(modLoc);
+  Log log = stdOutLog) {
   
   <msgs, allNormalizedBuilds> = loadAll(modLoc, outputDir, modulPt = modulPt, clean = clean, log = log);
   
-  if (Built m <- allNormalizedBuilds, m.normalizedMod.modDef.fqn == orig.modDef.fqn) {
-    return <msgs, m>;
+  if (Built m <- allNormalizedBuilds, m.inlinedMod.modDef@\loc.top == modLoc) {
+    return <msgs, just(m)>;
   } else {
     throw "Unable to locate normalized module in result";
   }   
@@ -57,7 +57,7 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
   loc outputDir, 
   Maybe[Module] modulPt = nothing(), 
   bool clean = false, 
-  Log log = noLog) {
+  Log log = stdOutLog) {
   
   int indent = 0;
   void ilog(str x) {
@@ -65,10 +65,10 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
     log(msg);
   }
   
-  map[FullyQualifiedName, tuple[bool, Built]] done = ();
+  map[FullyQualifiedName, tuple[bool, BuiltInternal]] done = ();
   map[loc, Module] parsed = ();
   
-  tuple[set[Message], Built, set[Module]] build(Module modul) {
+  tuple[set[Message], BuiltInternal, set[Module]] build(Module modul) {
     ImporterResult importResult = loadImports(modul, cachedParse);
     Refs refs = resolve({modul} + importResult<1>);
     
@@ -96,12 +96,12 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
   //  writeBinaryValueFile(builtFile(normalizedMod), b);
   //}
 
-  void saveToOutput(Built b) {
+  void saveToOutput(BuiltInternal b) {
     writeBinaryValueFile(builtFile(b.normalizedMod), b);
     writeFile(normalizedFile(b.normalizedMod), b.normalizedMod);
   }
   
-  Built loadFromOutput(Module orig) = readBinaryValueFile(#Built, builtFile(orig));
+  BuiltInternal loadBuiltFile(Module orig) = readBinaryValueFile(#BuiltInternal, builtFile(orig));
   
   @memo
   loc normalizedFile(Module src) = toOutputPath(outputDir, src)[extension = "nebl"];
@@ -113,7 +113,7 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
   @memo      
   loc toOutputPath(loc base, Module m) = (base + "<("" | "<it><p>/" | /VarName p := m.modDef.fqn)><m.modDef.fqn.modName>")[extension="ebl"];  
   
-  set[loc] loadUsedBy(Module src) = (exists(usedByFile(src))) ? readTextValueFile(#UsedBy, usedByFile(src)) : {};
+  UsedBy loadUsedBy(Module src) = (exists(usedByFile(src))) ? readTextValueFile(#UsedBy, usedByFile(src)) : {};
       
   set[Module] loadUsedByModules(Module src) { 
     set[loc] usedBy = loadUsedBy(src);
@@ -157,7 +157,15 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
     }
   }
   
-  bool changedOnDisk(Module m) = <m> != <parseModule(modLoc)>;
+  bool changedOnDisk(Module m) {
+    try {
+      Module fresh = parseModule(modLoc);
+      return <m> != <fresh>;
+    } catch ex: {
+      ilog("Error while parsing, reason: <ex>");
+      return false;
+    }
+  }
   
   bool needsBuild(Module origMod) {
     bool buildNecessary() = 
@@ -171,7 +179,7 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
       return false;
     } 
     else if (!buildNecessary()) {
-      Built buildModule = loadFromOutput(origMod);
+      BuiltInternal buildModule = loadBuiltFile(origMod);
       done += (origMod.modDef.fqn : <false, buildModule>); 
 
       return false;
@@ -186,11 +194,11 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
     indent += 1;
     ilog("Preparing <orig.modDef.fqn> for build");
     
-    if (needsBuild(orig) && orig.modDef.fqn notin done) {
+    if (needsBuild(orig)) {
       ilog("<orig.modDef.fqn.modName> needs fresh build");
       
-      tuple[set[Message], Built, set[Module]] result = build(orig); 
-      
+      tuple[set[Message], BuiltInternal, set[Module]] result = build(orig); 
+
       done += (result<1>.normalizedMod.modDef.fqn : <true, result<1>>);
       msgs += result<0>;
       
@@ -220,12 +228,13 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
   }
   
   Maybe[Module] modToBuild = (just(Module _) := modulPt) ? modulPt : cachedParse(modLoc);
+  
   if (just(Module orig) := modToBuild) {
     parsed += (orig@\loc.top : orig);
   
     buildRecursive(orig);
     
-    for (<bool needsSave, Built built> <- done<1>) {
+    for (<bool needsSave, BuiltInternal built> <- done<1>) {
       if (needsSave) {
         saveToOutput(built);
       }
@@ -236,6 +245,6 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
     ilog("Unable to build module because of Parse Errors");
   }
     
-  return <msgs, {b | Built b <- done<1><1>}>;
+  return <msgs, {<b.inlinedMod, b.normalizedMod, b.refs, b.resolvedTypes, loadUsedBy(b.inlinedMod)> | BuiltInternal b <- done<1><1>}>;
 }
 

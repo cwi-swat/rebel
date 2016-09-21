@@ -27,20 +27,22 @@ data Refs = refs(Reff imports,
 				         Reff stateRefs, 
 				         Reff keywordRefs, 
 				         Reff inheritance,
-				         Reff syncedEventRefs);
+				         Reff syncedEventRefs,
+				         Reff specRefs);
 				    
 alias Reff = rel[loc from, loc to];
 
 Refs resolve(set[Module] modules) =
 	   refs(resolveImports(modules), 
-		 resolveEventReferences(modules),
-		 resolveFunctionReferences(modules),
-		 resolveInvariantReferences(modules),
-		 resolveLifeCycleEventReferences(modules),
-		 resolveLifeCycleStateReferences(modules),
-		 resolveKeywordReferences(modules),	
-		 resolveInheritance(modules),
-		 resolveSyncedEventReferences(modules));
+		      resolveEventReferences(modules),
+		      resolveFunctionReferences(modules),
+		      resolveInvariantReferences(modules),
+		      resolveLifeCycleEventReferences(modules),
+		      resolveLifeCycleStateReferences(modules),
+		      resolveKeywordReferences(modules),	
+		      resolveInheritance(modules),
+		      resolveSyncedEventReferences(modules),
+          resolveReferencedSpecifications(modules));
 
 Reff resolveImports(set[Module] modules) {
   moduleNames = ("<m.modDef.fqn>":m@\loc | m <- modules);
@@ -168,14 +170,52 @@ Reff resolveInheritance(set[Module] modules) {
 
 Reff resolveSyncedEventReferences(set[Module] modules) {
   Reff ref = {};
-
+ 
   set[Module] libModules = allLibraryModules(modules);
   
-  for (Module libMod <- libModules, /EventDef evnt := libMod.decls, /SyncBlock sb := evnt.sync, SyncStatement syncStat <- sb.stats, /(SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)` := syncStat) {
-    if(Module m <- allSpecificationModules(importedModules(libMod, modules)), m.spec.name == specName, /EventRef er := m.spec.events, "<er.eventRef>" == "<event>") {
-      ref += <event@\loc, er@\loc>;
+  for (Module libMod <- libModules, /EventDef evnt := libMod.decls) { 
+    for (/SyncBlock sb := evnt.sync, SyncStatement syncStat <- sb.stats, /(SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)` := syncStat) {
+      if (Module m <- allSpecificationModules(importedModules(libMod, modules)), "<m.spec.name>" == "<specName>", /EventRef er := m.spec.events, "<er.eventRef>" == "<event>") {
+        ref += <event@\loc, er@\loc>;
+      } 
     }
-  } 
+  }
+  
+  return ref;
+}
+
+Reff resolveReferencedSpecifications(set[Module] modules) {
+  Reff ref = {};
+  
+  Reff checkStats(Statement* stats, Module libMod) {
+    Reff intRef = {};
+    
+    for (/(Expr)`<TypeName specName>[<Expr _>]` := stats) {
+      if (Module m <- allSpecificationModules(importedModules(libMod, modules)), "<m.spec.name>" == "<specName>") {
+        intRef += <specName@\loc, m.spec@\loc>;
+      }
+    }
+    
+    return intRef;
+  }
+  
+  set[Module] libModules = allLibraryModules(modules);
+  
+  for(Module libMod <- libModules, /EventDef evnt := libMod.decls) {
+    for (/SyncBlock sb := evnt.sync, SyncStatement syncStat <- sb.stats, /(SyncExpr)`<TypeName specName>[<Expr _>].<VarName _>(<{Expr ","}* _>)` := syncStat) {
+      if (Module m <- allSpecificationModules(importedModules(libMod, modules)), "<m.spec.name>" == "<specName>") {
+        ref += <specName@\loc, m.spec@\loc>;
+      }
+    }
+    
+    if (/Statement* stats := evnt.pre) {
+      ref += checkStats(stats, libMod);
+    } 
+    if (/Statement* stats := evnt.post) {
+      ref += checkStats(stats, libMod);
+    }
+      
+  }  
   
   return ref;
 }

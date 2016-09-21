@@ -55,9 +55,9 @@ NormalizeResult inline(Module flattenedSpc, set[Module] modules, Refs refs) {
 		case m:(Module)`<ModuleDef modDef> <Import* imports> <Specification spec>` => 
 			mergedImports
 			when 
-				Module mergedImports := ((Module)`<ModuleDef modDef> <Specification spec>` | mergeImports(it, imp) | /Import imp := allImports)	
+				Module mergedImports := ((Module)`<ModuleDef modDef> <Specification spec>`[@\loc=m@\loc] | mergeImports(it, imp) | /Import imp := allImports)	
 	
-		case (Specification)`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { <Fields fields> <EventRefs eventRefs> <InvariantRefs invariantRefs> <LifeCycle lifeCycle>}` =>
+		case orig:(Specification)`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { <Fields fields> <EventRefs eventRefs> <InvariantRefs invariantRefs> <LifeCycle lifeCycle>}` =>
 			(Specification)	`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { 
 							'  <Fields fields> 
 							'  <FunctionDefs funcs>
@@ -66,7 +66,7 @@ NormalizeResult inline(Module flattenedSpc, set[Module] modules, Refs refs) {
 							'  <InvariantRefs invariantRefs>
 							'  <InvariantDefs invs>
 							'  <LifeCycle lifeCycle>  
-							'}`
+							'}`[@\loc=orig@\loc]
 				when
 					FunctionDefs funcs := ((FunctionDefs)`functionDefs {}` | merge(it, f) | f <- functions),
 					EventDefs ev := ((EventDefs)`eventDefs {}` | merge(it, e) | e <- events),
@@ -108,7 +108,7 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs) {
   events = syncedEventResult<1>;
 	
 	Module normalized = visit(inlinedSpc) {
-		case (Specification)`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { <Fields _> <FunctionDefs funcs> <EventRefs eventRefs> <EventDefs _> <InvariantRefs invariantRefs> <InvariantDefs invs> <LifeCycle lifeCycle>}` =>
+		case orig:(Specification)`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { <Fields _> <FunctionDefs funcs> <EventRefs eventRefs> <EventDefs _> <InvariantRefs invariantRefs> <InvariantDefs invs> <LifeCycle lifeCycle>}` =>
 			(Specification)	`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { 
 							'	<Fields mergedFields> 
 							'	<FunctionDefs funcs>
@@ -117,7 +117,7 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs) {
 							'	<InvariantRefs invariantRefs>
 							'	<InvariantDefs invs>
 							'	<LifeCycle mergedLc>  
-							'}`
+							'}`[@\loc=orig@\loc]
 				when
 					Fields mergedFields := ((Fields)`fields {}` | merge(it, f) | f <- fields),
 					EventDefs mergedEv := ((EventDefs)`eventDefs {}` | merge(it, e) | e <- events),
@@ -212,11 +212,11 @@ tuple[set[Message], set[EventDef]] replaceReferencesToThisWithSpecificationName(
   return <msgs, altered>;
 }
 
-Module mergeImports((Module)`<ModuleDef modDef> <Import* imports> <Specification spec>` , Import new) = 
+Module mergeImports(orig:(Module)`<ModuleDef modDef> <Import* imports> <Specification spec>` , Import new) = 
 	(Module)`<ModuleDef modDef> 
 			'<Import* imports>
 			'<Import new>
-			'<Specification spec>`;
+			'<Specification spec>`[@\loc=orig@\loc];
 
 Fields merge((Fields)`fields { <FieldDecl* orig> }`, FieldDecl new) = 
 	(Fields) `fields { 
@@ -308,7 +308,7 @@ set[EventDef] addFrameConditions(set[EventDef] events, set[FieldDecl] fields) {
                                 '}`
     } when /Statement* _ := evnt.post;          
 	
-	EventDef mergePost((EventDef)`<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>){<Preconditions? pre> <Postconditions? post> <SyncBlock? sync>}`, Statement fc) 
+	EventDef mergePost(orig:(EventDef)`<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>){<Preconditions? pre> <Postconditions? post> <SyncBlock? sync>}`, Statement fc) 
 	  =  (EventDef)
 	       `<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>) {
 	       '  <Preconditions? pre> 
@@ -316,7 +316,7 @@ set[EventDef] addFrameConditions(set[EventDef] events, set[FieldDecl] fields) {
          '    <Statement fc>
          '  }
          '  <SyncBlock? sync>
-         '}`
+         '}`[@\loc = orig@\loc]
        when /Statement* _ !:= post;
 	
 	EventDef addFrameConditionsToEvent(EventDef e) {
@@ -353,14 +353,14 @@ set[EventDef] createEventMapping(set[EventDef] events) {
 			};
 		} else {
 			e = visit(e) {
-				case (EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
+				case orig:(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
 					(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
 								'  <Preconditions? pre> 
 								'  postconditions {
 								'    <Statement labeledEvent>
 								'  }
 								'  <SyncBlock? sync> 
-								'}`
+								'}`[@\loc = orig@\loc]
 			}			
 		}
 		
@@ -385,12 +385,12 @@ set[StateFrom] createStateMapping(set[StateFrom] states) {
 	return {labelState(s) | s <- states};
 }
 
-EventDef addTransitionParam((EventDef) `<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* origParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }`, Parameter newTransitionParam) =
+EventDef addTransitionParam(orig:(EventDef) `<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* origParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }`, Parameter newTransitionParam) =
   (EventDef)  `<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* origParams>, <Parameter newTransitionParam>) {
               '  <Preconditions? pre>
               '  <Postconditions? post>
               '  <SyncBlock? sync>
-              '}`;  
+              '}`[@\loc = orig@\loc];  
   
 
 tuple[set[Message], set[EventDef], set[StateFrom]] desugarStates(set[EventDef] events, set[StateFrom] states) {
@@ -409,14 +409,14 @@ tuple[set[Message], set[EventDef], set[StateFrom]] desugarStates(set[EventDef] e
       };
     } else {
       return visit(e) {
-        case (EventDef) `<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
+        case orig:(EventDef) `<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
           (EventDef)  `<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
                 '  <Preconditions? pre> 
                 '  postconditions {
                 '    <Statement labeledEvent>
                 '  }
                 '  <SyncBlock? sync> 
-                '}`
+                '}`[@\loc = orig@\loc]
       }     
     }
   }  
@@ -496,14 +496,14 @@ tuple[set[Message], set[EventDef], set[StateFrom]] desugarStates(set[EventDef] e
   			} 	 
   		} else {
   			e = visit(e) {
-  				case (EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
+  				case orig:(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
   					(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
   								'  preconditions {
   								'    <Statement inlinedLifeCycle>
   								'  } 
   								'  <Postconditions? post>
   								'  <SyncBlock? sync> 
-  								'}`
+  								'}`[@\loc = orig@\loc]
   					when Statement inlinedLifeCycle := createInlinedPreconditionLifeCycleStatement(e)
   			}			
   		}
@@ -519,14 +519,14 @@ tuple[set[Message], set[EventDef], set[StateFrom]] desugarStates(set[EventDef] e
 			}	
 		} else {
 			e = visit(e) {
-				case (EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
+				case orig:(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
 					(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
 								'  <Preconditions? pre>
 								'  postconditions {
 								'    <Statement postCon>
 								'  } 
 								'  <SyncBlock? sync> 
-								'}`
+								'}`[@\loc = orig@\loc]
 			}			
 
 		}

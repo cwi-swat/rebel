@@ -18,52 +18,56 @@ import lang::Parser;
 import lang::Resolver;
 import lang::Importer;
 
+import util::Maybe;
+
+Maybe[Module] cachedParser(loc file) = just(parseModule(file)); 
+
 Refs testResolveAll(loc file) {
 	Module modul = parseModule(file);
-	return resolve({modul} + loadImports(modul));
+	return resolve({modul} + loadImports(modul, cachedParser)<1>);
 }
 
-Ref testResolveImports(loc file) {
+Reff testResolveImports(loc file) {
 	Module modul = parseModule(file);
-	return resolveImports({modul} + loadImports(modul));
+	return resolveImports({modul} + loadImports(modul, cachedParser)<1>);
 }
 
-Ref testResolveEventRefs(loc file) {
+Reff testResolveEventRefs(loc file) {
 	Module modul = parseModule(file);
-	return resolveEventReferences({modul} + loadImports(modul));
+	return resolveEventReferences({modul} + loadImports(modul, cachedParser)<1>);
 }
 
-Ref testResolveFunctionRefs(loc file) {
+Reff testResolveFunctionRefs(loc file) {
 	Module modul = parseModule(file);
-	return resolveFunctionReferences({modul} + loadImports(modul));
+	return resolveFunctionReferences({modul} + loadImports(modul, cachedParser)<1>);
 }
 
-Ref testResolveKeywordRefs(loc file) {
+Reff testResolveKeywordRefs(loc file) {
 	Module modul = parseModule(file);
-	return resolveKeywordReferences({modul} + loadImports(modul));
+	return resolveKeywordReferences({modul} + loadImports(modul, cachedParser)<1>);
 }
 
-Ref testResolveInvariantRefs(loc file) {
+Reff testResolveInvariantRefs(loc file) {
 	Module modul = parseModule(file);
-	return resolveInvariantReferences({modul} + loadImports(modul));
+	return resolveInvariantReferences({modul} + loadImports(modul, cachedParser)<1>);
 }
 
-Ref testResolveLifeCycleEventRefs(loc file) {
+Reff testResolveLifeCycleEventRefs(loc file) {
 	Module modul = parseModule(file);
-	return resolveLifeCycleEventReferences({modul} + loadImports(modul));
+	return resolveLifeCycleEventReferences({modul} + loadImports(modul, cachedParser)<1>);
 }
 
-Ref testResolveLifeCycleStateRefs(loc file) {
+Reff testResolveLifeCycleStateRefs(loc file) {
 	Module modul = parseModule(file);
-	return resolveLifeCycleStateReferences({modul} + loadImports(modul));
+	return resolveLifeCycleStateReferences({modul} + loadImports(modul, cachedParser)<1>);
 }
 
-Ref testResolveInheritance(loc file) {
+Reff testResolveInheritance(loc file) {
 	Module modul = parseModule(file);
-	return resolveInheritance({modul} + loadImports(modul));
+	return resolveInheritance({modul} + loadImports(modul, cachedParser)<1>);
 }
 
-Ref testResolveSpecRefs(loc file) {
+Reff testResolveSyncedEventReferences(loc file) {
 	Module modul = parseModule(file);
-	return resolveSpecRefs({modul} + loadImports(modul));
+	return resolveSyncedEventReferences({modul} + loadImports(modul, cachedParser)<1>);
 }

@@ -14,8 +14,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 module visualize::ADT
 
 data JsStatement
-	= jsCodeOnly(str code)
-	| jsDocAndCode(str doc, str code)
+	= codeOnly(str code)
+	| docAndCode(str doc, str code)
 	;
 
 data JsParam 
@@ -24,9 +24,9 @@ data JsParam
 	;
 
 data JsState 
-	= jsInitialState(str name)
-	| jsFinalState(str name)
-	| jsState(str name)
+	= initialState(str name)
+	| finalState(str name)
+	| state(str name)
 	;
 	
 data JsReferenceType
@@ -35,16 +35,16 @@ data JsReferenceType
 	| both()
 	;	
 	
-data JsExternalMachine = jsEM(str fqn, str name, JsReferenceType rt);
+data JsExternalMachine = externalMachine(str fqn, str name, JsReferenceType referenceType);
 data JsTransition 
-	= jsTrans(str from, str to, str via)
-	| jsTransToExternal(str from, str toMachine)
-	| jsTransToExternal(str from, str toMachine, str toEvent)
-	| jsTransFromExternal(str fromMachine, str fromEvent, str to)
+	= trans(str from, str to, str via)
+	| transToExternal(str from, str toMachine)
+	| transToExternal(str from, str toMachine, str toEvent)
+	| transFromExternal(str fromMachine, str fromEvent, str to)
 	;
 	
-data JsEvent = jsEvent(str id, str name, str doc, list[JsParam] config, list[JsParam] params, list[JsStatement] preconditions, list[JsStatement] postconditions, list[JsStatement] sync);
-data JsField = jsField(str name, str tipe);
+data JsEvent = event(str id, str name, str doc, list[JsParam] config, list[JsParam] params, list[JsStatement] preconditions, list[JsStatement] postconditions, list[JsStatement] sync);
+data JsField = field(str name, str tipe);
 data JsInheritance
 	= extends(str name, str fqn)
 	| none()
@@ -56,7 +56,7 @@ data JsSpecModifier
 	| external()
 	;
 	
-data JsSpec = jsSpec(str fqn, str name, str doc, JsSpecModifier specMod, JsInheritance inheritsFrom, 
+data JsSpec = spec(str fqn, str name, str doc, JsSpecModifier modifier, JsInheritance inheritsFrom, 
 	set[JsInheritance] extendedBy, set[JsField] fields, set[JsEvent] events, set[JsState] states, 
 	set[JsTransition] transitions, set[JsExternalMachine] externalMachines, 
 	set[JsTransition] transitionsToExternal, set[JsTransition] transitionsFromExternal);     
