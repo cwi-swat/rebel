@@ -24,17 +24,17 @@ Maybe[Module] cachedParser(loc file) = just(parseModule(file));
 
 Refs testResolveAll(loc file) {
 	Module modul = parseModule(file);
-	return resolve({modul} + loadImports(modul, cachedParser)<1>);
+	return resolve(modul, loadImports(modul, cachedParser)<1>);
 }
 
 Reff testResolveImports(loc file) {
 	Module modul = parseModule(file);
-	return resolveImports({modul} + loadImports(modul, cachedParser)<1>);
+	return resolveImports(modul, loadImports(modul, cachedParser)<1>);
 }
 
 Reff testResolveEventRefs(loc file) {
 	Module modul = parseModule(file);
-	return resolveEventReferences({modul} + loadImports(modul, cachedParser)<1>);
+	return resolveEventReferences(modul, loadImports(modul, cachedParser)<1>);
 }
 
 Reff testResolveFunctionRefs(loc file) {
@@ -44,12 +44,12 @@ Reff testResolveFunctionRefs(loc file) {
 
 Reff testResolveKeywordRefs(loc file) {
 	Module modul = parseModule(file);
-	return resolveKeywordReferences({modul} + loadImports(modul, cachedParser)<1>);
+	return resolveKeywordReferences(modul, loadImports(modul, cachedParser)<1>);
 }
 
 Reff testResolveInvariantRefs(loc file) {
 	Module modul = parseModule(file);
-	return resolveInvariantReferences({modul} + loadImports(modul, cachedParser)<1>);
+	return resolveInvariantReferences(modul, loadImports(modul, cachedParser)<1>);
 }
 
 Reff testResolveLifeCycleEventRefs(loc file) {

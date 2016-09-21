@@ -32,30 +32,29 @@ data Refs = refs(Reff imports,
 				    
 alias Reff = rel[loc from, loc to];
 
-Refs resolve(set[Module] modules) =
-	   refs(resolveImports(modules), 
-		      resolveEventReferences(modules),
-		      resolveFunctionReferences(modules),
-		      resolveInvariantReferences(modules),
-		      resolveLifeCycleEventReferences(modules),
-		      resolveLifeCycleStateReferences(modules),
-		      resolveKeywordReferences(modules),	
-		      resolveInheritance(modules),
-		      resolveSyncedEventReferences(modules),
-          resolveReferencedSpecifications(modules));
+Refs resolve(Module current, set[Module] imports) =
+	   refs(resolveImports(current, imports), 
+		      resolveEventReferences(current, imports),
+		      resolveFunctionReferences(current + imports),
+		      resolveInvariantReferences(current, imports),
+		      resolveLifeCycleEventReferences(current + imports),
+		      resolveLifeCycleStateReferences(current + imports),
+		      resolveKeywordReferences(current, imports),	
+		      resolveInheritance(current + imports),
+		      resolveSyncedEventReferences(current + imports),
+          resolveReferencedSpecifications(current + imports));
 
-Reff resolveImports(set[Module] modules) {
-  moduleNames = ("<m.modDef.fqn>":m@\loc | m <- modules);
-  return {<i.fqn@\loc, moduleNames["<i.fqn>"]> | current <- modules, /Import i := current.imports, "<i.fqn>" in moduleNames};
+Reff resolveImports(Module current, set[Module] imports) {
+  moduleNames = ("<m.modDef.fqn>":m@\loc | m <- imports);
+  return {<i.fqn@\loc, moduleNames["<i.fqn>"]> | /Import i := current.imports, "<i.fqn>" in moduleNames};
 } 
    
-Reff resolveEventReferences(set[Module] modules) {	
+Reff resolveEventReferences(Module current, set[Module] imports) {	
 	Reff refs = {};
-	for (m <- modules, /Specification s := m) {
-		set[Module] imports = importedModules(m, modules);
+	if (/Specification s := current) {
 		defs = ("<def.name>" : def@\loc | EventDef def <- allEventDefs(imports));
 		
-		refs += {<ref@\loc, defs["<ref.eventRef>"]> | /EventRef ref := m, "<ref.eventRef>" in defs};
+		refs += {<ref@\loc, defs["<ref.eventRef>"]> | /EventRef ref := s, "<ref.eventRef>" in defs};
 	}
 	
 	return refs;
@@ -97,14 +96,13 @@ Reff resolveFunctionReferences(set[Module] modules) {
 	return refs;
 }
 
-Reff resolveKeywordReferences(set[Module] modules) {
+Reff resolveKeywordReferences(Module current, set[Module] imports) {
 	Reff refs = {};
 	
-	for (m <- modules, m has spec) {
-		set[Module] imports = importedModules(m, modules);
+	if (current has spec) {
 		defs = ("<def.name>" : def | EventDef def <- allEventDefs(imports));
 	
-		for (/EventRef er := m.spec.events, "<er.eventRef>" in defs) {
+		for (/EventRef er := current.spec.events, "<er.eventRef>" in defs) {
 			refs += {<p@\loc, cp@\loc> | ConfigParameter cp <- er.config, /EventConfigBlock ecb := defs["<er.eventRef>"].configParams, Parameter p <- ecb.params, "<p.name>" == "<cp.name>" }; 			
 		}
 	}
@@ -112,15 +110,14 @@ Reff resolveKeywordReferences(set[Module] modules) {
 	return refs;
 }
 
-Reff resolveInvariantReferences(set[Module] modules) {
+Reff resolveInvariantReferences(Module current, set[Module] imports) {
 	Reff refs = {};
 	
-	for (m <- modules, /Specification s := m) {
-		set[Module] libMods = allLibraryModules(importedModules(m, modules));
+	for (current has spec) {
+		set[Module] libMods = allLibraryModules(imports);
 		map[str, loc] defs = ("<def.name>" : def@\loc | Module lib <- libMods, /InvariantDef def <- lib.decls);
-		refs += {<inv@\loc, defs["<inv>"]> | /InvariantRefs ref := s, /FullyQualifiedVarName inv := ref, "<inv>" in defs };
+		refs += {<inv@\loc, defs["<inv>"]> | /InvariantRefs ref := current.spec.invariants, /FullyQualifiedVarName inv := ref, "<inv>" in defs };
 	}
-	
 
 	return refs;
 }

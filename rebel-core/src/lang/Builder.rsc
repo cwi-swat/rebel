@@ -70,7 +70,7 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
   
   tuple[set[Message], BuiltInternal, set[Module]] build(Module modul) {
     ImporterResult importResult = loadImports(modul, cachedParse);
-    Refs refs = resolve({modul} + importResult<1>);
+    Refs refs = resolve(modul, importResult<1>);
     
     if (modul has spec) {
       FlattenerResult flattenResult = flatten(modul, importResult<1>);
