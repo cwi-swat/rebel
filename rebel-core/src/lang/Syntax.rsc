@@ -63,7 +63,10 @@ syntax Fields =  @Foldable "fields" "{" FieldDecl* fields "}";
 
 syntax EventRefs =  @Foldable eventInstances: "events" "{" EventRef* events "}";
 
-syntax EventRef = FullyQualifiedVarName eventRef "[" {ConfigParameter ","}* config "]";
+syntax EventRef 
+  = ref: FullyQualifiedVarName eventRef "[" {ConfigParameter ","}* config "]"
+  | interfaceDecl: VarName name "(" Parameter ","* params ")"
+  ;
 
 syntax InvariantRefs =  @Foldable "invariants" "{" FullyQualifiedVarName* invariants "}";
 

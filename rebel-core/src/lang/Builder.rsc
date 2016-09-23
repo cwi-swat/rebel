@@ -55,7 +55,7 @@ tuple[set[Message], Maybe[Built]] load(loc modLoc,
 
 tuple[set[Message], set[Built]] loadAll(loc modLoc, 
   loc outputDir, 
-  Maybe[Module] modulPt = nothing(), 
+  Maybe[Module] modulPt = nothing(),
   bool clean = false, 
   Log log = stdOutLog) {
   
@@ -190,11 +190,11 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
   
   set[Message] msgs = {};
   
-  void buildRecursive(Module orig) {
+  void buildRecursive(Module orig, bool forceBuild = false) {
     indent += 1;
     ilog("Preparing <orig.modDef.fqn> for build");
     
-    if (needsBuild(orig)) {
+    if (needsBuild(orig) || forceBuild) {
       ilog("<orig.modDef.fqn.modName> needs fresh build");
       
       tuple[set[Message], BuiltInternal, set[Module]] result = build(orig); 
@@ -211,6 +211,9 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
         if ("<orig.modDef.fqn>" notin {"<imp.fqn>" | Import imp <- dependency.imports}) {
           ilog("Dependend module <dependency.modDef.fqn.modName> is not depending on this module any more");
           removeFromUsedBy(orig, dependency@\loc.top);
+        } else if (orig has decls && dependency has spec) {
+          // current module beign build is a library module and a specifiation depends on it, build the specification as well
+          buildRecursive(dependency, forceBuild = true);
         }
       } 
       
