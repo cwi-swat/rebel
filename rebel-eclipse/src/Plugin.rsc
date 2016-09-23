@@ -14,20 +14,12 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 module Plugin
 
 import lang::Syntax;
-import lang::Parser;
-import lang::Importer;
-import lang::Resolver;
 import lang::Builder;
+import lang::Resolver;
+import lang::Parser;
 import Checker;
 
-//import execution::simulation::Simulation;
-//import execution::modelchecker::ModelChecker;
-//import execution::testrunner::profile::ProfileTestRunner;
-//import execution::DataTypes;
-//
-//import execution::documentation::documentgenerator::DocumentGenerator;
-
-//import vis::StateEventGraph;
+import visualize::VisualisationServer;
 
 import util::IDE;
 import util::Prompt;
@@ -42,13 +34,17 @@ import DateTime;
 
 import util::Benchmark;
 import util::Maybe;
+import util::HtmlDisplay;
 
-//import execution::documentation::DescriptionFileReader;
-//import execution::documentation::IDEDocAnnotator;
 
 anno rel[loc, loc] Tree@hyperlinks; 
 
 void main() {
+  int startPort = 4300;
+  int endPort = 4310;
+  map[loc rebelSrcRoot, loc baseUrl] runningVisInstances = ();
+  list[int] visualisationPorts = [startPort..endPort];
+
 	REBEL_LANGUAGE = "Rebel Language";
 
 	registerLanguage(REBEL_LANGUAGE,"ebl", parseModule);
@@ -68,66 +64,65 @@ void main() {
     }),
 		popup(
 			menu("Rebel actions", [
-				group("Simulation", [
-					action("Start simulation", (Module current, loc file) {
-						println("Starting simulation");
-						if (/Specification s := current) {
-							startSimulation(file.top, noOpTestRunner);
-						} else {
-							alert("Only specifications can be simulated");
-						}
-					}),
-					action("Start simulation with Profile Test Runner", (Module current, loc file) {
-						if (/Specification s := current) {
-							println("Starting simulation");
-							startSimulation(file.top, profileTestRunner);
-						} else {
-							alert("Only specifications can be simulated");
-						}
-					})
-				]),
+				action("Simulate", (Module current, loc file) {
+					if (/Specification s := current) {
+						startSimulation(file.top, noOpTestRunner);
+					} else {
+						alert("Only specifications can be simulated");
+					}
+				}),
 
-				group("Model checking", [
-					action("Run (bounded) model checker", (Module current, loc file) {
-						if (/Specification s := current) {
-							int k = 100;//toInt(prompt("What should be the maximum search depth?"));						
-							checkAndSimulate(file.top, k);
-						} else {
-							alert("Only can start simulations of Specifications");
-						}
+				action("Run (bounded) model checker", (Module current, loc file) {
+					if (/Specification s := current) {
+						int k = 100;//toInt(prompt("What should be the maximum search depth?"));						
+						checkAndSimulate(file.top, k);
+					} else {
+						alert("Only can start simulations of Specifications");
+					}
 				
-					})
-				]),
-				group("Visualization", [
-					action("Visualize States and Events", (Module current, loc file) {
-						if (/Specification s := current) {
-							m = implodeModule(current);
-							imports = loadImports(m);
-							refs = resolve(m + imports);
-							
-							visualizeStateEventGraph(m, imports, refs);
-						} else {
-							alert("Only can visualize state and events of Specification");
-						}
-					})
-				]),
-				menu("Documentation options", [
-					action("Generate doc (in English)", (Module current, loc file) {
-						if (/Specification s := current) {
-							generatePDF(file.top, "en");	
-						}
-					}),
-					action("Generate doc (in Dutch)", (Module current, loc file) {
-						if (/Specification s := current) {
-							generatePDF(file.top, "nl");
-						}
-					})
-				])
+				}),
+				action("Visualize", (Module current, loc file) {
+					if (/Specification s := current) {
+            loc baseDirOfMod = resolveBaseDir(current);
+            
+            if (baseDirOfMod notin runningVisInstances) {
+              int port = startPort;
+              
+              while (baseDirOfMod notin runningVisInstances && port < endPort) {
+                try {
+                  loc servingBase = |http://localhost|[port=port];
+                  serve(baseDirOfMod, config = appConfig(baseUrl = servingBase));
+                  runningVisInstances[baseDirOfMod] = servingBase;
+                  
+                } catch ex: port += 1;
+              }
+            }
+            
+            if (baseDirOfMod in runningVisInstances) {          
+              htmlDisplay(runningVisInstances[baseDirOfMod][fragment="<current.modDef.fqn>"]);
+            } else {
+              alert("Unable to start visualisation server, no port available");
+            }            
+					} else {
+						alert("Only can visualize Specifications");
+					}
+				})
 			])
 		)		
 	};
 	registerContributions(REBEL_LANGUAGE, contribs);
 }
+
+loc resolveBaseDir(Module m) {
+  loc base = m@\loc.top.parent;
+  
+  for (package <- reverse(["<p>" | /VarName p := m.modDef.fqn]), endsWith(base.path, "<package>")) {
+    base = base.parent;
+  }
+  
+  return base;
+}
+
 
 void reset(){
 	clearLanguages();

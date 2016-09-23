@@ -12,6 +12,8 @@ import visualize::ModelGenerator;
 import visualize::ADT; 
 import web::Uri;
 
+import util::Editors;
+
 data AppConfig = appConfig(loc baseUrl = |http://localhost:9001|, loc staticFileBase = |project://rebel-web/src/main/webapp/dynamic|);
 data AppRunContext = appContext(loc rebelBaseDir, AppConfig config);
 
@@ -27,7 +29,7 @@ data Request
 
 Request rewrite(get(str path)) = get([URI]"<path>"); 
 
-ShutdownHandle serveMultipleSpecifications(loc rebelBaseDir, AppConfig config = appConfig()) {
+ShutdownHandle serve(loc rebelBaseDir, AppConfig config = appConfig()) {
   AppRunContext ctx = appContext(rebelBaseDir, config);
   
   Response handleInternal(Request req) = handle(rewrite(req), ctx);
@@ -47,9 +49,11 @@ Response handle(get((URI)`/rest/spec/<Part spec>`), AppRunContext ctx) {
   str path = replaceAll("<spec>", ".", "/");
   
   if (specExists(path, ctx), just(JsSpec model) := generateForDynamic(getSpecFile(path, ctx))) {
+    edit(getSpecFile(path, ctx));
+
     return jsonResponse(ok(), (), model);
-  }
-  
+  } 
+
   return response(notFound(), "Unable to load specification");
 } 
 

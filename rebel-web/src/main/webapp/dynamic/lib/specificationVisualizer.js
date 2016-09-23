@@ -18,6 +18,22 @@ var SpecRenderer = function() {
   }
 
   function buildGraph(specification) {
+    function hasState(state) {
+      return specification.states.find(function (elem) {
+        if ("finalState" in elem) return elem.finalState.name == state;
+        else if ("initialState" in elem) return elem.initialState.name == state;
+        else return elem.state.name == state;
+      }) !== undefined;
+    }
+
+    function hasEvent(event) {
+      return specification.events.find(function (elem) { return elem.event.id == event;}) !== undefined;
+    }
+
+    function hasExternalMachine(em) {
+      return specification.externalMachines.find(function (elem) { return elem.externalMachine.fqn == em;}) !== undefined;
+    }
+
     function guid() {
       function s4() {
         return Math.floor((1 + Math.random()) * 0x10000)
@@ -145,17 +161,23 @@ var SpecRenderer = function() {
 
     // Set up internal edges
     specification.transitions.forEach(function(t) {
-      g.setEdge(t.trans.from, t.trans.via, {label: "", arrowhead: "undirected", lineInterpolate:"basis"});
-      g.setEdge(t.trans.via, t.trans.to, {label: "", lineInterpolate:"basis"});
+      if (hasState(t.trans.from) && hasState(t.trans.to) && hasEvent(t.trans.via)) {
+        g.setEdge(t.trans.from, t.trans.via, {label: "", arrowhead: "undirected", lineInterpolate:"basis"});
+        g.setEdge(t.trans.via, t.trans.to, {label: "", lineInterpolate:"basis"});
+      }
     });
 
     // set up external edges
     specification.transitionsToExternalMachines.forEach(function(t) {
-      g.setEdge(t.transToExternal.from, t.transToExternal.toMachine, {class: "syncTo", lineInterpolate:"basis"});
+      if (hasEvent(t.transToExternal.from) && hasExternalMachine(t.transToExternal.toMachine)) {
+        g.setEdge(t.transToExternal.from, t.transToExternal.toMachine, {class: "syncTo", lineInterpolate:"basis"});
+      }
     });
 
     specification.transitionsFromExternalMachines.forEach(function(t) {
-      g.setEdge(t.transFromExternal.fromMachine, t.transFromExternal.to, {class: "syncFrom", lineInterpolate:"basis"});
+      if (hasEvent(t.transFromExternal.to) && hasExternalMachine(t.transFromExternal.fromMachine)) {
+        g.setEdge(t.transFromExternal.fromMachine, t.transFromExternal.to, {class: "syncFrom", lineInterpolate:"basis"});
+      }
     });
 
 
