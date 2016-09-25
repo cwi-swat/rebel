@@ -267,7 +267,8 @@ aside #specInfo table {
 }
 
 #main article #viz #options {
-  flex: 0 1 30px;
+  flex: 0 2 30px;
+  display: flex;
   margin: 10px 10px 0 10px;
   background-color: #fff;
   border: 1px dashed #cacdce;
@@ -276,6 +277,7 @@ aside #specInfo table {
 #main article #viz #options form {
   margin: 5px;
   font-size: 0.8em;
+  flex-flow: column;
 }
 
 #main article #viz svg {

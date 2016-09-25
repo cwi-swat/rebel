@@ -7,6 +7,7 @@ import util::Maybe;
 import IO;
 import Message;
 import String;
+import Boolean;
 
 import visualize::ModelGenerator;
 import visualize::ADT; 
@@ -19,7 +20,7 @@ data AppRunContext = appContext(loc rebelBaseDir, AppConfig config);
 
 alias ShutdownHandle = void ();
 
-data Request 
+data Request
   = get(URI uri)
   | put (URI uri, Body content)
   | post(URI uri, Body content)
@@ -27,7 +28,7 @@ data Request
   | head(URI uri)
   ;
 
-Request rewrite(get(str path)) = get([URI]"<path>"); 
+Request rewrite(rq:get(str path)) = get([URI]"<path>", headers = rq.headers, parameters = rq.parameters); 
 
 ShutdownHandle serve(loc rebelBaseDir, AppConfig config = appConfig()) {
   AppRunContext ctx = appContext(rebelBaseDir, config);
@@ -45,11 +46,13 @@ Response handle(get((URI)`/static/<{Part "/"}* path>/<Part file>`), AppRunContex
 
 Response handle(get((URI)`/rest/spec`), AppRunContext ctx) = jsonResponse(ok(), (), listSpecifications(ctx.rebelBaseDir));
 
-Response handle(get((URI)`/rest/spec/<Part spec>`), AppRunContext ctx) { 
+Response handle(req:get((URI)`/rest/spec/<Part spec>`), AppRunContext ctx) { 
   str path = replaceAll("<spec>", ".", "/");
   
   if (specExists(path, ctx), just(JsSpec model) := generateForDynamic(getSpecFile(path, ctx))) {
-    edit(getSpecFile(path, ctx));
+    if ("openInEditor" in req.parameters && fromString(req.parameters["openInEditor"])) {
+      edit(getSpecFile(path, ctx));
+    }
 
     return jsonResponse(ok(), (), model);
   } 

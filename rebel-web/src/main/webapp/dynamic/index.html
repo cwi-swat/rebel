@@ -32,6 +32,10 @@
             <input type="checkbox" id="incoming" checked onclick="toggleDisplayOptions();">Show referenced by</input>
             <input type="checkbox" id="fields" checked onclick="toggleDisplayOptions();">Show fields</input>
           </form>
+          <form>
+            <label>Other options:</label>
+            <input type="checkbox" id="openInEditor" onclick="toggleOtherOptions();">Open in Editor</input>
+          </form>
         </div>
         <svg id="graph" xmlns="http://www.w3.org/2000/svg"><g/></svg>
       </div>
@@ -73,6 +77,7 @@ var g;
 var currentSpec;
 
 var mainNode = $("#main");
+var openInEditor = false;
 
 var asideClosed = Handlebars.compile($("#aside-closed").html());
 var asideOpened = Handlebars.compile($("#aside-opened").html());
@@ -141,7 +146,7 @@ function loadAndShowSpec() {
   var fqnOfSpec = window.location.hash.substring(1);
   if (fqnOfSpec !== "") {
 
-    SpecificationService.load(fqnOfSpec, function (wrapper) {
+    SpecificationService.load(fqnOfSpec, openInEditor, function (wrapper) {
       var svg = d3.select("svg");
       currentSpec = wrapper.spec;
       g = SpecRenderer.render(currentSpec, svg);
@@ -169,6 +174,10 @@ var toggleDisplayOptions = function() {
   toggle($(".node.externalMachine.out"), $("#outgoing").is(":checked"));
   toggle($(".edgePath.syncTo"), $("#outgoing").is(":checked"));
   toggle($(".node.fields"), $("#fields").is(":checked"));
+}
+
+var toggleOtherOptions = function() {
+  openInEditor = $("#openInEditor").is(":checked");
 }
 
 var centerSpec = function() {
