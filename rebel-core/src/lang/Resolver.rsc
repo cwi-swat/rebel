@@ -45,16 +45,26 @@ Refs resolve(Module current, set[Module] imports) =
           resolveReferencedSpecifications(current + imports));
 
 Reff resolveImports(Module current, set[Module] imports) {
-  moduleNames = ("<m.modDef.fqn>":m@\loc | m <- imports);
-  return {<i.fqn@\loc, moduleNames["<i.fqn>"]> | /Import i := current.imports, "<i.fqn>" in moduleNames};
+  map[str, Module] moduleNames = ("<m.modDef.fqn>":m | m <- imports);
+  Reff resolveImportsInt(Module m) = {<imp.fqn@\loc, moduleNames["<imp.fqn>"]@\loc> | Import imp <- current.imports, "<imp.fqn>" in moduleNames}; 
+  
+  Reff result = resolveImportsInt(current);
+  if (current has spec) {
+    //also add the imports of the lib modules
+    for (Import imp <- current.imports, "<imp.fqn>" in moduleNames, Module def := moduleNames["<imp.fqn>"], def has decls) {
+      result += resolveImportsInt(def);
+    }
+  }
+  
+  return result;
 } 
    
 Reff resolveEventReferences(Module current, set[Module] imports) {	
 	Reff refs = {};
-	if (/Specification s := current) {
+	if (/Specification s := current, s has events) { 
 		defs = ("<def.name>" : def@\loc | EventDef def <- allEventDefs(imports));
 		
-		refs += {<ref@\loc, defs["<ref.eventRef>"]> | /EventRef ref := s, "<ref.eventRef>" in defs};
+		refs += {<r@\loc, defs["<event>"]> | /r:ref(FullyQualifiedVarName event, _) := s.events, "<event>" in defs};
 	}
 	
 	return refs;

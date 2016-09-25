@@ -257,13 +257,24 @@ set[Import] inlineImports(Module spc, set[Module] modules) {
 tuple[set[Message], set[EventDef]] addParamNameToSyncedVariables(set[EventDef] events, set[Module] modules, Reff syncEventRefs, Reff eventRefs) {
   set[Message] msgs = {};
   
+  Maybe[EventDef] findEventDefUsingRef(loc eventRef, set[Module] allMods) {
+    if (Module m <- allMods, m@\loc.top == eventRef.top) {
+      Reff eventRefs = resolveEventReferences(m, allMods);
+      if ({loc eventDef} := eventRefs[eventRef]) {
+        return findEventDef(eventDef, allMods);
+      }
+    }
+    
+    return nothing();
+  }
+  
   SyncExpr merge((SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)`, Expr newParam) =
     (SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>, <Expr newParam>)`;
   
   SyncExpr addParamNames(orig:(SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)`) {
     SyncExpr result = orig;
     
-    if (syncEventRefs[event@\loc] != {}, eventRefs[syncEventRefs[event@\loc]] != {}, {loc eventLoc} := eventRefs[syncEventRefs[event@\loc]], just(EventDef evntDef) := findEventDef(eventLoc, modules)) {
+    if ({loc eventRef} := syncEventRefs[event@\loc], just(EventDef evntDef) := findEventDefUsingRef(eventRef, modules)) {
       list[str] args = ["<arg>" | Expr arg <- params];
       list[str] eventParamNames = ["<p>" | Parameter p <- evntDef.transitionParams];
       
