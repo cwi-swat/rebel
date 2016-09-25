@@ -9,9 +9,7 @@ import Set;
 import String;
 import List;
 
-import lang::TypeResolver;
-
-alias RebelLit = lang::Syntax::Literal;
+alias RebelLit = lang::ExtendedSyntax::Literal;
 
 data TransitionResult
 	= failed(str reason)
@@ -21,7 +19,7 @@ data TransitionResult
 data Context = context(str spec, str event);
 
 data Variable = var(str name, Type tipe, value val);
-data EntityInstance = instance(str entityType, list[lang::Syntax::Literal] id, list[Variable] vals);  
+data EntityInstance = instance(str entityType, list[RebelLit] id, list[Variable] vals);  
 data State = state(int nr, DateTime now, list[EntityInstance] instances);
 
 list[Command] transition(str entity, str transitionToFire, list[Variable] transitionParams, State current, set[Module] normalizedSpecs) {	
@@ -109,7 +107,7 @@ Command translateEventToFunction(str entity, EventDef evnt) =
          [translateSyncStat(s, context(entity, "<evnt.name>")) | /SyncStatement s := evnt])
   );
 
-Formula translateSyncStat(SyncStatement s, Context ctx) = lit(boolVal(true()));
+Formula translateSyncStat(SyncStatement s, Context ctx) = lit(boolVal(true));
 
 Formula translateStat((Statement)`(<Statement s>)`, Context ctx) = translateStat(s, ctx);
 Formula translateStat((Statement)`<Annotations _> <Expr e>;`, Context ctx) = translateExpr(e, ctx);
@@ -130,16 +128,16 @@ Formula translateExpr((Expr)`<Literal l>`, Context ctx) = translateLit(l);
 Formula translateExpr((Expr)`<Ref r>`, Context ctx) = functionCall(simple("eventParam_<ctx.spec>_<ctx.event>_<r>"), [var(simple("next"))]);
 Formula translateExpr((Expr)`<VarName function>(<{Expr ","}* params>)`, Context ctx) = functionCall(simple("<function>"), [translateExpr(p, ctx) | Expr p <- params]);
 
-Formula translateExpr((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = add(translateExpr(lhs, ctx), tranlsateExpr(rhs, ctx));
-Formula translateExpr((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = sub(translateExpr(lhs, ctx), tranlsateExpr(rhs, ctx));
-Formula translateExpr((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = mul(translateExpr(lhs, ctx), tranlsateExpr(rhs, ctx));
-Formula translateExpr((Expr)`<Expr lhs> / <Expr rhs>`, Context ctx) = div(translateExpr(lhs, ctx), tranlsateExpr(rhs, ctx));
-Formula translateExpr((Expr)`<Expr lhs> % <Expr rhs>`, Context ctx) = \mod(translateExpr(lhs, ctx), tranlsateExpr(rhs, ctx));
+Formula translateExpr((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = add(translateExpr(lhs, ctx), [translateExpr(rhs, ctx)]);
+Formula translateExpr((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = sub(translateExpr(lhs, ctx), [translateExpr(rhs, ctx)]);
+Formula translateExpr((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = mul(translateExpr(lhs, ctx), [translateExpr(rhs, ctx)]);
+Formula translateExpr((Expr)`<Expr lhs> / <Expr rhs>`, Context ctx) = div(translateExpr(lhs, ctx), [translateExpr(rhs, ctx)]);
+Formula translateExpr((Expr)`<Expr lhs> % <Expr rhs>`, Context ctx) = \mod(translateExpr(lhs, ctx), translateExpr(rhs, ctx));
 
 Formula translateExpr((Expr)`-<Expr expr>`, Context ctx) = neg(translateExpr(expr, ctx));
 
 Formula translateExpr((Expr)`not <Expr expr>`, Context ctx) = not(translateExpr(expr, ctx));
-Formula translateExpr((Expr)`<Expr lhs> \< <Expr rhs>`, Context ctx) = lt(translateExpr(lhs, ctx), tranlsateExpr(rhs, ctx));
+Formula translateExpr((Expr)`<Expr lhs> \< <Expr rhs>`, Context ctx) = lt(translateExpr(lhs, ctx), translateExpr(rhs, ctx));
 Formula translateExpr((Expr)`<Expr lhs> \<= <Expr rhs>`, Context ctx) = lte(translateExpr(lhs, ctx), translateExpr(rhs, ctx));
 Formula translateExpr((Expr)`<Expr lhs> \> <Expr rhs>`, Context ctx) = gt(translateExpr(lhs, ctx), translateExpr(rhs, ctx));
 Formula translateExpr((Expr)`<Expr lhs> \>= <Expr rhs>`, Context ctx) = gte(translateExpr(lhs, ctx), translateExpr(rhs, ctx));
@@ -173,7 +171,7 @@ Sort translateSort((Type)`Integer`) = \int();
 Sort translateSort((Type)`Frequency`) = \int();
 default Sort translateSort(Type t) { throw "Sort conversion for <t> not yet implemented"; }
 
-Formula translateLit(value v) = translateLit(l) when lang::Syntax::Literal l := v;
+Formula translateLit(value v) = translateLit(l) when RebelLit l := v;
 
 Formula translateLit((Literal)`<Int i>`) = translateLit(i);
 Formula translateLit((Literal)`<IBAN i>`) = translateLit(i);

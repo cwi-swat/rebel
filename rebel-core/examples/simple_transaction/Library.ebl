@@ -127,12 +127,12 @@ event book() {
 	preconditions {
 		this.bookedOn == now.date;	
 	}
-	sync {
+	sync { 
 	   // implicitly checks for initialized state
 		@doc{Synchronize with the withdraw event of the from account. Can only succeed if the account is in the 'opened' state}
 		Account[this.from].withdraw(this.amount);
 		@doc{Synchronize with the deposit event of the to account. Can only succeed if the account is in the 'opened' state}
-		Account[this.to].deposit(this.amount);
+		Account[this.to].deposit(this.amount);  
 	}
 }
 

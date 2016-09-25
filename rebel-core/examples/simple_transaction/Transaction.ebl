@@ -18,9 +18,9 @@ specification Transaction {
 	}
 	 
 	events {
-		start[] 
+		start[]  
 		book[]    
-		fail[]
+		fail[] 
 	}
 	
 	lifeCycle {

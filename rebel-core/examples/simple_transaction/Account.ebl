@@ -31,7 +31,7 @@ specification Account {
 			   -> blocked: block
 			   -> closed: close
 		blocked -> opened: unblock
-		final closed			  	
+		final closed	 		  	
 			
 	}
 }
