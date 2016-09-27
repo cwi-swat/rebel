@@ -1,43 +1,105 @@
 module analysis::Simulator
 
 import lang::ExtendedSyntax;
+import lang::Builder;
+import lang::Resolver;
 
 import lang::smtlib25::AST;
+import lang::smtlib25::Compiler;
+import solver::SolverRunner;
 
 import IO;
 import Set;
 import String;
 import List;
+//import ParseTree;
+import util::Maybe;
 
 alias RebelLit = lang::ExtendedSyntax::Literal;
+
+anno loc Module@\loc;
 
 data TransitionResult
 	= failed(str reason)
 	| successful(State new)
 	;
 	
-data Context = context(str spec, str event);
+data Context = context(str spec, str event, map[str,str] specLookup);
+
+data Param = param(str name, Type tipe);
 
 data Variable = var(str name, Type tipe, value val);
 data EntityInstance = instance(str entityType, list[RebelLit] id, list[Variable] vals);  
 data State = state(int nr, DateTime now, list[EntityInstance] instances);
 
-list[Command] transition(str entity, str transitionToFire, list[Variable] transitionParams, State current, set[Module] normalizedSpecs) {	
+list[Param] getTransitionParams(loc spec, str transitionToFire) = 
+  [param("<p.name>", p.tipe) | p <- evnt.transitionParams]
+  when <_, just(Built b)> := load(spec),
+       EventDef evnt <- b.normalizedMod.spec.events.events,
+       "<evnt.name>" == transitionToFire;
+
+TransitionResult transition(loc spec, str entity, str transitionToFire, list[Variable] transitionParams, State current) {	
+  set[Built] builtSpecs = loadAllSpecs(spec, {});
+  set[Module] normalizedSpecs = {b.normalizedMod | Built b <- builtSpecs}; 
+   
   //1. Find the event definition to fire
   EventDef eventToRaise = findEventDef(transitionToFire, normalizedSpecs);
   
   // Collect all the synced events and their entity types
   
   
+  map[str,str] specLookup = ("<m.modDef.fqn.modName>":"<m.modDef.fqn>" | m <- normalizedSpecs);
+  
   list[Command] smt = declareSmtTypes(normalizedSpecs) +
                       declareSmtVariables(entity, transitionToFire, transitionParams, normalizedSpecs) +
                       declareSmtSpecLookup(normalizedSpecs) +
                       translateState(current) +
                       translateTransitionParams(entity, transitionToFire, transitionParams) +
-                      translateEventToSingleAsserts(entity, eventToRaise);
+                      translateEventToSingleAsserts(entity, eventToRaise, specLookup);
   
-  return smt; 
+  list[str] rawSmt = compile(smt);
+
+  SolverPID pid = startSolver();
+  TransitionResult result;
+  
+  try { 
+    runSolver(pid, intercalate("\n", compile(smt)));
+    
+    //for (s <- rawSmt) {
+    //  runSolver(pid, s);
+    //}
+    
+    if (checkSat(pid)) {
+      result = successful(current);
+    } else {
+      result = failed("Unknown");
+    }
+  } 
+  catch ex: throw ex;
+  finally {
+    stopSolver(pid);
+  }
+  
+  return result; 
 }  
+
+set[Built] loadAllSpecs(loc file, set[loc] visited) {
+  set[Built] result = {};
+  
+  if (<_,just(Built b)> := load(file)) {
+    if (b.normalizedMod has spec) {
+      result += b;    
+    }
+    
+    for (<_, loc imported> <- b.refs.imports, imported.top notin visited) {
+      set[Built] loaded = loadAllSpecs(imported.top, visited + file);
+      visited += {l.normalizedMod@\loc.top | Built l <- loaded};
+      result += loaded;
+    } 
+  }
+  
+  return result;
+}
 
 EventDef findEventDef(str eventName, set[Module] spcs) = evnt when /EventDef evnt := spcs, "<evnt.name>" == eventName;
 EventDef findEventDef(str eventName, set[Module] spcs) { throw "Event with name \'<eventName>\' not found in specs"; }
@@ -45,15 +107,15 @@ EventDef findEventDef(str eventName, set[Module] spcs) { throw "Event with name 
 list[Command] declareSmtSpecLookup(set[Module] mods) {
   list[Command] smt = [];
 
-  for (/normalized(_, _, TypeName name, _, Fields fields, _, _, _, _, _, LifeCycle lc) := mods) {
+  for (Module m <- mods, /normalized(_, _, TypeName name, _, Fields fields, _, _, _, _, _, LifeCycle lc) := m) {
     // lookup @key fields
     list[Sort] sortsOfKey = [translateSort(tipe) | /(FieldDecl)`<VarName _>: <Type tipe> @key` := fields];
     
-    smt += declareFunction("spec_<name>", [custom("State")] + sortsOfKey, custom("<name>"));  
+    smt += declareFunction("spec_<m.modDef.fqn>", [custom("State")] + sortsOfKey, custom("<m.modDef.fqn>"));  
     // define the initialized function
     // 1. get all the states nr's which represent initialized states
     set[int] initializedStateNrs = {toInt("<sf.nr>") | /StateFrom sf := lc, /(LifeCycleModifier)`initial` !:= sf};
-    smt += defineFunction("spec_<name>_initialized", [sortedVar("entity", custom("<name>"))], \bool(), \or([eq(functionCall(simple("field_<name>__state"), [var(simple("entity"))]), lit(intVal(nr))) | int nr <- initializedStateNrs]));
+    smt += defineFunction("spec_<m.modDef.fqn>_initialized", [sortedVar("entity", custom("<m.modDef.fqn>"))], \bool(), \or([eq(functionCall(simple("field_<m.modDef.fqn>__state"), [var(simple("entity"))]), lit(intVal(nr))) | int nr <- initializedStateNrs]));
   }
   
   return smt;
@@ -67,14 +129,14 @@ list[Command] declareSmtTypes(set[Module] specs) {
   smt += declareSort("State");
   
   // Add 'specification' types as undefined sorts
-  smt += toList({declareSort("<spc.name>") | /Specification spc := specs});
+  smt += toList({declareSort("<m.modDef.fqn>") | /Module m := specs, m has spec});
   
   return smt; 
 }
 
 list[Command] declareSmtVariables(str entity, str transitionToFire, list[Variable] transitionParams, set[Module] spcs) {
   // declare functions for all entity fields
-  list[Command] smt = [declareFunction("field_<spc.name>_<f.name>", [custom("<spc.name>")], translateSort(f.tipe)) | /Specification spc := spcs, /FieldDecl f := spc.fields];
+  list[Command] smt = [declareFunction("field_<m.modDef.fqn>_<f.name>", [custom("<m.modDef.fqn>")], translateSort(f.tipe)) | Module m <- spcs, m has spec, /FieldDecl f := m.spec.fields];
   
   smt += [declareFunction("eventParam_<entity>_<transitionToFire>_<v.name>", [custom("State")], translateSort(v.tipe)) | Variable v <- transitionParams];
   
@@ -89,7 +151,7 @@ list[Command] translateState(State state) {
   smt += [declareFunction("now", [custom("State")], custom("DateTime")), \assert(eq(functionCall(simple("now"), [var(simple("next"))]), translateLit(state.now)))];
     
   // Assert all the current values of the entities
-  smt += [\assert(eq(functionCall(simple("field_<ei.entityType>_<v.name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("current")), *[translateLit(i) | lang::Syntax::Literal i <- ei.id]])]), translateLit(v.val))) | EntityInstance ei <- state.instances, Variable v <- ei. vals];
+  smt += [\assert(eq(functionCall(simple("field_<ei.entityType>_<v.name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("current")), *[translateLit(i) | lang::ExtendedSyntax::Literal i <- ei.id]])]), translateLit(v.val))) | EntityInstance ei <- state.instances, Variable v <- ei. vals];
   
   return smt; 
 }
@@ -97,28 +159,28 @@ list[Command] translateState(State state) {
 list[Command] translateTransitionParams(str entity, str transitionToFire, list[Variable] params) =
   [\assert(eq(functionCall(simple("eventParam_<entity>_<transitionToFire>_<p.name>"), [var(simple("next"))]), translateLit(p.val))) | Variable p <- params]; 
 
-list[Command] translateEventToSingleAsserts(str entity, EventDef evnt) =
-  [\assert(translateStat(s, context(entity, "<evnt.name>"))) | /Statement s := evnt] +
-  [\assert(translateSyncStat(s, context(entity, "<evnt.name>"))) | /SyncStatement s := evnt];
+list[Command] translateEventToSingleAsserts(str entity, EventDef evnt, map[str,str] specLookup) =
+  [\assert(translateStat(s, context(entity, "<evnt.name>", specLookup))) | /Statement s := evnt] +
+  [\assert(translateSyncStat(s, context(entity, "<evnt.name>", specLookup))) | /SyncStatement s := evnt];
 
-Command translateEventToFunction(str entity, EventDef evnt) =
-  defineFunction("event_<entity>_<evnt.name>", [sortedVar("current", custom("State")), sortedVar("next", custom("State"))], \bool(),
-    \and([translateStat(s, context(entity, "<evnt.name>")) | /Statement s := evnt] + 
-         [translateSyncStat(s, context(entity, "<evnt.name>")) | /SyncStatement s := evnt])
-  );
+//Command translateEventToFunction(str entity, EventDef evnt) =
+//  defineFunction("event_<entity>_<evnt.name>", [sortedVar("current", custom("State")), sortedVar("next", custom("State"))], \bool(),
+//    \and([translateStat(s, context(entity, "<evnt.name>")) | /Statement s := evnt] + 
+//         [translateSyncStat(s, context(entity, "<evnt.name>")) | /SyncStatement s := evnt])
+//  );
 
 Formula translateSyncStat(SyncStatement s, Context ctx) = lit(boolVal(true));
 
 Formula translateStat((Statement)`(<Statement s>)`, Context ctx) = translateStat(s, ctx);
 Formula translateStat((Statement)`<Annotations _> <Expr e>;`, Context ctx) = translateExpr(e, ctx);
 
-Formula translateExpr((Expr)`new <Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<spc>"), [var(simple("next")), translateExpr(id, ctx)]);
-Formula translateExpr((Expr)`new <Expr spc>[<Expr id>].<VarName field>`, Context ctx) = functionCall(simple("field_<ctx.spec>_<field>"), [functionCall(simple("spec_<spc>"), [var(simple("next")), translateExpr(id, ctx)])]);
+Formula translateExpr((Expr)`new <Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("next")), translateExpr(id, ctx)]);
+Formula translateExpr((Expr)`new <Expr spc>[<Expr id>].<VarName field>`, Context ctx) = functionCall(simple("field_<ctx.spec>_<field>"), [functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("next")), translateExpr(id, ctx)])]);
 
-Formula translateExpr((Expr)`<Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<spc>"), [var(simple("current")), translateExpr(id, ctx)]);
-Formula translateExpr((Expr)`<Expr spc>[<Expr id>].<VarName field>`, Context ctx) = functionCall(simple("field_<ctx.spec>_<field>"), [functionCall(simple("spec_<spc>"), [var(simple("current")), translateExpr(id, ctx)])]);
+Formula translateExpr((Expr)`<Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("current")), translateExpr(id, ctx)]);
+Formula translateExpr((Expr)`<Expr spc>[<Expr id>].<VarName field>`, Context ctx) = functionCall(simple("field_<ctx.specLookup["<spc>"]>_<field>"), [functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("current")), translateExpr(id, ctx)])]);
 
-Formula translateExpr((Expr)`initialized <Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<spc>_initialized"), [translateExpr((Expr)`<Expr spc>[<Expr id>]`, ctx)]); 
+Formula translateExpr((Expr)`initialized <Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<ctx.specLookup["<spc>"]>_initialized"), [translateExpr((Expr)`<Expr spc>[<Expr id>]`, ctx)]); 
 
 Formula translateExpr((Expr)`<Expr lhs>.<VarName field>`, Context ctx) = functionCall(simple("<field>"), [translateExpr(lhs, ctx)]); 
 
@@ -176,7 +238,7 @@ Formula translateLit(value v) = translateLit(l) when RebelLit l := v;
 Formula translateLit((Literal)`<Int i>`) = translateLit(i);
 Formula translateLit((Literal)`<IBAN i>`) = translateLit(i);
 
-Formula translateLit((Literal)`<Money m>`) = functionCall(simple("amount"), [translateLit(m)]);
+Formula translateLit((Literal)`<Money m>`) = translateLit(m);//functionCall(simple("amount"), [translateLit(m)]);
 Formula translateLit((Literal)`<DateTime tm>`) = translateLit(tm);
 
 Formula translateLit(Money m) = lit(adt("consMoney", [lit(strVal("<m.cur>")), translateLit(m.amount)]));

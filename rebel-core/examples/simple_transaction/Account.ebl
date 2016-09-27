@@ -14,8 +14,9 @@ specification Account {
 	
 	events {
 		openAccount[]
-		withdraw[]
+		withdraw[] 
 		deposit[]
+		interest[]
 		block[]  
 		unblock[]
 		close[]
@@ -27,7 +28,7 @@ specification Account {
 	
 	lifeCycle {
 		initial init -> opened: openAccount
-		opened -> opened: withdraw, deposit
+		opened -> opened: withdraw, deposit, interest
 			   -> blocked: block
 			   -> closed: close
 		blocked -> opened: unblock

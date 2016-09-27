@@ -7,11 +7,16 @@ import util::Maybe;
 import IO;
 import Message;
 import String;
-import Boolean;
+import Boolean; 
 
 import visualize::ModelGenerator;
 import visualize::ADT; 
+import visualize::SimulationWrapper;
+ 
 import web::Uri;
+
+import analysis::Simulator;
+import analysis::SimulationLoader;
 
 import util::Editors;
 
@@ -29,22 +34,46 @@ data Request
   ;
 
 Request rewrite(rq:get(str path)) = get([URI]"<path>", headers = rq.headers, parameters = rq.parameters); 
+Request rewrite(rq:post(str path, Body b)) = post([URI]"<path>", b, headers = rq.headers, parameters = rq.parameters); 
 
 ShutdownHandle serve(loc rebelBaseDir, AppConfig config = appConfig()) {
   AppRunContext ctx = appContext(rebelBaseDir, config);
   
   Response handleInternal(Request req) = handle(rewrite(req), ctx);
-
   serve(config.baseUrl, handleInternal);
    
   void sd() { shutdown(config.baseUrl); }
   return sd;  
 }
 
-Response handle(get((URI)`/`), AppRunContext ctx) = fileResponse(getStaticFile("index.html", ctx), mimeTypes["html"], ());
+Response handle(get((URI)`/vis`), AppRunContext ctx) = fileResponse(getStaticFile("visualize.html", ctx), mimeTypes["html"], ());
+Response handle(get((URI)`/sim`), AppRunContext ctx) = fileResponse(getStaticFile("simulate.html", ctx), mimeTypes["html"], ());
+
 Response handle(get((URI)`/static/<{Part "/"}* path>/<Part file>`), AppRunContext ctx) = fileResponse(getStaticFile("<path>/<file>", ctx), mimeTypes[getExtension("<file>")], ()) when staticFileExists("<path>/<file>", ctx);
 
 Response handle(get((URI)`/rest/spec`), AppRunContext ctx) = jsonResponse(ok(), (), listSpecifications(ctx.rebelBaseDir));
+
+Response handle(get((URI)`/rest/sim/start/<Part spec>`), AppRunContext ctx) 
+  = jsonResponse(ok(), (), getInitialConfiguration(specLoc))
+  when loc specLoc := resolveSpec("<spec>", ctx);
+
+Response handle(req:post((URI)`/rest/sim/start/<Part spec>`, Body b), AppRunContext ctx) 
+  = jsonResponse(ok(), (), toWeb(constructInitialState(cfg)))
+  when SimConfig cfg := b(#SimConfig);
+  
+Response handle(get((URI)`/rest/sim/fire/<Part spec>/<Part event>`), AppRunContext ctx) 
+  = jsonResponse(ok(), (), toWeb(getTransitionParams(specLoc, "<event>")))
+  when loc specLoc := resolveSpec("<spec>", ctx); 
+
+alias StateAndVars = tuple[State state, Variables vars];
+
+Response handle(post((URI)`/rest/sim/fire/<Part spec>/<Part event>`, Body b), AppRunContext ctx) {
+  if (StateAndVars sav := b(#StateAndVars)) {
+    loc specLoc = resolveSpec("<spec>", ctx);
+    
+    TransitionResult result = transition(specLoc, "<spec>", "<event>", toSim(sav.vars), toSim(sav.state));
+  }
+}
 
 Response handle(req:get((URI)`/rest/spec/<Part spec>`), AppRunContext ctx) { 
   str path = replaceAll("<spec>", ".", "/");
@@ -60,7 +89,12 @@ Response handle(req:get((URI)`/rest/spec/<Part spec>`), AppRunContext ctx) {
   return response(notFound(), "Unable to load specification");
 } 
 
-default Response handle(get(URI uri), AppRunContext ctx) = response(notFound(), "<uri> is not found on server");
+private loc resolveSpec(str spec, AppRunContext ctx) = getSpecFile(path, ctx)
+  when str path := replaceAll("<spec>", ".", "/"),
+       specExists(path, ctx);  
+
+default Response handle(get(URI uri), AppRunContext ctx) = response(notFound(), "Get of <uri> is not found on server");
+default Response handle(post(URI uri, Body b), AppRunContext ctx) = response(notFound(), "Post to <uri> with this body content not found");
 
 private str getExtension(/^.*[.]<ext:.*>$/) = ext;
 

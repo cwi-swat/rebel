@@ -7,15 +7,15 @@ import simple_transaction.Account
 
 	Nonfunctionals:
 	* Happens rarely; 1 in 50  events is of this type
-}
+} 
 event openAccount(initialDeposit: Money) {
 	preconditions {
-		initialDeposit >= EUR 0.00;
+		initialDeposit.amount >= EUR 50.00.amount;
 	}
 	postconditions {
 		new this.balance == initialDeposit;
 	} 
-}
+} 
 
 @doc {
 	Withdraw money from the account.
@@ -76,6 +76,17 @@ event close() {
 	}
 }	
 
+function singleInterest(balance: Money, interest: Percentage): Money =  (balance / 100) * interest;
+
+event interest[maxInterest: Percentage = 10%](currentInterest: Percentage) {
+  preconditions {
+    currentInterest <= maxInterest;
+  }
+  postconditions {
+    new this.balance == this.balance + singleInterest(this.balance, currentInterest);
+  }
+}
+
 @doc {
 	The balance should always be positive
 }
@@ -100,7 +111,7 @@ event start(amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
 		@doc{From and to account should differ}
 		to != from;
 		
-		amount > EUR 0.00;
+		amount.amount > EUR 0.00.amount;
 	}
 	postconditions {
 		new this.amount == amount;

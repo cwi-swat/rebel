@@ -34,16 +34,16 @@ str toJson(JsSpec sp) =
 	'	\"fqn\":\"<jsonEsc(sp.fqn)>\", 
 	'	\"name\":\"<jsonEsc(splitter(sp.name))>\",
 	'	\"documentation\":\"<jsonEsc(sp.doc)>\",
-	'	\"modifier\":\"<toJson(sp.specMod)>\",
+	'	\"modifier\":\"<toJson(sp.modifier)>\",
 	'	\"inheritsFrom\": <toJson(sp.inheritsFrom)>,
 	'	\"extendedBy\":[<intercalate(",\n", [toJson(ex) | ex <- sp.extendedBy])>],
-	'	\"fields\":[<intercalate(",\n", [toJson(field) | field <- sp.fields])>],
+	'	\"fields\":[<intercalate(",\n", [toJson(field) | JsField field <- sp.fields])>],
 	'	\"events\":[<intercalate(",\n", [toJson(evnt) | evnt <- sp.events])>],
 	'	\"states\":[<intercalate(",\n", [toJson(s) | s <- sp.states])>],
 	'	\"transitions\":[<intercalate(",\n", [toJson(t) | t <- sp.transitions])>],
 	'	\"externalMachines\":[<intercalate(",\n", [toJson(m) | m <- sp.externalMachines])>],
-	'	\"transitionsToExternalMachines\":[<intercalate(",\n", [toJson(t) | t <- sp.transitionsToExternal])>],
-	'	\"transitionsFromExternalMachines\":[<intercalate(",\n", [toJson(t) | t <- sp.transitionsFromExternal])>]
+	'	\"transitionsToExternalMachines\":[<intercalate(",\n", [toJson(t) | t <- sp.transitionsToExternalMachines])>],
+	'	\"transitionsFromExternalMachines\":[<intercalate(",\n", [toJson(t) | t <- sp.transitionsFromExternalMachines])>]
 	'}";
 
 str toJson(extends(str name, str fqn)) = "{\"name\":\"<jsonEsc(name)>\", \"url\":\"<jsonEsc(fqn)>\"}";

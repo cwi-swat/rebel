@@ -161,5 +161,4 @@ Type resolveType((Expr)`(<Expr expr>)`, Context ctx) = resolveTypeCached(expr, c
 Type resolveType((SyncExpr)`not <SyncExpr expr>`, Context ctx) = (Type)`Boolean`;
 Type resolveType((SyncExpr)`<TypeName specName>[<Expr _>].<VarName _>(<{Expr ","}* _>)`, Context ctx) = getTypeOfSpec("<specName>", ctx.scp);
 
-
 default Type resolveType((Expr)`<Expr e>`, Context _) = (Type)`$$INVALID_TYPE$$`;

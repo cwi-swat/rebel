@@ -3,5 +3,5 @@ Bundle-ManifestVersion: 2
 Bundle-Name: rebel_core
 Bundle-SymbolicName: rebel_core
 Bundle-Version: 1.0.0
-Require-Bundle: rascal
+Require-Bundle: rascal_eclipse
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8

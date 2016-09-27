@@ -99,7 +99,7 @@ void main() {
             }
             
             if (baseDirOfMod in runningVisInstances) {          
-              htmlDisplay(runningVisInstances[baseDirOfMod][fragment="<current.modDef.fqn>"]);
+              htmlDisplay((runningVisInstances[baseDirOfMod] + "vis")[fragment="<current.modDef.fqn>"]);
             } else {
               alert("Unable to start visualisation server, no port available");
             }            

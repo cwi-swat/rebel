@@ -1,0 +1,195 @@
+<!doctype html>
+<head>
+  <meta charset="utf-8">
+  <title>Rebel Specification Viewer</title>
+
+  <script src="static/lib/external/jquery-1.12.0.min.js"></script>
+  <script src="static/lib/external/jquery-ui.min.js"></script>
+  <script src="static/lib/external/handlebars.min-latest.js"></script>
+  <script src="static/lib/external/d3.v3.min.js" charset="utf-8"></script>
+  <script src="static/lib/external/dagre-d3.js"></script>
+  <script src="static/lib/external/micromarkdown.js"></script>
+  <script src="static/lib/specificationVisualizer.js"></script>
+  <script src="static/lib/specificationService.js"></script>
+
+  <link rel="stylesheet" href="static/lib/external/reset.css">
+
+  <link rel="stylesheet" href="static/lib/external/tipsy.css">
+  <script src="static/lib/external/tipsy.js"></script>
+
+  <link rel="stylesheet" href="static/lib/layout.css">
+</head>
+<body>
+
+<section>
+  <div id="main">
+    <article>
+      <div id="viz">
+        <div id="options">
+          <form>
+            <label>Visualization options:</label>
+            <input type="checkbox" id="outgoing" checked onclick="toggleDisplayOptions();">Show references</input>
+            <input type="checkbox" id="incoming" checked onclick="toggleDisplayOptions();">Show referenced by</input>
+            <input type="checkbox" id="fields" checked onclick="toggleDisplayOptions();">Show fields</input>
+          </form>
+          <form>
+            <label>Other options:</label>
+            <input type="checkbox" id="openInEditor" onclick="toggleOtherOptions();">Open in Editor</input>
+          </form>
+        </div>
+        <svg id="graph" xmlns="http://www.w3.org/2000/svg"><g/></svg>
+      </div>
+    </article>
+  </div>
+</section>
+
+<script id="aside-opened" type="text/x-handlebars-template">
+  <aside class="opened">
+    <div class="title">
+      <h1>extra info</h1>
+      <button class="openclose close">&rarr;</button>
+    </div>
+    <div id="specInfo">
+      <p>{{{info}}}</p>
+    </div>
+  </aside>
+</script>
+
+<script id="aside-closed" type="text/x-handlebars-template">
+  <aside class="closed">
+    <button class="openclose open">&larr;</button>
+    <p>e</p><p>x</p><p>t</p><p>r</p><p>a</p><br/><p>i</p><p>n</p><p>f</p><p>o</p>
+  </aside>
+</script>
+
+<script>
+Handlebars.registerHelper('list', function(context, options) {
+  var ret = "<ul>";
+
+  for(var i=0, j=context.length; i<j; i++) {
+    ret = ret + "<li>" + options.fn(context[i]) + "</li>";
+  }
+
+  return ret + "</ul>";
+});
+
+var g;
+var currentSpec;
+
+var mainNode = $("#main");
+var openInEditor = false;
+
+var asideClosed = Handlebars.compile($("#aside-closed").html());
+var asideOpened = Handlebars.compile($("#aside-opened").html());
+
+var openAside = function() {
+  $("aside.closed").remove();
+  var extraSpecInfo = getExtraSpecInfo();
+  mainNode.append(asideOpened(extraSpecInfo));
+  $("aside button.close").click(closeAside);
+  centerSpec();
+}
+
+var closeAside = function() {
+  $("aside.opened").remove();
+  mainNode.append(asideClosed());
+  $("aside button.open").click(openAside);
+  centerSpec();
+}
+
+function refreshExtraInfo() {
+  if ($("aside.opened").length) {
+      var extraSpecInfo = getExtraSpecInfo();
+      $("aside.opened").remove();
+      mainNode.append(asideOpened(extraSpecInfo));
+  }
+}
+
+function getExtraSpecInfo() {
+  if (currentSpec !== undefined) {
+    var info = currentSpec.doc;
+    if ("name" in currentSpec.inheritsFrom) {
+      info += "\n##inherits from:\n";
+      info += currentSpec.inheritsFrom.url !== "?" ? "[" + currentSpec.inheritsFrom.name + "](#" + currentSpec.inheritsFrom.url + ")" : currentSpec.inheritsFrom.name;
+    }
+    if (currentSpec.extendedBy.length > 0) {
+      info += "\n##extended by:\n"
+      currentSpec.extendedBy.forEach(function(eb, index) {
+        info += eb.url !== "?" ? "[" + eb.name + "](#" + eb.url + ")" : eb.name;
+        if (index < currentSpec.extendedBy.length-1) {
+          info += ", ";
+        }
+      })
+    }
+
+    info = micromarkdown.parse(info);
+
+    return {
+      info: info
+    }
+  } else {
+    return {
+      info: "No specification found"
+    }
+  }
+}
+
+var noSpecFound = new SpecRenderer.Specification("$NO_SPEC_FOUND$", "No specification found", "No specficiation could be found", {}, [], [], [], [], [], []);
+
+function initializeGui() {
+  mainNode.append(asideClosed());
+
+  $("aside button.open").click(openAside);
+}
+
+function loadAndShowSpec() {
+  var fqnOfSpec = window.location.hash.substring(1);
+  if (fqnOfSpec !== "") {
+
+    SpecificationService.load(fqnOfSpec, openInEditor, function (wrapper) {
+      var svg = d3.select("svg");
+      currentSpec = wrapper.spec;
+      g = SpecRenderer.render(currentSpec, svg);
+
+      centerSpec();
+      toggleDisplayOptions();
+      refreshExtraInfo();
+    });
+  }
+}
+
+var toggleDisplayOptions = function() {
+  function toggle(elements, visible) {
+    elements.each(function() {
+      if (visible) {
+        $( this ).removeClass("hide");
+      } else {
+        $( this ).addClass("hide");
+      }
+    })
+  }
+
+  toggle($(".node.externalMachine.in"), $("#incoming").is(":checked"));
+  toggle($(".edgePath.syncFrom"), $("#incoming").is(":checked"));
+  toggle($(".node.externalMachine.out"), $("#outgoing").is(":checked"));
+  toggle($(".edgePath.syncTo"), $("#outgoing").is(":checked"));
+  toggle($(".node.fields"), $("#fields").is(":checked"));
+}
+
+var toggleOtherOptions = function() {
+  openInEditor = $("#openInEditor").is(":checked");
+}
+
+var centerSpec = function() {
+  if (g !== undefined) {
+    g.initialPlacement($(graph));
+  }
+}
+
+$(window).on('hashchange', function() {loadAndShowSpec();});
+$(document).ready(function() {
+  initializeGui();
+  loadAndShowSpec();
+});
+</script>
+</body>
