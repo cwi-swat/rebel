@@ -58,6 +58,8 @@ private bool inCurrentScope(str name, Scope scope) = name == scope.name || name 
 
 @memo
 Type resolveTypeCached(Expr exp, Context ctx) = resolveType(exp, ctx);
+@memo
+Type resolveTypeCached(SyncExpr exp, Context ctx) = resolveType(exp, ctx);
 
 // Negative
 Type resolveNegative((Type)`Integer`) = (Type)`Integer`;
@@ -155,5 +157,9 @@ Type resolveType((Expr)`now`, Context _)            = (Type)`DateTime`;
 Type resolveType((Expr)`<Ref r>`, Context ctx)      = getTypeOfVar("<r>", ctx.scp);
 
 Type resolveType((Expr)`(<Expr expr>)`, Context ctx) = resolveTypeCached(expr, ctx);
+ 
+Type resolveType((SyncExpr)`not <SyncExpr expr>`, Context ctx) = (Type)`Boolean`;
+Type resolveType((SyncExpr)`<TypeName specName>[<Expr _>].<VarName _>(<{Expr ","}* _>)`, Context ctx) = getTypeOfSpec("<specName>", ctx.scp);
+
 
 default Type resolveType((Expr)`<Expr e>`, Context _) = (Type)`$$INVALID_TYPE$$`;

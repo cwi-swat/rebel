@@ -37,6 +37,38 @@ TypeCheckerResult checkTypes(Module inlinedModul, set[Module] imports) {
     }
   }
   
+    void checkSyncStatements(SyncStatement* stats, Context ctx, str eventName) {
+      set[Message] internalMsg = {};
+      map[loc, Type] internalTypes = ();
+    
+      bottom-up visit(stats) {
+        case SyncExpr expr: {
+          Type inferredTipe = resolveTypeCached(expr, ctx);
+          if ((Type)`$$INVALID_TYPE$$` := inferredTipe) {
+            internalMsg += error("Type error", expr@\loc);
+          } else {
+            internalTypes += (expr@\loc : inferredTipe);
+          }  
+        }
+        case Expr expr: {
+          Type inferredTipe = resolveTypeCached(expr, ctx);
+          if ((Type)`$$INVALID_TYPE$$` := inferredTipe) {
+            internalMsg += error("Type error", expr@\loc);
+          } else {
+            internalTypes += (expr@\loc : inferredTipe);
+          }  
+        }
+        
+      }
+      
+      msgs += internalMsg;
+      types += internalTypes;
+      
+      if (internalMsg != {}) {
+        msgs += error("Event definition contains type errors", findEventRef(eventName));
+      }
+  }
+  
   loc findEventRef(str eventName) = er@\loc
     when EventRef er <- inlinedModul.spec.eventRefs.events,
          "<er.eventRef>" == eventName;
@@ -52,8 +84,9 @@ TypeCheckerResult checkTypes(Module inlinedModul, set[Module] imports) {
       paramsInEvent = ("<p.name>" : p.tipe | Parameter p <- ev.transitionParams);
       Context ctx = context(nested("<ev.name>", paramsInEvent, rootScope));
       
-      if (/Statement* stats := ev.pre) checkStatements(stats, ctx, "<ev.name>");
-      if (/Statement* stats := ev.post) checkStatements(stats, ctx, "<ev.name>");
+      if (ev has pre, /Statement* stats := ev.pre) checkStatements(stats, ctx, "<ev.name>");
+      if (ev has post, /Statement* stats := ev.post) checkStatements(stats, ctx, "<ev.name>");
+      if (ev has sync, /SyncStatement* stats := ev.sync) checkSyncStatements(stats, ctx, "<ev.name>");
     }
   }
     
