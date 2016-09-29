@@ -17,7 +17,7 @@ specification Transaction {
 		bookedOn: Date
 	}
 	 
-	events {
+	events { 
 		start[]  
 		book[]    
 		fail[] 
@@ -25,7 +25,7 @@ specification Transaction {
 	
 	lifeCycle {
 		initial init -> validated: start 
-		validated   -> booked: book 
+		validated    -> booked: book 
 					-> failed: fail
 		final booked
 		final failed

@@ -4,13 +4,10 @@ import simple_transaction.Account
 
 @doc { 	
 	Opening an account needs a valid IBAN and some initial deposit. 
-
-	Nonfunctionals:
-	* Happens rarely; 1 in 50  events is of this type
 } 
 event openAccount(initialDeposit: Money) {
 	preconditions {
-		initialDeposit.amount >= EUR 50.00.amount;
+		initialDeposit >= EUR 50.00;
 	}
 	postconditions {
 		new this.balance == initialDeposit;
@@ -19,9 +16,6 @@ event openAccount(initialDeposit: Money) {
 
 @doc {
 	Withdraw money from the account.
-
-	Nonfunctionals:
-	* Happens often; 1 in 3 events is of this type
 }
 event withdraw(amount: Money) {
 	preconditions {
@@ -35,9 +29,6 @@ event withdraw(amount: Money) {
 
 @doc {
 	Deposit money on the account.
-
-	Nonfunctionals:
-	* Happens often; 1 in 3 raised events is of this type
 }
 event deposit(amount: Money) {
 	preconditions {
@@ -50,26 +41,18 @@ event deposit(amount: Money) {
 
 @doc {
 	Block the account for withdrawals and deposits.
-
-	Nonfunctionals:
-	* Happens very rarely; 1 in 100 events is of this type
 }
 event block() {}
 
 @doc {
 	Unblock the account so that withdrawals and deposits can happen again.
-
-	Nonfunctionals:
-	* Happend very rarely; 1 in 100 events is of this type
 }
 event unblock() {}
 
 @doc {
 	Close the account.
-
-	Nonfunctionals:
-	* Happens rarely; 1 in 50 events is of this type
 }
+
 event close() {
 	preconditions {
 		this.balance == EUR 0.00;
@@ -97,9 +80,6 @@ invariant positiveBalance {
 @doc {
 	Start a new transaction.
 	The transaction can only be booked on the specified date.
-
-	Nonfunctionals:
-	* Happens very often; 1 in 3 events is of this type
 }
 event start(amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
 	preconditions {
@@ -111,7 +91,7 @@ event start(amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
 		@doc{From and to account should differ}
 		to != from;
 		
-		amount.amount > EUR 0.00.amount;
+		amount > EUR 0.00;
 	}
 	postconditions {
 		new this.amount == amount;
@@ -128,11 +108,6 @@ event start(amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
 @doc{
 	Book the transaction.
 	The transaction can only be booked if today is the set book date
-
-	Nonfunctionals:
-	* Happens very often; 1 in 3 events is of this type
-	* From and To accounts can 'live' on different servers
-	* Can only continue if its known that transaction and balance updates are persisted to disk
 }
 event book() {
 	preconditions {
@@ -151,8 +126,5 @@ event book() {
 	Fails the transaction.
 	If it is not possible to book the transaction (not enough money in account, past the bookOn date, etc) the transaction can be failed.
 	No money is transfered between the accounts
-
-	Nonfunctionals:
-	* Happens frequently, 1 in 20 events is of this type
 }
 event fail() {}

@@ -33,16 +33,17 @@ bool isSatisfiable(SolverPID pid, str smtFormula) {
 }
 
 bool checkSat(SolverPID pid) {
-	switch(runSolver(pid, "(check-sat)")) {
+	switch(runSolver(pid, "(check-sat)", wait = 20)) {
 		case "sat" : return true;
 		case "unsat": return false;
 		case "unknown": throw "Could not compute satisfiability";		
+		default: throw "unable to get result from smt solver";
 	}
 }
 
-str runSolver(SolverPID pid, str commands) {
+str runSolver(SolverPID pid, str commands, int wait = 0) {
 	try {
-		return run(pid, commands, debug=true);
+		return run(pid, commands, debug=true, wait = wait);
 	}
 	catch er: throw "Error while running SMT solver, reason: <er>"; 	
 }

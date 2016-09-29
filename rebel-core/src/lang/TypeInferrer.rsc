@@ -30,7 +30,7 @@ data Context = context(Scope scp);
 data Scope
   = nested(str name, map[str, Type] vars, Scope parent)
   | root(str name, map[str, Type] vars, map[str, Type] functions, map[str, Type] referrencedSpecs)
-  ;
+  | func(str name, map[str, Type] vars, map[str, Type] functions);
 
 Type getTypeOfVar(str name, Scope scope) = scope.vars[name]
   when name in scope.vars;
@@ -88,12 +88,21 @@ Type resolveMultiplication((Type)`Integer`,     (Type)`Percentage`) = (Type)`Per
 Type resolveMultiplication((Type)`Percentage`,  (Type)`Integer`)    = (Type)`Percentage`;
 Type resolveMultiplication((Type)`Percentage`,  (Type)`Money`)      = (Type)`Money`;
 Type resolveMultiplication((Type)`Money`,       (Type)`Percentage`) = (Type)`Money`;
+default Type resolveMultipliciation(Type _, Type _)                 = (Type)`$$INVALID_TYPE$$`;
 
+// Divide
+Type resolveDividing((Type)`Money`,       (Type)`Integer`)    = (Type)`Money`;
+Type resolveDividing((Type)`Period`,      (Type)`Integer`)    = (Type)`Term`;
+Type resolveDividing((Type)`Integer`,     (Type)`Percentage`) = (Type)`Percentage`;
+Type resolveDividing((Type)`Percentage`,  (Type)`Integer`)    = (Type)`Percentage`;
+default Type resolveDividing(Type _, Type _)                  = (Type)`$$INVALID_TYPE$$`;
+ 
 Type resolveType((Expr)`-<Expr exp>`, Context ctx) = resolveNegative(resolveTypeCached(exp, ctx));
 
 Type resolveType((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx) = resolveSubtraction(resolveTypeCached(lhs, ctx), resolveTypeCached(rhs, ctx));
 Type resolveType((Expr)`<Expr lhs> + <Expr rhs>`, Context ctx) = resolveAddition(resolveTypeCached(lhs, ctx), resolveTypeCached(rhs, ctx));
 Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = resolveMultiplication(resolveTypeCached(lhs, ctx), resolveTypeCached(rhs, ctx));
+Type resolveType((Expr)`<Expr lhs> / <Expr rhs>`, Context ctx) = resolveDividing(resolveTypeCached(lhs, ctx), resolveTypeCached(rhs, ctx));
 
 // Comparisons and boolean logic
 Type resolveType((Expr)`<Expr lhs> == <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
@@ -113,6 +122,8 @@ Type resolveType((Expr)`this`, Context ctx) = (Type)`$$SPEC_TYPE$$`;
 
 // Field access
 Type resolveType((Expr)`this.<VarName rhs>`, Context ctx) = tipe when Type tipe := getTypeOfVar("this.<rhs>", ctx.scp);
+Type resolveType((Expr)`<TypeName spc>[<Expr _>].<VarName rhs>`, Context ctx) = tipe when Type tipe := getTypeOfVar("this.<rhs>", ctx.scp);
+
 Type resolveType((Expr)`<Expr lhs>.currency`, Context ctx) = (Type)`Currency` when resolveTypeCached(lhs, ctx) == (Type)`Money`;
 Type resolveType((Expr)`<Expr lhs>.amount`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Money`;
 Type resolveType((Expr)`<Expr lhs>.countryCode`, Context ctx) = (Type)`String` when resolveTypeCached(lhs, ctx) == (Type)`IBAN`;

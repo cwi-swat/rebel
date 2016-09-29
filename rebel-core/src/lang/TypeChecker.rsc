@@ -10,9 +10,28 @@ import lang::ExtendedSyntax;
 
 alias TypeCheckerResult = tuple[set[Message], map[loc, Type]]; 
 
-TypeCheckerResult checkTypes(Module inlinedModul, set[Module] imports) {
+TypeCheckerResult checkTypes(Module modul, set[Module] imports) {
   set[Message] msgs = {};
   map[loc, Type] types = ();
+
+  void checkStatement(Statement stat, Context ctx) {
+    set[Message] internalMsg = {};
+    map[loc, Type] internalTypes = ();
+    
+    bottom-up visit(stat) {
+      case Expr expr: {
+        Type inferredTipe = resolveTypeCached(expr, ctx);
+        if ((Type)`$$INVALID_TYPE$$` := inferredTipe) {
+          internalMsg += error("Type error", expr@\loc);
+        } else {
+          internalTypes += (expr@\loc : inferredTipe);
+        }  
+      }
+    }
+    
+    msgs += internalMsg;
+    types += internalTypes;
+  }
 
   void checkStatements(Statement* stats, Context ctx, str eventName) {
     set[Message] internalMsg = {};
@@ -70,23 +89,30 @@ TypeCheckerResult checkTypes(Module inlinedModul, set[Module] imports) {
   }
   
   loc findEventRef(str eventName) = er@\loc
-    when EventRef er <- inlinedModul.spec.eventRefs.events,
+    when EventRef er <- modul.spec.eventRefs.events,
          "<er.eventRef>" == eventName;
      
-  if (inlinedModul has spec) {
-    map[str, Type] fields = ("this.<f.name>" : f.tipe | FieldDecl f <- inlinedModul.spec.fields.fields);
-    map[str, Type] functions = ("<f.name>" : f.returnType | FunctionDef f <- inlinedModul.spec.functions.defs);
-    map[str, Type] otherSpecs = ("<m.modDef.fqn.modName>" : [Type]"<m.modDef.fqn.modName>" | Module m <- imports + inlinedModul, m has spec); 
+  if (modul has spec) {
+    map[str, Type] fields = ("this.<f.name>" : f.tipe | FieldDecl f <- modul.spec.fields.fields);
+    map[str, Type] functions = ("<f.name>" : f.returnType | FunctionDef f <- modul.spec.functions.defs);
+    map[str, Type] otherSpecs = ("<m.modDef.fqn.modName>" : [Type]"<m.modDef.fqn.modName>" | Module m <- imports + modul, m has spec); 
     
-    Scope rootScope = root("<inlinedModul.spec.name>", fields, functions, otherSpecs);
+    Scope rootScope = root("<modul.spec.name>", fields, functions, otherSpecs);
     
-    for (EventDef ev <- inlinedModul.spec.events.events) {
+    for (EventDef ev <- modul.spec.events.events) {
       paramsInEvent = ("<p.name>" : p.tipe | Parameter p <- ev.transitionParams);
       Context ctx = context(nested("<ev.name>", paramsInEvent, rootScope));
       
       if (ev has pre, /Statement* stats := ev.pre) checkStatements(stats, ctx, "<ev.name>");
       if (ev has post, /Statement* stats := ev.post) checkStatements(stats, ctx, "<ev.name>");
       if (ev has sync, /SyncStatement* stats := ev.sync) checkSyncStatements(stats, ctx, "<ev.name>");
+    }
+    
+    for (FunctionDef fd <- modul.spec.functions.defs) {
+      paramsInFunction = ("<p.name>" : p.tipe | Parameter p <- fd.params);
+      Context ctx = context(nested("<fd.name>", paramsInFunction, rootScope));
+      
+      checkStatement(fd.statement, ctx);
     }
   }
     

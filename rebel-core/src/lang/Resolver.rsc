@@ -112,7 +112,7 @@ Reff resolveKeywordReferences(Module current, set[Module] imports) {
 	if (current has spec) {
 		defs = ("<def.name>" : def | EventDef def <- allEventDefs(imports));
 	
-		for (/EventRef er := current.spec.events, "<er.eventRef>" in defs) {
+		for (/EventRef er := current.spec.events, er has eventRef, "<er.eventRef>" in defs) {
 			refs += {<p@\loc, cp@\loc> | ConfigParameter cp <- er.config, /EventConfigBlock ecb := defs["<er.eventRef>"].configParams, Parameter p <- ecb.params, "<p.name>" == "<cp.name>" }; 			
 		}
 	}
@@ -138,7 +138,7 @@ Reff resolveLifeCycleEventReferences(set[Module] modules) {
 	for (m <- modules) {
 		if (m has spec) {
 			set[Module] chain = {m} + findParents(m, modules); 
-			map[str, loc] defs = ("<def.eventRef>" : def@\loc | EventRef def <- allEventRefs(chain));
+			map[str, loc] defs = ("<def.eventRef>" : def@\loc | EventRef def <- allEventRefs(chain), def has eventRef);
 			
 			refs += {<event@\loc, defs["<event>"]> | /LifeCycle lc := m.spec.lifeCycle, StateFrom sf <- lc.from, StateTo st <- sf.destinations, VarName event <- st.via.refs, "<event>" in defs};
 		}
@@ -182,8 +182,8 @@ Reff resolveSyncedEventReferences(set[Module] modules) {
   
   for (Module libMod <- libModules, /EventDef evnt := libMod.decls) { 
     for (/SyncBlock sb := evnt.sync, SyncStatement syncStat <- sb.stats, /(SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)` := syncStat) {
-      if (Module m <- allSpecificationModules(importedModules(libMod, modules)), "<m.spec.name>" == "<specName>", /EventRef er := m.spec.events, "<er.eventRef>" == "<event>") {
-        ref += <event@\loc, er@\loc>;
+      if (Module m <- allSpecificationModules(importedModules(libMod, modules)), "<m.spec.name>" == "<specName>", /EventRef er := m.spec.events, er has eventRef, "<er.eventRef>" == "<event>") {
+        ref += <event@\loc, er@\loc>; 
       } 
     }
   }

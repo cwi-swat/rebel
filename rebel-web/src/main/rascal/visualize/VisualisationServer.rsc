@@ -72,6 +72,11 @@ Response handle(post((URI)`/rest/sim/fire/<Part spec>/<Part event>`, Body b), Ap
     loc specLoc = resolveSpec("<spec>", ctx);
     
     TransitionResult result = transition(specLoc, "<spec>", "<event>", toSim(sav.vars), toSim(sav.state));
+    
+    switch(result) {
+      case successful(State next): return jsonResponse(ok(), (), toWeb(next));
+      case failed(list[str] failingStatements): return jsonResponse(badRequest(), (), failingStatements);
+    } 
   }
 }
 

@@ -218,7 +218,7 @@ lexical Real = [0-9] !<< [0-9]+ [.] [0-9]+ !>> [0-9];
 
 lexical Hex = "#" "x" [0-9 a-f]+;
 lexical Bin = "#" "b" [0-1]+;
-lexical String = "\"" ![\"]* "\"";
+lexical String = "\"" ![\"]* val "\"";
 
 lexical Id = ([a-z A-Z 0-9 _.] !<< [a-z A-Z _][a-z A-Z 0-9 _.]* !>> [a-z A-Z 0-9 _.]) \ Keywords;
 lexical SortId = ([a-z A-Z 0-9 _] !<< [A-Z _][a-z A-Z 0-9 _]* !>> [a-z A-Z 0-9 _]) \ Keywords;

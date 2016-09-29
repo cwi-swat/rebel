@@ -79,7 +79,7 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
       
       // Check types
       TypeCheckerResult inlineTypeCheckerResult = checkTypes(inliningResult<1>, importResult<1>);
-      TypeCheckerResult desugaredTypeCheckerResult = checkTypes(inliningResult<1>, importResult<1>);
+      TypeCheckerResult desugaredTypeCheckerResult = checkTypes(desugaringResult<1>, importResult<1>);
       
       return <importResult<0> + flattenResult<0> + inliningResult<0> + desugaringResult<0> + inlineTypeCheckerResult<0> + desugaredTypeCheckerResult<0>, <inliningResult<1>, desugaringResult<1>, refs, inlineTypeCheckerResult<1> + desugaredTypeCheckerResult<1>>, importResult<1>>;
     } else {

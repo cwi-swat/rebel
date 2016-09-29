@@ -29,7 +29,8 @@ State constructInitialState(SimConfig cfg) {
   Literal getIdProposal((Type)`Integer`) {intIter += 1; return [Literal]"<intIter>"; }
   default Literal getIdProposal(Type t) { throw "Id proposal for type \'<t>\' not yet implemented"; }
   
-  map[str, Type] getIdFields(Module spc) = ("<field>":tipe | (FieldDecl)`<VarName field> : <Type tipe> @key` <- spc.spec.fields.fields);
+  set[Variable] getIdFields(Module spc) = {var("<field>",tipe, getIdProposal(tipe)) | (FieldDecl)`<VarName field> : <Type tipe> @key` <- spc.spec.fields.fields};
+  set[Variable] getNonIdFields(Module spc) = {uninitialized("<field>",tipe) | (FieldDecl)`<VarName field> : <Type tipe>` <- spc.spec.fields.fields, !startsWith("<field>", "_")};
   
   int findInitialStateNr(Module spc) {
     if (StateFrom sf <- spc.spec.lifeCycle.from, sf has \mod, /(LifeCycleModifier)`initial` := sf.\mod) {
@@ -39,13 +40,20 @@ State constructInitialState(SimConfig cfg) {
     throw "Unable to locate initial state of spec \'<spc.modDef.fqn>\'"; 
   }
   
+  list[EntityInstance] instances = [];
+  for (<loc specLoc, _, int nrOfInstances> <- cfg, <_, just(Built b)> := load(specLoc), Module spc := b.normalizedMod) {
+    idFields = getIdFields(spc);
+    instances += instance("<spc.modDef.fqn>", 
+                   [v.val | v <- idFields], // id
+                   [var("_state", [Type]"Int", [Literal]"<findInitialStateNr(spc)>")] + // current initial state 
+                   [v | v <- idFields] + // identity fields with value
+                   [v | v <- getNonIdFields(spc)]); // other uninitialized fields
+  } 
+  
   return state(0, 
               [DateTime]"26 Sep 2016, 14:32:00", // TODO: Construct now base on actual time 
-              [instance("<spc.modDef.fqn>", 
-                        [getIdProposal(idFields[id]) | map[str,Type] idFields := getIdFields(spc), str id <- idFields],
-                        [var("_state", [Type]"Int", [Int]"<findInitialStateNr(spc)>")])
-              | <loc specLoc, _, int nrOfInstances> <- cfg, <_, just(Built b)> := load(specLoc), Module spc := b.normalizedMod] 
-    );    
+              instances
+         );    
 }
 
 set[Built] loadAllSpecs(loc file, set[loc] visited) {

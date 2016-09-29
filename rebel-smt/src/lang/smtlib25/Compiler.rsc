@@ -124,5 +124,5 @@ str compile(store(arr, idx, val)) = "(store <compile(arr)> <compile(idx)> <compi
 
 // Attributes
 str compile(list[Attribute] attributes) = ("" | "<it> <compile(att)>" | att <- attributes);
-str compile(named(name)) = ":<name>";
+str compile(named(name)) = ":named <name>";
 str compile(pattern(exprs)) = "<("" | "<it> :pattern <compile(e)>" | e <- exprs)>";
