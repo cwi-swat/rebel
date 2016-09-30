@@ -76,8 +76,9 @@ NormalizeResult inline(Module flattenedSpc, set[Module] modules, Refs refs) {
 	return <resolvedEventsResult<0> + resolvedFunctionsResult<0> + mergedConfigResult<0>, inlined>;	
 }
 
-NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs) {
+NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs, map[loc, Type] resolvedInlinedTypes) {
 	set[EventDef] events = {e | EventDef e <- inlinedSpc.spec.events.events};
+	set[FunctionDef] functions = {f | FunctionDef f <- inlinedSpc.spec.functions.defs};
 	set[FieldDecl] fields = {f | FieldDecl f <- inlinedSpc.spec.fields.fields};
   set[StateFrom] states = {s | /LifeCycle lc := inlinedSpc.spec.lifeCycle, StateFrom s <- lc.from};
 	
@@ -102,7 +103,12 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs) {
   // 9. Replace all the references to this with the name of the specification
   tuple[set[Message], set[EventDef]] thisReplacingResult = replaceReferencesToThisWithSpecificationName(events, inlinedSpc.spec.eventRefs, "<inlinedSpc.spec.name>", fields);
   events = thisReplacingResult<1>;
-
+  
+  // Rewrite percentage arithmetics
+  resultRewritePercentage = rewritePercentageArithmetics(events, functions, resolvedInlinedTypes);
+  events = resultRewritePercentage<0>;
+  functions = resultRewritePercentage<1>;
+  
 	// Find all synchronized events and add parameter names to the call
   tuple[set[Message], set[EventDef]] syncedEventResult = addParamNameToSyncedVariables(events, modules, refs.syncedEventRefs, refs.eventRefs);
   events = syncedEventResult<1>;
@@ -111,7 +117,7 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs) {
 		case orig:(Specification)`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { <Fields _> <FunctionDefs funcs> <EventRefs eventRefs> <EventDefs _> <InvariantRefs invariantRefs> <InvariantDefs invs> <LifeCycle lifeCycle>}` =>
 			(Specification)	`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { 
 							'	<Fields mergedFields> 
-							'	<FunctionDefs funcs>
+							'	<FunctionDefs mergedFunctions>
 							'	<EventRefs eventRefs> 
 							'	<EventDefs mergedEv>
 							'	<InvariantRefs invariantRefs>
@@ -121,11 +127,23 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs) {
 				when
 					Fields mergedFields := ((Fields)`fields {}` | merge(it, f) | f <- fields),
 					EventDefs mergedEv := ((EventDefs)`eventDefs {}` | merge(it, e) | e <- events),
+					FunctionDefs mergedFunctions := ((FunctionDefs)`functionDefs {}` | merge(it, f) | f <- functions),
 					LifeCycle mergedLc := ((LifeCycle)`lifeCycle {}` | merge(it, sf) | StateFrom sf <- states) 										
 	};
 	
 	return <desugaringStatesResult<0> + thisReplacingResult<0> + syncedEventResult<0>, normalized>;	
 }
+
+tuple[set[EventDef], set[FunctionDef]] rewritePercentageArithmetics(set[EventDef] events, set[FunctionDef] functions, map[loc, Type] types) {
+  EventDef rewrite(EventDef orig) = bottom-up visit(orig) {
+    case e:(Expr)`<Expr lhs> * <Expr rhs>` => (Expr)`(<Expr lhs> * <Expr rhs>) / 100`[@\loc=e@\loc] when types[lhs@\loc] == (Type)`Percentage` || types[rhs@\loc] == (Type)`Percentage`
+  };
+  FunctionDef rewrite(FunctionDef orig) = bottom-up visit(orig) {
+    case e:(Expr)`<Expr lhs> * <Expr rhs>` => (Expr)`(<Expr lhs> * <Expr rhs>) / 100`[@\loc=e@\loc] when types[lhs@\loc] == (Type)`Percentage` || types[rhs@\loc] == (Type)`Percentage`
+  };
+      
+  return <{rewrite(e) | e <- events}, {rewrite(f) | f <- functions}>;
+} 
 
 set[Module] importedModules(Module moi, set[Module] allMods) {
 	set[str] impModNames = {"<imp.fqn>" | imp <- moi.imports};

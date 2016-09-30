@@ -29,7 +29,12 @@ data TransitionResult
 	| successful(State new)
 	;
 	
-data Context = context(str spec, str event, map[str,str] specLookup, map[loc, Type] types);
+data Context(map[str,str] specLookup = (), map[loc, Type] types = ())
+  = context(str spec, str event)
+  | flattenedEvent(str spec, str event)
+  | eventAsFunction()
+  | function()
+  ;
 
 data Param = param(str name, Type tipe);
 
@@ -66,8 +71,8 @@ TransitionResult transition(loc spec, str entity, str transitionToFire, list[Var
                       declareSmtSpecLookup(normalizedSpecs) +
                       translateState(current) +
                       translateTransitionParams(entity, transitionToFire, transitionParams) +
-                      translateFunctions(([] | it + f | s <- builtSpecs, FunctionDef f <- s.normalizedMod.spec.functions.defs), context("", "", (), types)) + 
-                      translateEventToSingleAsserts(entity, eventToRaise, specLookup, types);
+                      translateFunctions(([] | it + f | s <- builtSpecs, FunctionDef f <- s.normalizedMod.spec.functions.defs), function(types=types)) + 
+                      translateEventToSingleAsserts(entity, eventToRaise, flattenedEvent(entity, "<eventToRaise.name>", specLookup = specLookup, types = types));
   
   SolverPID pid = startSolver();
   TransitionResult result;
@@ -209,11 +214,11 @@ list[Command] translateTransitionParams(str entity, str transitionToFire, list[V
   [\assert(eq(functionCall(simple("eventParam_<entity>_<transitionToFire>_<p.name>"), [var(simple("next"))]), translateLit(p.val))) | Variable p <- params]; 
 
 list[Command] translateFunctions(list[FunctionDef] functions, Context ctx) =
-  [defineFunction("func_<f.name>", [sortedVar("<p.name>", translateSort(p.tipe)) | p <- f.params], translateSort(f.returnType), translateStat(f.statement, ctx)) | f <- functions];
+  [defineFunction("func_<f.name>", [sortedVar("param_<p.name>", translateSort(p.tipe)) | p <- f.params], translateSort(f.returnType), translateStat(f.statement, ctx)) | f <- functions];
 
-list[Command] translateEventToSingleAsserts(str entity, EventDef evnt, map[str,str] specLookup, map[loc,Type] types) =
-  [\assert(attributed(translateStat(s, context(entity, "<evnt.name>", specLookup, types)), [named(locToStr(s@\loc))])) | /Statement s := evnt] +
-  [\assert(attributed(translateSyncStat(s, context(entity, "<evnt.name>", specLookup, types)), [named(locToStr(s@\loc))])) | /SyncStatement s := evnt];
+list[Command] translateEventToSingleAsserts(str entity, EventDef evnt, Context ctx) =
+  [\assert(attributed(translateStat(s, ctx), [named(locToStr(s@\loc))])) | /Statement s := evnt] +
+  [\assert(attributed(translateSyncStat(s, ctx), [named(locToStr(s@\loc))])) | /SyncStatement s := evnt];
 
 //Command translateEventToFunction(str entity, EventDef evnt) =
 //  defineFunction("event_<entity>_<evnt.name>", [sortedVar("current", custom("State")), sortedVar("next", custom("State"))], \bool(),
@@ -239,8 +244,16 @@ Formula translateExpr((Expr)`<Expr lhs>.<VarName field>`, Context ctx) = functio
 Formula translateExpr((Expr)`(<Expr e>)`, Context ctx) = translateExpr(e, ctx);
 
 Formula translateExpr((Expr)`<Literal l>`, Context ctx) = translateLit(l);
-Formula translateExpr((Expr)`<Ref r>`, Context ctx) = functionCall(simple("eventParam_<ctx.spec>_<ctx.event>_<r>"), [var(simple("next"))]);
-Formula translateExpr((Expr)`<VarName function>(<{Expr ","}* params>)`, Context ctx) = functionCall(simple("<function>"), [translateExpr(p, ctx) | Expr p <- params]);
+
+Formula translateExpr((Expr)`<Ref r>`, Context ctx) 
+  = functionCall(simple("eventParam_<spec>_<event>_<r>"), [var(simple("next"))])
+  when flattenedEvent(str spec, str event) := ctx;
+
+Formula translateExpr((Expr)`<Ref r>`, Context ctx) 
+  = var(simple("param_<r>"))
+  when function() := ctx;
+
+Formula translateExpr((Expr)`<VarName function>(<{Expr ","}* params>)`, Context ctx) = functionCall(simple("func_<function>"), [translateExpr(p, ctx) | Expr p <- params]);
 
 Formula translateFormula(Expr lhs, Expr rhs, (Type)`Money`, (Type)`Money`, Context ctx, Formula (Formula, Formula) createComp) 
   = createComp(functionCall(simple("amount"), [translateExpr(lhs, ctx)]), functionCall(simple("amount"), [translateExpr(rhs, ctx)])); 
@@ -252,6 +265,14 @@ Formula translateExpr(Expr lhs, Expr rhs, (Type)`Money`, (Type)`Money`, Context 
   = functionCall(simple("consMoney"), [functionCall(simple("currency"), [translateExpr(lhs,ctx)]), 
       createComp(functionCall(simple("amount"), [translateExpr(lhs, ctx)]), functionCall(simple("amount"), [translateExpr(rhs, ctx)]))]); 
 
+Formula translateExpr(Expr lhs, Expr rhs, (Type)`Money`, (Type)`Integer`, Context ctx, Formula (Formula, Formula) createComp) 
+  = functionCall(simple("consMoney"), [functionCall(simple("currency"), [translateExpr(lhs,ctx)]), 
+      createComp(functionCall(simple("amount"), [translateExpr(lhs, ctx)]), translateExpr(rhs, ctx))]); 
+
+Formula translateExpr(Expr lhs, Expr rhs, (Type)`Money`, (Type)`Percentage`, Context ctx, Formula (Formula, Formula) createComp) 
+  = functionCall(simple("consMoney"), [functionCall(simple("currency"), [translateExpr(lhs,ctx)]), 
+      createComp(functionCall(simple("amount"), [translateExpr(lhs, ctx)]), translateExpr(rhs, ctx))]); 
+
 default Formula translateExpr(Expr lhs, Expr rhs, Type _, Type _, Context ctx, Formula (Formula, Formula) createComp) 
   = createComp(translateExpr(lhs, ctx), translateExpr(rhs, ctx)); 
 
@@ -262,7 +283,12 @@ Formula translateExpr((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx)
   = translateExpr(lhs, rhs, ctx.types[lhs@\loc], ctx.types[rhs@\loc], ctx, Formula (Formula l, Formula r) { return sub(l, [r]); });
 
 Formula translateExpr((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx)
-  = translateExpr(lhs, rhs, ctx.types[lhs@\loc], ctx.types[rhs@\loc], ctx, Formula (Formula l, Formula r) { return mul(l, [r]); });
+  = translateExpr(lhs, rhs, ctx.types[lhs@\loc], ctx.types[rhs@\loc], ctx, Formula (Formula l, Formula r) { return mul(l, [r]); })
+  when ctx.types[lhs@\loc] == (Type)`Percentage` || ctx.types[rhs@\loc] == (Type)`Percentage`;
+
+Formula translateExpr((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx)
+  = translateExpr(lhs, rhs, ctx.types[lhs@\loc], ctx.types[rhs@\loc], ctx, Formula (Formula l, Formula r) { return mul(l, [r]); })
+  when ctx.types[lhs@\loc] != (Type)`Percentage` && ctx.types[rhs@\loc] != (Type)`Percentage`;
 
 Formula translateExpr((Expr)`<Expr lhs> / <Expr rhs>`, Context ctx)
   = translateExpr(lhs, rhs, ctx.types[lhs@\loc], ctx.types[rhs@\loc], ctx, Formula (Formula l, Formula r) { return div(l, [r]); });
@@ -288,7 +314,6 @@ Formula translateExpr((Expr)`<Expr lhs> \>= <Expr rhs>`, Context ctx)
 
 Formula translateExpr((Expr)`<Expr lhs> == <Expr rhs>`, Context ctx) = eq(translateExpr(lhs, ctx), translateExpr(rhs, ctx));
 Formula translateExpr((Expr)`<Expr lhs> != <Expr rhs>`, Context ctx) = \not(eq(translateExpr(lhs, ctx), translateExpr(rhs, ctx)));
-
 Formula translateExpr((Expr)`<Expr lhs> && <Expr rhs>`, Context ctx) = and([translateExpr(lhs, ctx), translateExpr(rhs, ctx)]);
 Formula translateExpr((Expr)`<Expr lhs> || <Expr rhs>`, Context ctx) = or([translateExpr(lhs, ctx), translateExpr(rhs, ctx)]);
 

@@ -62,8 +62,10 @@ Type resolveTypeCached(Expr exp, Context ctx) = resolveType(exp, ctx);
 Type resolveTypeCached(SyncExpr exp, Context ctx) = resolveType(exp, ctx);
 
 // Negative
-Type resolveNegative((Type)`Integer`) = (Type)`Integer`;
-Type resolveNegative((Type)`Money`) = (Type)`Money`;
+Type resolveNegative((Type)`Integer`)     = (Type)`Integer`;
+Type resolveNegative((Type)`Money`)       = (Type)`Money`;
+Type resolveNegative((Type)`Percentage`)  = (Type)`Percentage`;
+default Type resolveNegative(Type _)      = (Type)`$$INVALID_TYPE$$`;
 
 // Subtraction
 Type resolveSubtraction((Type)`Integer`, (Type)`Integer`) = (Type)`Integer`;
@@ -80,6 +82,7 @@ Type resolveAddition((Type)`Money`,     (Type)`Money`)   = (Type)`Money`;
 default Type resolveAddition(Type _, Type _)             = (Type)`$$INVALID_TYPE$$`;
 
 // Multiply
+Type resolveMultiplication((Type)`Integer`,     (Type)`Integer`)    = (Type)`Integer`;
 Type resolveMultiplication((Type)`Money`,       (Type)`Integer`)    = (Type)`Money`;
 Type resolveMultiplication((Type)`Integer`,     (Type)`Money`)      = (Type)`Money`;
 Type resolveMultiplication((Type)`Period`,      (Type)`Integer`)    = (Type)`Term`;
@@ -93,8 +96,8 @@ default Type resolveMultipliciation(Type _, Type _)                 = (Type)`$$I
 // Divide
 Type resolveDividing((Type)`Money`,       (Type)`Integer`)    = (Type)`Money`;
 Type resolveDividing((Type)`Period`,      (Type)`Integer`)    = (Type)`Term`;
-Type resolveDividing((Type)`Integer`,     (Type)`Percentage`) = (Type)`Percentage`;
 Type resolveDividing((Type)`Percentage`,  (Type)`Integer`)    = (Type)`Percentage`;
+Type resolveDividing((Type)`Integer`,     (Type)`Integer`)    = (Type)`Integer`;
 default Type resolveDividing(Type _, Type _)                  = (Type)`$$INVALID_TYPE$$`;
  
 Type resolveType((Expr)`-<Expr exp>`, Context ctx) = resolveNegative(resolveTypeCached(exp, ctx));
@@ -105,18 +108,18 @@ Type resolveType((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx) = resolveMultipli
 Type resolveType((Expr)`<Expr lhs> / <Expr rhs>`, Context ctx) = resolveDividing(resolveTypeCached(lhs, ctx), resolveTypeCached(rhs, ctx));
 
 // Comparisons and boolean logic
-Type resolveType((Expr)`<Expr lhs> == <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> == <Expr rhs>`, Context ctx)  = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
 Type resolveType((Expr)`<Expr lhs> \>= <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
 Type resolveType((Expr)`<Expr lhs> \<= <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
-Type resolveType((Expr)`<Expr lhs> != <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
-Type resolveType((Expr)`<Expr lhs> \> <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
-Type resolveType((Expr)`<Expr lhs> \< <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
-Type resolveType((Expr)`<Expr lhs> && <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == (Type)`Boolean` && resolveTypeCached(rhs, ctx) == (Type)`Boolean`;
-Type resolveType((Expr)`<Expr lhs> || <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == (Type)`Boolean` && resolveTypeCached(rhs, ctx) == (Type)`Boolean`;
+Type resolveType((Expr)`<Expr lhs> != <Expr rhs>`, Context ctx)  = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> \> <Expr rhs>`, Context ctx)  = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> \< <Expr rhs>`, Context ctx)  = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == resolveTypeCached(rhs, ctx);
+Type resolveType((Expr)`<Expr lhs> && <Expr rhs>`, Context ctx)  = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == (Type)`Boolean` && resolveTypeCached(rhs, ctx) == (Type)`Boolean`;
+Type resolveType((Expr)`<Expr lhs> || <Expr rhs>`, Context ctx)  = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == (Type)`Boolean` && resolveTypeCached(rhs, ctx) == (Type)`Boolean`;
 Type resolveType((Expr)`<Expr lhs> -\> <Expr rhs>`, Context ctx) = (Type)`Boolean` when resolveTypeCached(lhs, ctx) == (Type)`Boolean` && resolveTypeCached(rhs, ctx) == (Type)`Boolean`;
 
 // In for structured expressions
-Type resolveType((Expr)`<Expr lhs> in <Expr rhs>`, Context ctx) = (Type)`Boolean` when (Type)`set [<Type rhsType>]` := resolveTypeCached(rhs, ctx) && rhsType == resolveTypeCached(lhs, ctx); 
+Type resolveType((Expr)`<Expr lhs> in <Expr rhs>`, Context ctx)  = (Type)`Boolean` when (Type)`set [<Type rhsType>]` := resolveTypeCached(rhs, ctx) && rhsType == resolveTypeCached(lhs, ctx); 
 
 Type resolveType((Expr)`this`, Context ctx) = (Type)`$$SPEC_TYPE$$`;
 
@@ -124,11 +127,11 @@ Type resolveType((Expr)`this`, Context ctx) = (Type)`$$SPEC_TYPE$$`;
 Type resolveType((Expr)`this.<VarName rhs>`, Context ctx) = tipe when Type tipe := getTypeOfVar("this.<rhs>", ctx.scp);
 Type resolveType((Expr)`<TypeName spc>[<Expr _>].<VarName rhs>`, Context ctx) = tipe when Type tipe := getTypeOfVar("this.<rhs>", ctx.scp);
 
-Type resolveType((Expr)`<Expr lhs>.currency`, Context ctx) = (Type)`Currency` when resolveTypeCached(lhs, ctx) == (Type)`Money`;
-Type resolveType((Expr)`<Expr lhs>.amount`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Money`;
-Type resolveType((Expr)`<Expr lhs>.countryCode`, Context ctx) = (Type)`String` when resolveTypeCached(lhs, ctx) == (Type)`IBAN`;
-Type resolveType((Expr)`<Expr lhs>.time`, Context ctx) = (Type)`Time` when resolveTypeCached(lhs, ctx) == (Type)`DateTime`;
-Type resolveType((Expr)`<Expr lhs>.date`, Context ctx) = (Type)`Date` when resolveTypeCached(lhs, ctx) == (Type)`DateTime`;
+Type resolveType((Expr)`<Expr lhs>.currency`, Context ctx)      = (Type)`Currency` when resolveTypeCached(lhs, ctx) == (Type)`Money`;
+Type resolveType((Expr)`<Expr lhs>.amount`, Context ctx)        = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Money`;
+Type resolveType((Expr)`<Expr lhs>.countryCode`, Context ctx)   = (Type)`String` when resolveTypeCached(lhs, ctx) == (Type)`IBAN`;
+Type resolveType((Expr)`<Expr lhs>.time`, Context ctx)          = (Type)`Time` when resolveTypeCached(lhs, ctx) == (Type)`DateTime`;
+Type resolveType((Expr)`<Expr lhs>.date`, Context ctx)          = (Type)`Date` when resolveTypeCached(lhs, ctx) == (Type)`DateTime`;
 Type resolveType((Expr)`<Expr lhs>.<VarName rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Date` && "<rhs>" in { "day", "month", "year" };
 Type resolveType((Expr)`<Expr lhs>.<VarName rhs>`, Context ctx) = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Time` && "<rhs>" in { "hour", "minutes", "seconds" };
 //Type resolveType((Expr)`<Expr lhs>.<VarName rhs>`, Context ctx) = rhsType when rhsType := resolveTypeCached(rhs, ctx); // TODO perhaps append context to find rhs
@@ -148,8 +151,8 @@ Type resolveType((Expr)`<Expr _> instate <Expr _>`) = (Type)`Boolean`;
 Type resolveType((Expr)`<VarName function>(<{Expr ","}* exprs>)`, Context ctx) = getTypeOfFunction("<function>", ctx.scp);
 
 // Literals
-Type resolveType((Expr)`{<{Expr ","}* elements>}`, Context ctx) = (Type)`set [<Type subType>]` when /Expr e := elements && subType := resolveTypeCached(e, ctx); // sets are homogenous so we take the type of the first element
-Type resolveType((Expr)`(<{MapElement ","}* elements>)`, Context ctx) =  (Type)`map [<Type keyType> : <Type valueType>]` when /MapElement e := elements && keyType := resolveTypeCached(e.key, ctx) && valueType := resolveTypeCached(e.val, ctx); // maps are homogenous so we take the type of the first element 
+Type resolveType((Expr)`{<{Expr ","}* elements>}`, Context ctx)       = (Type)`set [<Type subType>]` when /Expr e := elements && subType := resolveTypeCached(e, ctx); // sets are homogenous so we take the type of the first element
+Type resolveType((Expr)`(<{MapElement ","}* elements>)`, Context ctx) = (Type)`map [<Type keyType> : <Type valueType>]` when /MapElement e := elements && keyType := resolveTypeCached(e.key, ctx) && valueType := resolveTypeCached(e.val, ctx); // maps are homogenous so we take the type of the first element 
 Type resolveType((Expr)`<Int _>`, Context _)        = (Type)`Integer`;
 Type resolveType((Expr)`<Bool _>`, Context _)       = (Type)`Boolean`;
 Type resolveType((Expr)`<String _>`, Context _)     = (Type)`String`;
