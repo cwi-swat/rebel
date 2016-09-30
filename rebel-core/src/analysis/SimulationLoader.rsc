@@ -41,7 +41,7 @@ State constructInitialState(SimConfig cfg) {
   }
   
   list[EntityInstance] instances = [];
-  for (<loc specLoc, _, int nrOfInstances> <- cfg, <_, just(Built b)> := load(specLoc), Module spc := b.normalizedMod) {
+  for (<loc specLoc, _, int nrOfInstances> <- cfg, <_, just(Built b)> := load(specLoc), Module spc := b.normalizedMod, int i <- [0 .. nrOfInstances]) {
     idFields = getIdFields(spc);
     instances += instance("<spc.modDef.fqn>", 
                    [v.val | v <- idFields], // id

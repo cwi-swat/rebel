@@ -1,6 +1,6 @@
 module analysis::SmtResponseTranslator
 
-import lang::smtlib25::Syntax;
+//import lang::smtlib25::Syntax;
 import lang::smtlib25::response::Syntax;
 import lang::smtlib25::response::Parser;
 
@@ -8,11 +8,12 @@ import solver::SolverRunner;
 
 import String;
 import util::Math;
+import IO;
 
 str parseSmtResponse(str smtOutput) {
-  Response resp = parseResponse(smtOutput);
+  GetValue resp = [GetValue]"<smtOutput>";
   
-  if ((Response)`((<Formula _> <Formula newVal>))` := resp) {
+  if ((GetValue)`((<Formula _> <Formula newVal>))` := resp) {
     return formatAsRebelLit(newVal);
   } 
   
@@ -27,6 +28,7 @@ list[str] parseSmtUnsatCore(str unsatCoreOutput) {
   if ((Response)`<GetUnsatCore unsatCore>` := resp, Labell l <- unsatCore.labels) {
     result += "<l>";
   }
+  
   
   return result;
 }

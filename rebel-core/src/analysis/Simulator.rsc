@@ -58,13 +58,11 @@ TransitionResult transition(loc spec, str entity, str transitionToFire, list[Var
    
   //1. Find the event definition to fire
   EventDef eventToRaise = findEventDef(transitionToFire, normalizedSpecs);
-  
-  // Collect all the synced events and their entity types
-  // TODO
-  set[EventDef] syncedEvents = {};
-    
+      
   map[str,str] specLookup = ("<m.modDef.fqn.modName>":"<m.modDef.fqn>" | m <- normalizedSpecs);
   map[loc, Type] types = (() | it + b.resolvedTypes | b <- builtSpecs);
+  
+
   
   list[Command] smt = declareSmtTypes(normalizedSpecs) +
                       declareSmtVariables(entity, transitionToFire, transitionParams, normalizedSpecs) +
@@ -83,7 +81,7 @@ TransitionResult transition(loc spec, str entity, str transitionToFire, list[Var
     
     list[str] rawSmt = compile(smt);
     for (s <- rawSmt) {
-      runSolver(pid, s);
+      runSolver(pid, s, wait = 2);
     }
     
     if (checkSat(pid)) {
@@ -128,7 +126,6 @@ Variable getNewValue(SolverPID pid, str entityType, list[RebelLit] id, Variable 
   Command newValCmd = getValue([functionCall(simple("field_<entityType>_<current.name>"), 
                         [functionCall(simple("spec_<entityType>"), [var(simple("next")), *[translateLit(i) | lang::ExtendedSyntax::Literal i <- id]])])
                       ]);
-                      
   str smtOutput = runSolver(pid, compile(newValCmd), wait = 10);
   str formattedRebelLit = parseSmtResponse(smtOutput);
   
@@ -223,7 +220,7 @@ list[Command] translateEventToSingleAsserts(str entity, EventDef evnt, Context c
 
 list[Command] translateEventsToFunctions(set[Module] specMods, Context ctx) {
   Command translate(Module m, EventDef evnt) =
-    defineFunction("event_<m.modDef.fqn>_<evnt.name>", [sortedVar("curEnt", custom("<m.modDef.fqn>")), sortedVar("nextEnt", custom("<m.modDef.fqn>"))] + 
+    defineFunction("event_<m.modDef.fqn>_<evnt.name>", [sortedVar("current", custom("State")), sortedVar("next", custom("State"))] + 
       [sortedVar("param_<p.name>", translateSort(p.tipe)) | p <- evnt.transitionParams], \bool(),
       \and([translateStat(s, ctx) | /Statement s := evnt] + 
          [translateSyncStat(s, ctx) | /SyncStatement s := evnt]));
@@ -236,37 +233,11 @@ Formula translateSyncStat(SyncStatement s, Context ctx) = lit(boolVal(true));
 Formula translateStat((Statement)`(<Statement s>)`, Context ctx) = translateStat(s, ctx);
 Formula translateStat((Statement)`<Annotations _> <Expr e>;`, Context ctx) = translateExpr(e, ctx);
 
-Formula translateExpr((Expr)`new <Expr spc>[<Expr id>]`, Context ctx) 
-  = functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("next")), translateExpr(id, ctx)])
-  when flattenedEvent(str spec, str event) := ctx;
+Formula translateExpr((Expr)`new <Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("next")), translateExpr(id, ctx)]);
+Formula translateExpr((Expr)`new <Expr spc>[<Expr id>].<VarName field>`, Context ctx) = functionCall(simple("field_<ctx.specLookup["<spc>"]>_<field>"), [functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("next")), translateExpr(id, ctx)])]);
 
-Formula translateExpr((Expr)`new <Expr spc>[<Expr id>]`, Context ctx) 
-  = var(simple("nextEnt"))
-  when eventAsFunction() := ctx;
-
-Formula translateExpr((Expr)`new <Expr spc>[<Expr id>].<VarName field>`, Context ctx) 
-  = functionCall(simple("field_<ctx.specLookup["<spc>"]>_<field>"), [functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("next")), translateExpr(id, ctx)])])
-  when flattenedEvent(str spec, str event) := ctx;
-
-Formula translateExpr((Expr)`new <Expr spc>[<Expr id>].<VarName field>`, Context ctx) 
-  = functionCall(simple("field_<ctx.specLookup["<spc>"]>_<field>"), [var(simple("nextEnt"))])
-  when eventAsFunction() := ctx;
-
-Formula translateExpr((Expr)`<Expr spc>[<Expr id>]`, Context ctx) 
-  = functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("current")), translateExpr(id, ctx)])
-  when flattenedEvent(str spec, str event) := ctx;
-
-Formula translateExpr((Expr)`<Expr spc>[<Expr id>]`, Context ctx) 
-  =  var(simple("curEnt"))
-  when eventAsFunction() := ctx;
-  
-Formula translateExpr((Expr)`<Expr spc>[<Expr id>].<VarName field>`, Context ctx) 
-  = functionCall(simple("field_<ctx.specLookup["<spc>"]>_<field>"), [functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("current")), translateExpr(id, ctx)])])
-  when flattenedEvent(str spec, str event) := ctx;
-
-Formula translateExpr((Expr)`<Expr spc>[<Expr id>].<VarName field>`, Context ctx) 
-  = functionCall(simple("field_<ctx.specLookup["<spc>"]>_<field>"), [var(simple("curEnt"))])
-  when eventAsFunction() := ctx;
+Formula translateExpr((Expr)`<Expr spc>[<Expr id>]`, Context ctx)  = functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("current")), translateExpr(id, ctx)]);
+Formula translateExpr((Expr)`<Expr spc>[<Expr id>].<VarName field>`, Context ctx) = functionCall(simple("field_<ctx.specLookup["<spc>"]>_<field>"), [functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("current")), translateExpr(id, ctx)])]);
 
 Formula translateExpr((Expr)`initialized <Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<ctx.specLookup["<spc>"]>_initialized"), [translateExpr((Expr)`<Expr spc>[<Expr id>]`, ctx)]); 
 
@@ -376,7 +347,10 @@ Formula translateLit((Literal)`<Percentage p>`) = translateLit(p);
 Formula translateLit((Literal)`<IBAN i>`) = translateLit(i);
 
 Formula translateLit((Literal)`<Money m>`) = translateLit(m);//functionCall(simple("amount"), [translateLit(m)]);
+
 Formula translateLit((Literal)`<DateTime tm>`) = translateLit(tm);
+Formula translateLit((Literal)`<Date d>`) = translateLit(d);
+Formula translateLit((Literal)`<Time t>`) = translateLit(t);
 
 Formula translateLit(Money m) = lit(adt("consMoney", [lit(strVal("<m.cur>")), translateLit(m.amount)]));
 Formula translateLit(MoneyAmount ma) = lit(intVal(toInt("<ma.whole>") * 100 + toInt("<ma.decimals>")));

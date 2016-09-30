@@ -17,13 +17,5 @@ import lang::smtlib25::response::Syntax;
 import ParseTree;
 import IO;
 
-Response parseResponse(str response) = checkAmb(parse(#start[Response], response).top);
-Response parseResponse(loc file) = checkAmb(parse(#start[Response], file).top);	
-
-private Response checkAmb(Response resp) {
-	if (/amb(a:_) := resp) {
-		throw "Ambiguity found: <a>";
-	}
-	
-	return resp;
-}
+Response parseResponse(str response) = parse(#start[Response], response).top;
+Response parseResponse(loc file) = parse(#start[Response], file).top;	
