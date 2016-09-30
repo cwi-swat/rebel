@@ -72,6 +72,7 @@ TransitionResult transition(loc spec, str entity, str transitionToFire, list[Var
                       translateState(current) +
                       translateTransitionParams(entity, transitionToFire, transitionParams) +
                       translateFunctions(([] | it + f | s <- builtSpecs, FunctionDef f <- s.normalizedMod.spec.functions.defs), function(types=types)) + 
+                      translateEventsToFunctions(normalizedSpecs, eventAsFunction(specLookup = specLookup, types = types)) +
                       translateEventToSingleAsserts(entity, eventToRaise, flattenedEvent(entity, "<eventToRaise.name>", specLookup = specLookup, types = types));
   
   SolverPID pid = startSolver();
@@ -220,22 +221,52 @@ list[Command] translateEventToSingleAsserts(str entity, EventDef evnt, Context c
   [\assert(attributed(translateStat(s, ctx), [named(locToStr(s@\loc))])) | /Statement s := evnt] +
   [\assert(attributed(translateSyncStat(s, ctx), [named(locToStr(s@\loc))])) | /SyncStatement s := evnt];
 
-//Command translateEventToFunction(str entity, EventDef evnt) =
-//  defineFunction("event_<entity>_<evnt.name>", [sortedVar("current", custom("State")), sortedVar("next", custom("State"))], \bool(),
-//    \and([translateStat(s, context(entity, "<evnt.name>")) | /Statement s := evnt] + 
-//         [translateSyncStat(s, context(entity, "<evnt.name>")) | /SyncStatement s := evnt])
-//  );
+list[Command] translateEventsToFunctions(set[Module] specMods, Context ctx) {
+  Command translate(Module m, EventDef evnt) =
+    defineFunction("event_<m.modDef.fqn>_<evnt.name>", [sortedVar("curEnt", custom("<m.modDef.fqn>")), sortedVar("nextEnt", custom("<m.modDef.fqn>"))] + 
+      [sortedVar("param_<p.name>", translateSort(p.tipe)) | p <- evnt.transitionParams], \bool(),
+      \and([translateStat(s, ctx) | /Statement s := evnt] + 
+         [translateSyncStat(s, ctx) | /SyncStatement s := evnt]));
+  
+  return [translate(m, evnt) | Module m <- specMods, EventDef evnt <- m.spec.events.events];
+}
 
 Formula translateSyncStat(SyncStatement s, Context ctx) = lit(boolVal(true));
 
 Formula translateStat((Statement)`(<Statement s>)`, Context ctx) = translateStat(s, ctx);
 Formula translateStat((Statement)`<Annotations _> <Expr e>;`, Context ctx) = translateExpr(e, ctx);
 
-Formula translateExpr((Expr)`new <Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("next")), translateExpr(id, ctx)]);
-Formula translateExpr((Expr)`new <Expr spc>[<Expr id>].<VarName field>`, Context ctx) = functionCall(simple("field_<ctx.spec>_<field>"), [functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("next")), translateExpr(id, ctx)])]);
+Formula translateExpr((Expr)`new <Expr spc>[<Expr id>]`, Context ctx) 
+  = functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("next")), translateExpr(id, ctx)])
+  when flattenedEvent(str spec, str event) := ctx;
 
-Formula translateExpr((Expr)`<Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("current")), translateExpr(id, ctx)]);
-Formula translateExpr((Expr)`<Expr spc>[<Expr id>].<VarName field>`, Context ctx) = functionCall(simple("field_<ctx.specLookup["<spc>"]>_<field>"), [functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("current")), translateExpr(id, ctx)])]);
+Formula translateExpr((Expr)`new <Expr spc>[<Expr id>]`, Context ctx) 
+  = var(simple("nextEnt"))
+  when eventAsFunction() := ctx;
+
+Formula translateExpr((Expr)`new <Expr spc>[<Expr id>].<VarName field>`, Context ctx) 
+  = functionCall(simple("field_<ctx.specLookup["<spc>"]>_<field>"), [functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("next")), translateExpr(id, ctx)])])
+  when flattenedEvent(str spec, str event) := ctx;
+
+Formula translateExpr((Expr)`new <Expr spc>[<Expr id>].<VarName field>`, Context ctx) 
+  = functionCall(simple("field_<ctx.specLookup["<spc>"]>_<field>"), [var(simple("nextEnt"))])
+  when eventAsFunction() := ctx;
+
+Formula translateExpr((Expr)`<Expr spc>[<Expr id>]`, Context ctx) 
+  = functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("current")), translateExpr(id, ctx)])
+  when flattenedEvent(str spec, str event) := ctx;
+
+Formula translateExpr((Expr)`<Expr spc>[<Expr id>]`, Context ctx) 
+  =  var(simple("curEnt"))
+  when eventAsFunction() := ctx;
+  
+Formula translateExpr((Expr)`<Expr spc>[<Expr id>].<VarName field>`, Context ctx) 
+  = functionCall(simple("field_<ctx.specLookup["<spc>"]>_<field>"), [functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("current")), translateExpr(id, ctx)])])
+  when flattenedEvent(str spec, str event) := ctx;
+
+Formula translateExpr((Expr)`<Expr spc>[<Expr id>].<VarName field>`, Context ctx) 
+  = functionCall(simple("field_<ctx.specLookup["<spc>"]>_<field>"), [var(simple("curEnt"))])
+  when eventAsFunction() := ctx;
 
 Formula translateExpr((Expr)`initialized <Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<ctx.specLookup["<spc>"]>_initialized"), [translateExpr((Expr)`<Expr spc>[<Expr id>]`, ctx)]); 
 
@@ -251,7 +282,7 @@ Formula translateExpr((Expr)`<Ref r>`, Context ctx)
 
 Formula translateExpr((Expr)`<Ref r>`, Context ctx) 
   = var(simple("param_<r>"))
-  when function() := ctx;
+  when function() := ctx || eventAsFunction() := ctx;
 
 Formula translateExpr((Expr)`<VarName function>(<{Expr ","}* params>)`, Context ctx) = functionCall(simple("func_<function>"), [translateExpr(p, ctx) | Expr p <- params]);
 
@@ -283,12 +314,7 @@ Formula translateExpr((Expr)`<Expr lhs> - <Expr rhs>`, Context ctx)
   = translateExpr(lhs, rhs, ctx.types[lhs@\loc], ctx.types[rhs@\loc], ctx, Formula (Formula l, Formula r) { return sub(l, [r]); });
 
 Formula translateExpr((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx)
-  = translateExpr(lhs, rhs, ctx.types[lhs@\loc], ctx.types[rhs@\loc], ctx, Formula (Formula l, Formula r) { return mul(l, [r]); })
-  when ctx.types[lhs@\loc] == (Type)`Percentage` || ctx.types[rhs@\loc] == (Type)`Percentage`;
-
-Formula translateExpr((Expr)`<Expr lhs> * <Expr rhs>`, Context ctx)
-  = translateExpr(lhs, rhs, ctx.types[lhs@\loc], ctx.types[rhs@\loc], ctx, Formula (Formula l, Formula r) { return mul(l, [r]); })
-  when ctx.types[lhs@\loc] != (Type)`Percentage` && ctx.types[rhs@\loc] != (Type)`Percentage`;
+  = translateExpr(lhs, rhs, ctx.types[lhs@\loc], ctx.types[rhs@\loc], ctx, Formula (Formula l, Formula r) { return mul(l, [r]); });
 
 Formula translateExpr((Expr)`<Expr lhs> / <Expr rhs>`, Context ctx)
   = translateExpr(lhs, rhs, ctx.types[lhs@\loc], ctx.types[rhs@\loc], ctx, Formula (Formula l, Formula r) { return div(l, [r]); });
