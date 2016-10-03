@@ -1,3 +1,0 @@
-module Plugin
-
-void main();
