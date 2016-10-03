@@ -215,8 +215,11 @@ list[Command] translateFunctions(list[FunctionDef] functions, Context ctx) =
   [defineFunction("func_<f.name>", [sortedVar("param_<p.name>", translateSort(p.tipe)) | p <- f.params], translateSort(f.returnType), translateStat(f.statement, ctx)) | f <- functions];
 
 list[Command] translateEventToSingleAsserts(str entity, EventDef evnt, Context ctx) =
-  [\assert(attributed(translateStat(s, ctx), [named(locToStr(s@\loc))])) | /Statement s := evnt] +
+  [\assert(labelIfOriginal(s, ctx)) | /Statement s := evnt] +
   [\assert(attributed(translateSyncStat(s, ctx), [named(locToStr(s@\loc))])) | /SyncStatement s := evnt];
+
+Formula labelIfOriginal(s:(Statement)`new <TypeName _1>[<Expr _>].<VarName _> == <TypeName _>[<Expr _>].<VarName _>;`, Context ctx) = translateStat(s, ctx);
+default Formula labelIfOriginal(Statement s, Context ctx) = attributed(translateStat(s, ctx), [named(locToStr(s@\loc))]);
 
 list[Command] translateEventsToFunctions(set[Module] specMods, Context ctx) {
   Command translate(Module m, EventDef evnt) =
