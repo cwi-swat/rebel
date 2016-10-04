@@ -67,8 +67,8 @@ str compile(custom(str name, str val)) = ":<name> <val>";
 // Sorts
 str compile(list[SortedVar] params) = ("" | "<it> (<param.name> <compile(param.sort)>)" | param <- params); 
 str compile(list[Sort] sorts) = ("" | "<it> <compile(sort)>" | sort <- sorts); 
-str compile(\int()) = "Int";
-str compile(\bool())= "Bool";
+str compile(\integer()) = "Int";
+str compile(\boolean())= "Bool";
 str compile(string()) = "String";
 str compile(array(Sort idx, Sort elems))= "(Array <compile(idx)> <compile(elems)>)";
 str compile(custom(str name)) = name;
@@ -101,7 +101,7 @@ str compile(implies(lhs, rhs)) = "(=\> <compile(lhs)> <compile(rhs)>)";
 str compile(and(list[Formula] clauses)) = "(and <intercalate(" ", [compile(c) | c <- clauses])>)";
 str compile(or(list[Formula] clauses)) = "(or <intercalate(" ", [compile(c) | c <- clauses])>)";
 str compile(xor(list[Formula] clauses)) = "(xor <intercalate(" ", [compile(c) | c <- clauses])>)";
-str compile(eq(lhs, rhs)) = "(= <compile(lhs)> <compile(rhs)>)";
+str compile(equal(lhs, rhs)) = "(= <compile(lhs)> <compile(rhs)>)";
 str compile(distinct(list[Formula] clauses)) = "(distinct <intercalate(" ", [compile(c) | c <- clauses])>)";
 str compile(ite(condition, whenTrue, whenFalse)) = "(ite <compile(condition)> <compile(whenTrue)> <compile(whenFalse)>)";   
 

@@ -35,8 +35,5 @@ syntax InvariantDefs = "invariantDefs" "{" InvariantDef* defs "}";
 syntax EventDef = 
   Annotations annos "event" FullyQualifiedVarName name "{" {Parameter ","}* thisStructure  "}"EventConfigBlock? configParams "(" {Parameter ","}* transitionParams")" "{" Preconditions? pre Postconditions? post SyncBlock? sync "}";
 
-syntax Expr 
-  = syncKeywordVar: VarName name ":" Type tipe DefaultValue defaultValue;
-
 lexical VarName = ([_] !<< [_][a-z A-Z 0-9 _]* !>> [a-z A-Z 0-9 _]) \Keywords;
 

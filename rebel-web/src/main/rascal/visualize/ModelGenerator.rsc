@@ -16,6 +16,7 @@ module visualize::ModelGenerator
 import lang::ExtendedSyntax;
 import lang::Builder;
 import lang::Resolver;
+import lang::Finder;
 
 import visualize::ADT; 
 import visualize::JavaScriptModelWriter;
@@ -144,26 +145,10 @@ Maybe[JsSpec] generateJsStructureOfInternals(loc file) {
 	}
 }
 
-private Maybe[EventDef] findEventDef(loc evntToFind, set[Built] builds) {
-  if (Built b <- builds, Module m := b.inlinedMod, m has spec, EventDef evnt <- m.spec.events.events, partOf(evntToFind, evnt@\loc)) {
-    return just(evnt);
-  } else {
-    return nothing();
-  } 
-} 
-
-private Maybe[EventRef] findEventRef(loc evntToFind, set[Built] builds) {
-  if (Built b <- builds, Module m := b.inlinedMod, m has spec, EventRef evnt <- m.spec.eventRefs.events, evnt@\loc == evntToFind) {
-    return just(evnt);
-  } else {
-    return nothing();
-  } 
-} 
-
 bool inEventOfSpec(loc partOfEvent, Built b) = true
   when <loc ref, loc def> <- b.refs.eventRefs,
-       partOf(ref, b.inlinedMod@\loc),
-       partOf(partOfEvent, def);
+       contains(b.inlinedMod@\loc, ref),
+       contains(def, partOfEvent);
 default bool inEventOfSpec(loc partOfEvent, Built b) = false;
 
 private set[JsTransition] processLinksFromExternalMachines(str eventId, EventRef er, Built b, set[Built] referencedBy ) {
@@ -173,7 +158,7 @@ private set[JsTransition] processLinksFromExternalMachines(str eventId, EventRef
     Built other <- referencedBy,
     other.inlinedMod@\loc != b.inlinedMod@\loc,
     <loc ref, erLoc> <- other.refs.syncedEventRefs, 
-    just(EventDef callingEvnt) := findEventDef(ref, referencedBy)}; 
+    just(EventDef callingEvnt) := findInlinedEventDef(ref, referencedBy)}; 
 }
 
 private set[Built] loadImports(Built origin) = loadImports(origin, {});
@@ -215,29 +200,18 @@ private str processDoc(&T<:Tree t) = trim("<doc.contents>")
 	when /(Annotation)`@doc <TagString doc>` := t; 
 private default str processDoc(&T<:Tree t) = "";
 
-private Maybe[Module] findSpec(loc specDef, set[Built] mods) {
-  if (Built b <- mods, b.inlinedMod has spec, b.inlinedMod.spec@\loc == specDef) {
-    return just(b.inlinedMod);
-  }
-  else {
-    return nothing();
-  }
-} 
-
-private bool partOf(loc l1, loc l2) = l1.top == l2.top && l2 >= l1;
-
 private set[JsExternalMachine] processExternalMachines(Built current, set[Built] others) {
 	set[tuple[str,str]] og = {<"<m.modDef.fqn>", "<m.spec.name>"> | 
 	                                   <loc ref, loc def> <- current.refs.specRefs, 
 	                                   inEventOfSpec(ref, current), 
-	                                   just(Module m) := findSpec(def, others)};
+	                                   just(Module m) := findInlinedSpec(def, others)};
 	
 	set[tuple[str,str]] ic = {<"<b.inlinedMod.modDef.fqn>", "<b.inlinedMod.spec.name>"> |
 	                                   Built b <- others,
 	                                   b.inlinedMod has spec,
 	                                   <loc ref, loc def> <- b.refs.specRefs,
 	                                   inEventOfSpec(ref, b),
-	                                   partOf(def, current.inlinedMod@\loc)};
+	                                   contains(current.inlinedMod@\loc, def)};
 	
 	return {externalMachine(fqn, name, outgoing()) | e:<fqn, name> <- og, e notin ic} +
 	       {externalMachine(fqn, name, incoming()) | e:<fqn, name> <- ic, e notin og} +

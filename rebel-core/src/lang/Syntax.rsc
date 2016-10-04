@@ -35,7 +35,7 @@ syntax LibraryModule
 	| @Foldable FunctionDef functionDef 
 	| @Foldable InvariantDef invariantDef 
 	; 
- 
+  
 // Library rules
 
 syntax EventDef = Annotations annos "event" FullyQualifiedVarName name EventConfigBlock? configParams "(" {Parameter ","}* transitionParams")" "{" Preconditions? pre Postconditions? post SyncBlock? sync "}";

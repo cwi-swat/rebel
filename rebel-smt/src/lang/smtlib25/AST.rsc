@@ -55,7 +55,7 @@ data Formula
 	;
 
 // AST from theory core
-data Sort = \bool();
+data Sort = \boolean();
 
 data Formula
 	= \not(Formula term)
@@ -63,7 +63,7 @@ data Formula
 	| and(list[Formula] forms)
 	| or(list[Formula] forms)
 	| xor(list[Formula] forms)
-	| eq(Formula lhs, Formula rhs)
+	| equal(Formula lhs, Formula rhs)
 	| distinct(list[Formula] forms)
 	| ite(Formula condition, Formula \then, Formula \else)
 	;  
@@ -73,7 +73,7 @@ data Literal = boolVal(bool val);
 // End of theory core AST
 
 // AST of theory of int
-data Sort = \int();
+data Sort = \integer();
 
 data Formula
 	= neg(Formula val)

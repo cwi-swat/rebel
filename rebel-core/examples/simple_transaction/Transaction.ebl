@@ -12,15 +12,15 @@ specification Transaction {
 		id: Integer @key
 		amount: Money
 		from: IBAN @ref=Account
-		to: IBAN @ref=Account
+		to: IBAN @ref=Account 
 		createdOn: DateTime
 		bookedOn: Date
 	}
 	 
 	events { 
 		start[]  
-		book[]    
-		fail[] 
+		book[]   
+		fail[]  
 	}
 	
 	lifeCycle {

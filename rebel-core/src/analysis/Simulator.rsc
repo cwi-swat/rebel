@@ -3,6 +3,7 @@ module analysis::Simulator
 import lang::ExtendedSyntax;
 import lang::Builder;
 import lang::Resolver;
+import lang::Finder;
 
 import lang::smtlib25::AST;
 import lang::smtlib25::Compiler;
@@ -17,12 +18,9 @@ import String;
 import List;
 import util::Maybe;
 
-alias RebelLit = lang::ExtendedSyntax::Literal;
+import ParseTree;
 
-anno loc Module@\loc;
-anno loc Statement@\loc;
-anno loc SyncStatement@\loc;
-anno loc Expr@\loc;
+alias RebelLit = lang::ExtendedSyntax::Literal;
 
 data TransitionResult
 	= failed(list[str] reasons)
@@ -53,16 +51,18 @@ list[Param] getTransitionParams(loc spec, str transitionToFire) =
        "<evnt.name>" == transitionToFire;
 
 TransitionResult transition(loc spec, str entity, str transitionToFire, list[Variable] transitionParams, State current) {	
+  Built origSpec = loadSpec(spec);
+  
   set[Built] builtSpecs = loadAllSpecs(spec, {});
   set[Module] normalizedSpecs = {b.normalizedMod | Built b <- builtSpecs}; 
    
-  //1. Find the event definition to fire
-  EventDef eventToRaise = findEventDef(transitionToFire, normalizedSpecs);
-      
   map[str,str] specLookup = ("<m.modDef.fqn.modName>":"<m.modDef.fqn>" | m <- normalizedSpecs);
   map[loc, Type] types = (() | it + b.resolvedTypes | b <- builtSpecs);
   
+  lrel[Built,EventDef] allEventsNeeded = filterSynchronizedEventsOnly(origSpec, transitionToFire, builtSpecs, {});
+  for (<_, EventDef e> <- allEventsNeeded) println("<e.name>");
 
+  EventDef eventToRaise = findEventToRaise(transitionToFire, allEventsNeeded[origSpec]);
   
   list[Command] smt = declareSmtTypes(normalizedSpecs) +
                       declareSmtVariables(entity, transitionToFire, transitionParams, normalizedSpecs) +
@@ -70,7 +70,7 @@ TransitionResult transition(loc spec, str entity, str transitionToFire, list[Var
                       translateState(current) +
                       translateTransitionParams(entity, transitionToFire, transitionParams) +
                       translateFunctions(([] | it + f | s <- builtSpecs, FunctionDef f <- s.normalizedMod.spec.functions.defs), function(types=types)) + 
-                      translateEventsToFunctions(normalizedSpecs, eventAsFunction(specLookup = specLookup, types = types)) +
+                      translateEventsToFunctions(allEventsNeeded, eventAsFunction(specLookup = specLookup, types = types)) +
                       translateEventToSingleAsserts(entity, eventToRaise, flattenedEvent(entity, "<eventToRaise.name>", specLookup = specLookup, types = types));
   
   SolverPID pid = startSolver();
@@ -85,7 +85,7 @@ TransitionResult transition(loc spec, str entity, str transitionToFire, list[Var
     }
     
     if (checkSat(pid)) {
-      result = successful(getNextStateModel(pid, current, eventToRaise + syncedEvents, specLookup));
+      result = successful(getNextStateModel(pid, current, allEventsNeeded<1>, specLookup));
     } else {
       result = failed(getUnsatCoreStatements(pid, eventToRaise));
     }
@@ -98,6 +98,82 @@ TransitionResult transition(loc spec, str entity, str transitionToFire, list[Var
   return result; 
 }  
 
+EventDef findEventToRaise(str eventName, list[EventDef] events) {
+  if (EventDef evnt <- events, "<evnt.name>" == eventName) {
+    return evnt;
+  } 
+  
+  throw "Unable to locate event to raise";
+}
+
+EventDef addToStateAndIdToSyncedEventCalls(EventDef evnt, Built parent, set[Built] allBuilds) {
+  SyncExpr merge(orig:(SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)`, Expr newParam) =
+    (SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>, <Expr newParam>)`[@\loc=orig@\loc];
+  
+  Expr consToStateArg(str evnt, Module spc) {
+    list[int] possibleStates = [];
+    for (/LifeCycle lc := spc.spec.lifeCycle, StateFrom sf <- lc.from, (StateTo)`-\> <VarName to>: <StateVia via>` <- sf.destinations) {
+      if (VarName e <- via.refs, "<e>" == evnt) {
+        possibleStates += toInt("<sf.nr>");      
+      }
+    }
+    
+    return [Expr]"<intercalate(" || ",  dup(possibleStates))>";
+  }
+  
+  Maybe[Module] findMod(loc eventRefLoc) {
+    for (Built b <- allBuilds, contains(b.normalizedMod@\loc, eventRefLoc)) {
+      return just(b.normalizedMod);
+    }
+    
+    return nothing();
+  } 
+  
+  SyncExpr addParams(orig:(SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)`) {
+    SyncExpr result = orig;
+    
+    if ({loc eventRef} := parent.refs.syncedEventRefs[event@\loc], just(Module m) := findMod(eventRef)) {
+      result = merge(orig, consToStateArg("<event>", m));
+      result = merge(result, id);
+    } 
+    
+    return result;
+  }  
+  
+  default SyncExpr addParams(SyncExpr exp) { throw "Adding parameters to \'<exp>\' not yet implemented"; }
+  
+  EventDef addParamNames(EventDef orig) {
+    if (/SyncBlock _ !:= orig.sync) {
+      return orig;
+    }
+    
+    return visit(orig) {
+      case se:(SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)` => addParams(se)
+    }
+  }
+  
+  return addParamNames(evnt);
+}
+
+lrel[Built,EventDef] filterSynchronizedEventsOnly(Built origin, str eventName, set[Built] allSpecs, set[str] alreadyVisited) {
+  if (eventName in alreadyVisited) {
+    return [];
+  }
+  
+  EventDef evnt = findEventDef(eventName, origin);
+  evnt = addToStateAndIdToSyncedEventCalls(evnt, origin, allSpecs);
+  
+  lrel[Built, EventDef] result = [];
+  
+  for (<loc ref, loc def> <- origin.refs.syncedEventRefs, contains(evnt@\loc, ref)) {
+    if (just(Built b) := findBuilt(def, allSpecs), {loc eventDef} := b.refs.eventRefs[def], just(EventDef syncedEvnt) := findNormalizedEventDef(eventDef, allSpecs)) {
+      result += filterSynchronizedEventsOnly(b, "<syncedEvnt.name>", allSpecs, alreadyVisited + eventName);      
+    }  
+  }
+  
+  return result + <origin, evnt>;
+}
+
 list[str] getUnsatCoreStatements(SolverPID pid, EventDef raisedEvent) {
   str smtResponse = runSolver(pid, compile(getUnsatCore()), wait = 20);
   list[loc] unsatCoreLocs = [strToLoc(l) | str l <- parseSmtUnsatCore(smtResponse)];
@@ -108,7 +184,7 @@ list[str] getUnsatCoreStatements(SolverPID pid, EventDef raisedEvent) {
   return unsatCoreStats;
 } 
 
-State getNextStateModel(SolverPID pid, State current, set[EventDef] raisedEvents, map[str,str] specLookup) {
+State getNextStateModel(SolverPID pid, State current, list[EventDef] raisedEvents, map[str,str] specLookup) {
   lrel[str, str] unchangedFields = [<specLookup["<spec>"], "<field>"> | EventDef evnt <- raisedEvents,
     /(Statement)`new <TypeName spec>[<Expr _>].<VarName field> == <TypeName otherSpec>[<Expr _>].<VarName otherField>;` := evnt.post, 
     "<spec>" == "<otherSpec>", "<field>" == "<otherField>"];
@@ -137,23 +213,28 @@ Variable getNewValue(SolverPID pid, str entityType, list[RebelLit] id, Variable 
 set[Built] loadAllSpecs(loc file, set[loc] visited) {
   set[Built] result = {};
   
-  if (<_,just(Built b)> := load(file)) {
-    if (b.normalizedMod has spec) {
-      result += b;    
-    }
-    
-    for (<_, loc imported> <- b.refs.imports, imported.top notin visited) {
-      set[Built] loaded = loadAllSpecs(imported.top, visited + file);
-      visited += {l.normalizedMod@\loc.top | Built l <- loaded};
-      result += loaded;
-    } 
+  Built b = loadSpec(file);
+  if (b.normalizedMod has spec) {
+    result += b;    
   }
+    
+  for (<_, loc imported> <- b.refs.imports, imported.top notin visited) {
+    set[Built] loaded = loadAllSpecs(imported.top, visited + file);
+    visited += {l.normalizedMod@\loc.top | Built l <- loaded};
+    result += loaded;
+  } 
   
   return result;
 }
 
-EventDef findEventDef(str eventName, set[Module] spcs) = evnt when /EventDef evnt := spcs, "<evnt.name>" == eventName;
-EventDef findEventDef(str eventName, set[Module] spcs) { throw "Event with name \'<eventName>\' not found in specs"; }
+Built loadSpec(loc file) {
+  if (<_,just(Built b)> := load(file)) {
+    return b;
+  } else throw "Unable to load built file of <file>";
+}
+
+EventDef findEventDef(str eventName, Built b) = evnt when b.normalizedMod has spec, EventDef evnt <- b.normalizedMod.spec.events.events, "<evnt.name>" == eventName;
+EventDef findEventDef(str eventName, Built b) { throw "Event with name \'<eventName>\' not found in specs"; }
 
 list[Command] declareSmtSpecLookup(set[Module] mods) {
   list[Command] smt = [];
@@ -166,7 +247,7 @@ list[Command] declareSmtSpecLookup(set[Module] mods) {
     // define the initialized function
     // 1. get all the states nr's which represent initialized states
     set[int] initializedStateNrs = {toInt("<sf.nr>") | /StateFrom sf := lc, /(LifeCycleModifier)`initial` !:= sf};
-    smt += defineFunction("spec_<m.modDef.fqn>_initialized", [sortedVar("entity", custom("<m.modDef.fqn>"))], \bool(), \or([eq(functionCall(simple("field_<m.modDef.fqn>__state"), [var(simple("entity"))]), lit(intVal(nr))) | int nr <- initializedStateNrs]));
+    smt += defineFunction("spec_<m.modDef.fqn>_initialized", [sortedVar("entity", custom("<m.modDef.fqn>"))], \boolean(), or([equal(functionCall(simple("field_<m.modDef.fqn>__state"), [var(simple("entity"))]), lit(intVal(nr))) | int nr <- initializedStateNrs]));
   }
   
   return smt;
@@ -200,16 +281,16 @@ list[Command] translateState(State state) {
   
   // Assert the current value for 'now'
   smt += [declareFunction("now", [custom("State")], custom("DateTime"))] +
-         [\assert(eq(functionCall(simple("now"), [var(simple("next"))]), translateLit(state.now)))];
+         [\assert(equal(functionCall(simple("now"), [var(simple("next"))]), translateLit(state.now)))];
     
   // Assert all the current values of the entities
-  smt += [\assert(eq(functionCall(simple("field_<ei.entityType>_<name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("current")), *[translateLit(i) | lang::ExtendedSyntax::Literal i <- ei.id]])]), translateLit(val))) | EntityInstance ei <- state.instances, var(str name, Type tipe, RebelLit val) <- ei.vals];
+  smt += [\assert(equal(functionCall(simple("field_<ei.entityType>_<name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("current")), *[translateLit(i) | lang::ExtendedSyntax::Literal i <- ei.id]])]), translateLit(val))) | EntityInstance ei <- state.instances, var(str name, Type tipe, RebelLit val) <- ei.vals];
   
   return smt; 
 }
 
 list[Command] translateTransitionParams(str entity, str transitionToFire, list[Variable] params) =
-  [\assert(eq(functionCall(simple("eventParam_<entity>_<transitionToFire>_<p.name>"), [var(simple("next"))]), translateLit(p.val))) | Variable p <- params]; 
+  [\assert(equal(functionCall(simple("eventParam_<entity>_<transitionToFire>_<p.name>"), [var(simple("next"))]), translateLit(p.val))) | Variable p <- params]; 
 
 list[Command] translateFunctions(list[FunctionDef] functions, Context ctx) =
   [defineFunction("func_<f.name>", [sortedVar("param_<p.name>", translateSort(p.tipe)) | p <- f.params], translateSort(f.returnType), translateStat(f.statement, ctx)) | f <- functions];
@@ -221,17 +302,21 @@ list[Command] translateEventToSingleAsserts(str entity, EventDef evnt, Context c
 Formula labelIfOriginal(s:(Statement)`new <TypeName _1>[<Expr _>].<VarName _> == <TypeName _>[<Expr _>].<VarName _>;`, Context ctx) = translateStat(s, ctx);
 default Formula labelIfOriginal(Statement s, Context ctx) = attributed(translateStat(s, ctx), [named(locToStr(s@\loc))]);
 
-list[Command] translateEventsToFunctions(set[Module] specMods, Context ctx) {
+list[Command] translateEventsToFunctions(lrel[Built, EventDef] evnts, Context ctx) {
   Command translate(Module m, EventDef evnt) =
     defineFunction("event_<m.modDef.fqn>_<evnt.name>", [sortedVar("current", custom("State")), sortedVar("next", custom("State"))] + 
-      [sortedVar("param_<p.name>", translateSort(p.tipe)) | p <- evnt.transitionParams], \bool(),
+      [sortedVar("param_<p.name>", translateSort(p.tipe)) | p <- evnt.transitionParams], \boolean(),
       \and([translateStat(s, ctx) | /Statement s := evnt] + 
          [translateSyncStat(s, ctx) | /SyncStatement s := evnt]));
   
-  return [translate(m, evnt) | Module m <- specMods, EventDef evnt <- m.spec.events.events];
+  return [translate(b.normalizedMod, evnt) | Built b <- dup(evnts<0>), b.normalizedMod has spec, EventDef evnt <- evnts[b]];
 }
 
-Formula translateSyncStat(SyncStatement s, Context ctx) = lit(boolVal(true));
+Formula translateSyncStat(SyncStatement s, Context ctx) = translateSyncExpr(s.expr, ctx);
+
+Formula translateSyncExpr((SyncExpr)`not <SyncExpr expr>`, Context ctx) = \not(translateSyncExpr(expr, ctx));
+Formula translateSyncExpr((SyncExpr)`<TypeName spc>[<Expr id>].<VarName event>(<{Expr ","}* params>)`, Context ctx) 
+  = functionCall(simple("event_<ctx.specLookup["<spc>"]>_<event>"), [var(simple("current")), var(simple("next"))] + [translateExpr(p, ctx) | p <- params]);
 
 Formula translateStat((Statement)`(<Statement s>)`, Context ctx) = translateStat(s, ctx);
 Formula translateStat((Statement)`<Annotations _> <Expr e>;`, Context ctx) = translateExpr(e, ctx);
@@ -312,8 +397,8 @@ Formula translateExpr((Expr)`<Expr lhs> \> <Expr rhs>`, Context ctx)
 Formula translateExpr((Expr)`<Expr lhs> \>= <Expr rhs>`, Context ctx)
   = translateFormula(lhs, rhs, ctx.types[lhs@\loc], ctx.types[rhs@\loc], ctx, Formula (Formula l, Formula r) { return gte(l, r); });
 
-Formula translateExpr((Expr)`<Expr lhs> == <Expr rhs>`, Context ctx) = eq(translateExpr(lhs, ctx), translateExpr(rhs, ctx));
-Formula translateExpr((Expr)`<Expr lhs> != <Expr rhs>`, Context ctx) = \not(eq(translateExpr(lhs, ctx), translateExpr(rhs, ctx)));
+Formula translateExpr((Expr)`<Expr lhs> == <Expr rhs>`, Context ctx) = equal(translateExpr(lhs, ctx), translateExpr(rhs, ctx));
+Formula translateExpr((Expr)`<Expr lhs> != <Expr rhs>`, Context ctx) = \not(equal(translateExpr(lhs, ctx), translateExpr(rhs, ctx)));
 Formula translateExpr((Expr)`<Expr lhs> && <Expr rhs>`, Context ctx) = and([translateExpr(lhs, ctx), translateExpr(rhs, ctx)]);
 Formula translateExpr((Expr)`<Expr lhs> || <Expr rhs>`, Context ctx) = or([translateExpr(lhs, ctx), translateExpr(rhs, ctx)]);
 
@@ -336,7 +421,7 @@ Sort translateSort((Type)`Time`) = custom("Time");
 Sort translateSort((Type)`DateTime`) = custom("DateTime");
 Sort translateSort((Type)`IBAN`) = custom("IBAN");
 Sort translateSort((Type)`Money`) = custom("Money");
-Sort translateSort((Type)`Integer`) = \int();
+Sort translateSort((Type)`Integer`) = \integer();
 Sort translateSort((Type)`Frequency`) = custom("Frequency");
 Sort translateSort((Type)`Percentage`) = custom("Percentage");
 
@@ -392,19 +477,19 @@ default Literal translateLit(value l) { throw "translateLit(..) not implemented 
 
 list[Command] declareRebelTypesAsSmtSorts() {   
   set[tuple[str,Sort]] rebelTypes = {<"Currency", \string()>,
-                                     <"Frequency", \int()>,
-                                     <"Percentage", \int()>,
-                                     <"Period", \int()>,
-                                     <"Term", \int()>};
+                                     <"Frequency", \integer()>,
+                                     <"Percentage", \integer()>,
+                                     <"Period", \integer()>,
+                                     <"Term", \integer()>};
                              
   return [defineSort(name, [], sort) | <str name, Sort sort> <- rebelTypes] +
-         [declareDataTypes([], [dataTypeDef("IBAN", [combinedCons("consIBAN", [sortedVar("countryCode", string()), sortedVar("checksum",\int()), sortedVar("accountNumber", string())])])]),
-          declareDataTypes([], [dataTypeDef("Money", [combinedCons("consMoney", [sortedVar("currency", string()), sortedVar("amount", \int())])])]),
+         [declareDataTypes([], [dataTypeDef("IBAN", [combinedCons("consIBAN", [sortedVar("countryCode", string()), sortedVar("checksum",\integer()), sortedVar("accountNumber", string())])])]),
+          declareDataTypes([], [dataTypeDef("Money", [combinedCons("consMoney", [sortedVar("currency", string()), sortedVar("amount", \integer())])])]),
           declareDataTypes([], [dataTypeDef("Date", [
-            combinedCons("consDate", [sortedVar("date", \int()), sortedVar("month", \int()), sortedVar("year", \int())]), 
+            combinedCons("consDate", [sortedVar("date", \integer()), sortedVar("month", \integer()), sortedVar("year", \integer())]), 
             cons("undefDate")])]),
           declareDataTypes([], [dataTypeDef("Time", [
-            combinedCons("consTime", [sortedVar("hour", \int()), sortedVar("minutes", \int()), sortedVar("seconds", \int())]), 
+            combinedCons("consTime", [sortedVar("hour", \integer()), sortedVar("minutes", \integer()), sortedVar("seconds", \integer())]), 
             cons("undefTime")])]),
           declareDataTypes([], [dataTypeDef("DateTime", [combinedCons("consDateTime", [sortedVar("date", custom("Date")), sortedVar("time", custom("Time"))]), cons("undefDateTime")])])                                   
           ];                                  

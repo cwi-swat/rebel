@@ -16,6 +16,7 @@ module lang::Normalizer
 import lang::ExtendedSyntax;
 import lang::Resolver;
 import lang::Flattener;
+import lang::Finder;
 
 import IO;
 import List;
@@ -108,10 +109,6 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs, map[l
   resultRewritePercentage = rewritePercentageArithmetics(events, functions, resolvedInlinedTypes);
   events = resultRewritePercentage<0>;
   functions = resultRewritePercentage<1>;
-  
-	// Find all synchronized events and add parameter names to the call
-  tuple[set[Message], set[EventDef]] syncedEventResult = addParamNameToSyncedVariables(events, modules, refs.syncedEventRefs, refs.eventRefs);
-  events = syncedEventResult<1>;
 	
 	Module normalized = visit(inlinedSpc) {
 		case orig:(Specification)`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { <Fields _> <FunctionDefs funcs> <EventRefs eventRefs> <EventDefs _> <InvariantRefs invariantRefs> <InvariantDefs invs> <LifeCycle lifeCycle>}` =>
@@ -131,7 +128,7 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs, map[l
 					LifeCycle mergedLc := ((LifeCycle)`lifeCycle {}` | merge(it, sf) | StateFrom sf <- states) 										
 	};
 	
-	return <desugaringStatesResult<0> + thisReplacingResult<0> + syncedEventResult<0>, normalized>;	
+	return <desugaringStatesResult<0> + thisReplacingResult<0>, normalized>;	
 }
 
 tuple[set[EventDef], set[FunctionDef]] rewritePercentageArithmetics(set[EventDef] events, set[FunctionDef] functions, map[loc, Type] types) {
@@ -270,61 +267,6 @@ set[Import] inlineImports(Module spc, set[Module] modules) {
 	set[Import] getImports(Module m) = {imp | /Import imp := m};
 			
 	return ({} | it + {imp} + getImports(m) | Import imp <- getImports(spc), m <- modules, "<m.modDef.fqn>" == "<imp.fqn>");
-}
-
-tuple[set[Message], set[EventDef]] addParamNameToSyncedVariables(set[EventDef] events, set[Module] modules, Reff syncEventRefs, Reff eventRefs) {
-  set[Message] msgs = {};
-  
-  Maybe[EventDef] findEventDefUsingRef(loc eventRef, set[Module] allMods) {
-    if (Module m <- allMods, m@\loc.top == eventRef.top) {
-      Reff eventRefs = resolveEventReferences(m, allMods);
-      if ({loc eventDef} := eventRefs[eventRef]) {
-        return findEventDef(eventDef, allMods);
-      }
-    }
-    
-    return nothing();
-  }
-  
-  SyncExpr merge((SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)`, Expr newParam) =
-    (SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>, <Expr newParam>)`;
-  
-  SyncExpr addParamNames(orig:(SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)`) {
-    SyncExpr result = orig;
-    
-    if ({loc eventRef} := syncEventRefs[event@\loc], just(EventDef evntDef) := findEventDefUsingRef(eventRef, modules)) {
-      list[str] args = ["<arg>" | Expr arg <- params];
-      list[str] eventParamNames = ["<p>" | Parameter p <- evntDef.transitionParams];
-      
-      if (size(args) != size(eventParamNames)) { 
-        msgs += error("Synchronized event does not have the same arity as event definition in \'<specName>\'", event@\loc); 
-      } else {
-        list[Expr] namedArgs = [[Expr]"<eventParamNames[i]> = <args[i]>" | int i <- index(args)];
-
-        result = ((SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>()` | merge(it, arg) | Expr arg <- namedArgs);
-      }      
-    } else {
-      msgs += error("Unable to locate synchronized event", event@\loc);       
-    }   
-    
-    return result;
-  }  
-  
-  default SyncExpr addParamNames(SyncExpr exp) { throw "Adding parameters to \'<exp>\' not yet implemented"; }
-  
-  EventDef addParamNames(EventDef orig) {
-    if (/SyncBlock _ !:= orig.sync) {
-      return orig;
-    }
-    
-    return visit(orig) {
-      case se:(SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)` => addParamNames(se)
-    }
-  }
-  
-  events = {addParamNames(evnt) | EventDef evnt <- events};
-  
-  return <msgs, events>;
 }
 
 set[EventDef] addFrameConditions(set[EventDef] events, set[FieldDecl] fields) {
