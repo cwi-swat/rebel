@@ -10,7 +10,7 @@ import lang::Resolver;
 import lang::Checker;
 import lang::Normalizer;
 import lang::Parser;
-import lang::ExtendedSyntax;
+import lang::ExtendedSyntax; 
 import lang::TypeChecker;
 
 import IO;
@@ -98,12 +98,16 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
   void saveToOutput(BuiltInternal b) {
     writeBinaryValueFile(builtFile(b.normalizedMod), b);
     writeFile(normalizedFile(b.normalizedMod), b.normalizedMod);
+    writeFile(inlinedFile(b.inlinedMod), b.inlinedMod);
   }
   
   BuiltInternal loadBuiltFile(Module orig) = readBinaryValueFile(#BuiltInternal, builtFile(orig));
   
   @memo
   loc normalizedFile(Module src) = toOutputPath(outputDir, src)[extension = "nebl"];
+  @memo
+  loc inlinedFile(Module src) = toOutputPath(outputDir, src)[extension = "iebl"];
+  
   @memo
   loc builtFile(Module src) = toOutputPath(outputDir, src)[extension = "bebl"];
   @memo

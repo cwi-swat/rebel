@@ -41,7 +41,7 @@ str formatAsRebelLit((Formula)`(consTime <Formula hour> <Formula minutes> <Formu
 
 str formatAsRebelLit((Formula)`(consDateTime <Formula date> <Formula time>)`) = "<formatAsRebelLit(date)>, <formatAsRebelLit(time)>";
 
-str formatAsRebelLit((Formula)`(consIBAN <String cc> <Formula checksum> <String nr>)`) = "<cc.val><left("<checksum>", 2, "0")><nr.val>";
+str formatAsRebelLit((Formula)`(consIBAN <String cc> <Formula checksum> <String nr>)`) = "<cc.val><right("<checksum>", 2, "0")><nr.val>";
 str formatAsRebelLit((Formula)`(consMoney <String currency> <Formula amount>)`) = "<currency.val><floor(toInt("<amount>") / 100)>.<left("<toInt("<amount>") % 100>", 2, "0")>";
 
 default str formatAsRebelLit((Formula)`<Formula f>`) = "<f>";

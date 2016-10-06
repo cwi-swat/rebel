@@ -14,14 +14,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 module lang::ExtendedSyntax
 
 extend lang::Syntax;
-  
-start syntax Module
-  = ModuleDef modDef Import* imports UsedBy+ usedbys Specification spec
-  | ModuleDef modDef Import* imports UsedBy+ usedbys LibraryModule* decls
-  ;
-  
-syntax UsedBy = "usedby" FullyQualifiedName fqn;    
- 
+    
 syntax Specification = 
 	normalized: Annotations annos SpecModifier? modifier "specification" TypeName name Extend? extend "{" Fields fields FunctionDefs functions EventRefs eventRefs EventDefs events InvariantRefs invariantRefs InvariantDefs invariants LifeCycle lifeCycle "}";
 	
@@ -33,7 +26,9 @@ syntax EventDefs = "eventDefs" "{" EventDef* events "}";
 syntax InvariantDefs = "invariantDefs" "{" InvariantDef* defs "}";
 
 syntax EventDef = 
-  Annotations annos "event" FullyQualifiedVarName name "{" {Parameter ","}* thisStructure  "}"EventConfigBlock? configParams "(" {Parameter ","}* transitionParams")" "{" Preconditions? pre Postconditions? post SyncBlock? sync "}";
+  Annotations annos "event" FullyQualifiedVarName name EventConfigBlock? configParams "(" {Parameter ","}* transitionParams")" "{" Preconditions? pre Postconditions? post SyncBlock? sync SyncInstances syncInstances "}";
+
+syntax SyncInstances = "syncInstances" "{" Statement* stats "}";
 
 lexical VarName = ([_] !<< [_][a-z A-Z 0-9 _]* !>> [a-z A-Z 0-9 _]) \Keywords;
 

@@ -111,7 +111,7 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs, map[l
   functions = resultRewritePercentage<1>;
 	
 	Module normalized = visit(inlinedSpc) {
-		case orig:(Specification)`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { <Fields _> <FunctionDefs funcs> <EventRefs eventRefs> <EventDefs _> <InvariantRefs invariantRefs> <InvariantDefs invs> <LifeCycle lifeCycle>}` =>
+		case orig:(Specification)`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { <Fields fds> <FunctionDefs funcs> <EventRefs eventRefs> <EventDefs _> <InvariantRefs invariantRefs> <InvariantDefs invs> <LifeCycle lifeCycle>}` =>
 			(Specification)	`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { 
 							'	<Fields mergedFields> 
 							'	<FunctionDefs mergedFunctions>
@@ -130,6 +130,7 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs, map[l
 	
 	return <desugaringStatesResult<0> + thisReplacingResult<0>, normalized>;	
 }
+
 
 tuple[set[EventDef], set[FunctionDef]] rewritePercentageArithmetics(set[EventDef] events, set[FunctionDef] functions, map[loc, Type] types) {
   EventDef rewrite(EventDef orig) = bottom-up visit(orig) {
@@ -233,11 +234,11 @@ Module mergeImports(orig:(Module)`<ModuleDef modDef> <Import* imports> <Specific
 			'<Import new>
 			'<Specification spec>`[@\loc=orig@\loc];
 
-Fields merge((Fields)`fields { <FieldDecl* orig> }`, FieldDecl new) = 
+Fields merge(f:(Fields)`fields { <FieldDecl* orig> }`, FieldDecl new) = 
 	(Fields) `fields { 
 			     '  <FieldDecl* orig> 
 			     '  <FieldDecl new> 
-			     '}`;
+			     '}`[@\loc=f@\loc];
 			
 FunctionDefs merge((FunctionDefs)`functionDefs {<FunctionDef* orig>}`, FunctionDef new) = 
 	(FunctionDefs) `functionDefs {
@@ -247,15 +248,15 @@ FunctionDefs merge((FunctionDefs)`functionDefs {<FunctionDef* orig>}`, FunctionD
 				  
 EventDefs merge((EventDefs)`eventDefs {<EventDef* orig>}`, EventDef new) = 
 	(EventDefs)	`eventDefs {
-				'  <EventDef* orig>
-			   	'  <EventDef new>
-			   	'}`;
+				      '  <EventDef* orig>
+			       	'  <EventDef new>
+			   	    '}`;
 			   
 InvariantDefs merge((InvariantDefs)`invariantDefs {<InvariantDef* orig>}`, InvariantDef new) = 
 	(InvariantDefs)	`invariantDefs {
-					'  <InvariantDef* orig>
-				   	'  <InvariantDef new>
-				   	'}`;
+					        '  <InvariantDef* orig>
+				   	      '  <InvariantDef new>
+				   	      '}`;
 				   
 LifeCycle merge((LifeCycle)`lifeCycle { <StateFrom* orig> }`, StateFrom new) = 
 	(LifeCycle)	`lifeCycle { 

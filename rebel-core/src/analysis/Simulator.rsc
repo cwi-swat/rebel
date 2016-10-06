@@ -57,31 +57,37 @@ TransitionResult transition(loc spec, str entity, str transitionToFire, list[Var
   set[Module] normalizedSpecs = {b.normalizedMod | Built b <- builtSpecs}; 
    
   map[str,str] specLookup = ("<m.modDef.fqn.modName>":"<m.modDef.fqn>" | m <- normalizedSpecs);
+  println(specLookup);
   map[loc, Type] types = (() | it + b.resolvedTypes | b <- builtSpecs);
   
   lrel[Built,EventDef] allEventsNeeded = filterSynchronizedEventsOnly(origSpec, transitionToFire, builtSpecs, {});
   for (<_, EventDef e> <- allEventsNeeded) println("<e.name>");
 
   EventDef eventToRaise = findEventToRaise(transitionToFire, allEventsNeeded[origSpec]);
+  eventToRaise = addSyncedInstances(eventToRaise, origSpec, builtSpecs);
+  
+  println(eventToRaise);
   
   list[Command] smt = declareSmtTypes(normalizedSpecs) +
                       declareSmtVariables(entity, transitionToFire, transitionParams, normalizedSpecs) +
                       declareSmtSpecLookup(normalizedSpecs) +
                       translateState(current) +
+                      translateEntityFrameFunctions(builtSpecs) +
                       translateTransitionParams(entity, transitionToFire, transitionParams) +
                       translateFunctions(([] | it + f | s <- builtSpecs, FunctionDef f <- s.normalizedMod.spec.functions.defs), function(types=types)) + 
                       translateEventsToFunctions(allEventsNeeded, eventAsFunction(specLookup = specLookup, types = types)) +
-                      translateEventToSingleAsserts(entity, eventToRaise, flattenedEvent(entity, "<eventToRaise.name>", specLookup = specLookup, types = types));
+                      translateEventToSingleAsserts(entity, eventToRaise, flattenedEvent(entity, "<eventToRaise.name>", specLookup = specLookup, types = types)) +
+                      translateFrameConditionsForUnchangedInstances(eventToRaise, current, flattenedEvent(entity, "<eventToRaise.name>", specLookup = specLookup, types = types));
   
   SolverPID pid = startSolver();
   TransitionResult result;
   
   try { 
-//    runSolver(pid, intercalate("\n", compile(smt)));
+    writeFile(|project://rebel-core/examples/output.smt2|, intercalate("\n", compile(smt)));
     
     list[str] rawSmt = compile(smt);
     for (s <- rawSmt) {
-      runSolver(pid, s, wait = 2);
+      runSolver(pid, s, wait = 1);
     }
     
     if (checkSat(pid)) {
@@ -104,6 +110,33 @@ EventDef findEventToRaise(str eventName, list[EventDef] events) {
   } 
   
   throw "Unable to locate event to raise";
+}
+
+EventDef addSyncedInstances(EventDef evnt, Built current, set[Built] otherSpecs) {
+  SyncInstances merge((SyncInstances)`syncInstances { <Statement* stats> }`, Statement newStat) = 
+    (SyncInstances)`syncInstances {
+                   '  <Statement* stats>
+                   '  <Statement newStat>
+                   '}`; 
+  
+  if ([Expr key] := [[Expr]"_<field>" | (FieldDecl)`<VarName field>: <Type tipe> @key` <- current.normalizedMod.spec.fields.fields]) {
+    set[Statement] result = findSyncedInstances(key, evnt, current, otherSpecs);
+  
+    return visit(evnt) {
+      case (EventDef)`<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>){<Preconditions? pre> <Postconditions? post> <SyncBlock? sync>}` =>
+        (EventDef)`<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>){
+          ' <Preconditions? pre>
+          ' <Postconditions? post>
+          ' <SyncBlock? sync>
+          ' <SyncInstances si>
+          '}`
+        when SyncInstances si := ((SyncInstances)`syncInstances {}` | merge(it, stat) | Statement stat <- result)
+    }
+  } else {
+    throw "Currently no Specification with more (or less) than 1 key are supported";
+  }
+    
+  
 }
 
 EventDef addToStateAndIdToSyncedEventCalls(EventDef evnt, Built parent, set[Built] allBuilds) {
@@ -153,6 +186,40 @@ EventDef addToStateAndIdToSyncedEventCalls(EventDef evnt, Built parent, set[Buil
   }
   
   return addParamNames(evnt);
+}
+
+set[Statement] findSyncedInstances(Expr newId, EventDef evnt, Built origin, set[Built] allSpecs) {
+  Expr findEnclosingSyncExprId(loc ref) = id
+    when evnt has sync,
+         /e:(SyncExpr)`<TypeName _>[<Expr id>].<VarName _>(<{Expr ","}* _>)` := evnt.sync,
+         contains(e@\loc, ref);
+           
+  set[Statement] instances = {}; 
+  
+  if ([str key] := ["_<field>" | (FieldDecl)`<VarName field>: <Type tipe> @key` <- origin.normalizedMod.spec.fields.fields]) {
+
+    evnt = visit(evnt) {
+      case (Expr)`<Expr spc>[<Expr id>]` => (Expr)`<Expr spc>[<Expr newId>]` 
+        when "<spc>" == "<origin.normalizedMod.spec.name>",
+             "<id>" == "<key>"
+    } 
+    
+    top-down visit(evnt) {
+      case e:(Expr)`<Expr spc>[<Expr _>]`: {
+        if ("<spc>" == "<origin.normalizedMod.spec.name>") {
+          instances += [Statement]"<e>;";
+        }
+      }
+    } 
+
+    for (<loc ref, loc def> <- origin.refs.syncedEventRefs, contains(evnt@\loc, ref), Expr syncedId := findEnclosingSyncExprId(ref)) {
+      if (just(Built b) := findBuilt(def, allSpecs), {loc eventDef} := b.refs.eventRefs[def], just(EventDef syncedEvnt) := findNormalizedEventDef(eventDef, allSpecs)) {
+        instances += findSyncedInstances(syncedId, syncedEvnt, b, allSpecs);
+      }  
+    }
+  }
+  
+  return instances;
 }
 
 lrel[Built,EventDef] filterSynchronizedEventsOnly(Built origin, str eventName, set[Built] allSpecs, set[str] alreadyVisited) {
@@ -289,6 +356,23 @@ list[Command] translateState(State state) {
   return smt; 
 }
 
+list[Command] translateEntityFrameFunctions(set[Built] allSpecs) {
+  Formula frameField(Module m, FieldDecl field, list[FieldDecl] keyFields) 
+    = equal(functionCall(simple("field_<m.modDef.fqn>_<field.name>"), [functionCall(simple("spec_<m.modDef.fqn>"), [var(simple("next"))] + [var(simple("_<f.name>")) | FieldDecl f <- keyFields])]),
+            functionCall(simple("field_<m.modDef.fqn>_<field.name>"), [functionCall(simple("spec_<m.modDef.fqn>"), [var(simple("current"))] + [var(simple("_<f.name>")) | FieldDecl f <- keyFields])]));
+  
+  list[Command] result = [];
+  
+  for (Built b <- allSpecs, b.normalizedMod has spec, Module m := b.normalizedMod) {
+    list[FieldDecl] keyFields = [f | f:(FieldDecl)`<VarName _> :<Type _> @key` <- m.spec.fields.fields];
+    result += defineFunction("spec_<m.modDef.fqn>_frame", [sortedVar("current", custom("State")), sortedVar("next", custom("State"))] +
+      [sortedVar("_<f.name>", translateSort(f.tipe)) | f <- keyFields], boolean(), 
+      \and([frameField(m, f, keyFields) | FieldDecl f <- m.spec.fields.fields])); 
+  }
+  
+  return result;
+}
+
 list[Command] translateTransitionParams(str entity, str transitionToFire, list[Variable] params) =
   [\assert(equal(functionCall(simple("eventParam_<entity>_<transitionToFire>_<p.name>"), [var(simple("next"))]), translateLit(p.val))) | Variable p <- params]; 
 
@@ -296,7 +380,8 @@ list[Command] translateFunctions(list[FunctionDef] functions, Context ctx) =
   [defineFunction("func_<f.name>", [sortedVar("param_<p.name>", translateSort(p.tipe)) | p <- f.params], translateSort(f.returnType), translateStat(f.statement, ctx)) | f <- functions];
 
 list[Command] translateEventToSingleAsserts(str entity, EventDef evnt, Context ctx) =
-  [\assert(labelIfOriginal(s, ctx)) | /Statement s := evnt] +
+  [\assert(labelIfOriginal(s, ctx)) | /Statement s := evnt.pre] +
+  [\assert(labelIfOriginal(s, ctx)) | /Statement s := evnt.post] +
   [\assert(attributed(translateSyncStat(s, ctx), [named(locToStr(s@\loc))])) | /SyncStatement s := evnt];
 
 Formula labelIfOriginal(s:(Statement)`new <TypeName _1>[<Expr _>].<VarName _> == <TypeName _>[<Expr _>].<VarName _>;`, Context ctx) = translateStat(s, ctx);
@@ -310,6 +395,37 @@ list[Command] translateEventsToFunctions(lrel[Built, EventDef] evnts, Context ct
          [translateSyncStat(s, ctx) | /SyncStatement s := evnt]));
   
   return [translate(b.normalizedMod, evnt) | Built b <- dup(evnts<0>), b.normalizedMod has spec, EventDef evnt <- evnts[b]];
+}
+
+list[Command] translateFrameConditionsForUnchangedInstances(EventDef evnt, State current, Context ctx) {
+  set[Expr] getKeysThatTakePartInTransition(str fqn) = {id | /(Statement)`<TypeName spc>[<Expr id>];` := evnt.syncInstances, ctx.specLookup["<spc>"] == fqn};
+
+  set[EntityInstance] getInstancesOfType(str entityType) = {ei | EntityInstance ei <- current.instances, ei.entityType == entityType};
+
+  RebelLit getId(EntityInstance ei) = id when [id] := ei.id;
+  default RebelLit getId(EntityInstance ei) { throw "More then 1 field as id is not supported at this moment"; }
+  
+  list[Command] result = [];
+  set[str] uniqueEntities = {ei.entityType | EntityInstance ei <- current.instances};
+  
+  for (str fqn <- uniqueEntities) {
+    set[Expr] keys = getKeysThatTakePartInTransition(fqn);
+    set[EntityInstance] instances = getInstancesOfType(fqn);
+    
+    if (keys == {}) {
+      // Entity type does not take part in transitions, all instances should be framed
+      result += [\assert(functionCall(simple("spec_<fqn>_frame"), [var(simple("current")), var(simple("next")), translateLit(getId(i))])) | EntityInstance i <- instances];
+    } else {
+      // Check if the key is equal to one of the used keys and otherwise frame
+      for (EntityInstance ei <- instances) {
+        result += \assert(or([equal(translateLit(getId(ei)), translateExpr(key, ctx)) | Expr key <- keys] +
+                             [functionCall(simple("spec_<fqn>_frame"), [var(simple("current")), var(simple("next")), translateLit(getId(ei))])]
+                         ));
+      }
+    }
+  }
+  
+  return result; 
 }
 
 Formula translateSyncStat(SyncStatement s, Context ctx) = translateSyncExpr(s.expr, ctx);
@@ -424,6 +540,8 @@ Sort translateSort((Type)`Money`) = custom("Money");
 Sort translateSort((Type)`Integer`) = \integer();
 Sort translateSort((Type)`Frequency`) = custom("Frequency");
 Sort translateSort((Type)`Percentage`) = custom("Percentage");
+Sort translateSort((Type)`String`) = \string();
+
 
 default Sort translateSort(Type t) { throw "Sort conversion for <t> not yet implemented"; }
 
