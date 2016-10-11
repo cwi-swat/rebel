@@ -44,7 +44,7 @@ private ImporterResult loadImports(Module initial, loc baseDir, Maybe[Module] (l
 	}	
 	
 	recursiveLoad(initial);
-	
+	 
 	return <msgs, importedModules<1>>;
 }
 

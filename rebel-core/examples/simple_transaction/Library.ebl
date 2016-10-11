@@ -1,6 +1,7 @@
 module simple_transaction.Library
 
 import simple_transaction.Account 
+//import simple_transaction.Reservation
 
 @doc { 	
 	Opening an account needs a valid IBAN and some initial deposit. 
@@ -25,10 +26,13 @@ event withdraw(amount: Money) {
 	postconditions {
 		new this.balance == this.balance - amount;
 	}
+	//sync { 
+	//  Reservation[this.accountNumber].check(amount); 
+	//}
 }
 
 @doc {
-	Deposit money on the account.
+	Deposit money on the account. 
 }
 event deposit(amount: Money) {
 	preconditions {

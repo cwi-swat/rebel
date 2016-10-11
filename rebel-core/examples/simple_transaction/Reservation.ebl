@@ -1,0 +1,23 @@
+module simple_transaction.Reservation
+
+import simple_transaction.ReservationLib
+
+specification Reservation {
+  fields {
+    accountNumber: IBAN @key
+    balance: Money
+  }
+   
+  events {
+   create[]     
+   check[] 
+   close[]  
+  }
+   
+  lifeCycle {
+    initial init -> existing: create 
+    existing -> existing: check
+             -> closed: close
+    final closed 
+  }
+}

@@ -49,7 +49,7 @@ tuple[set[Message], Maybe[Built]] load(loc modLoc,
   if (Built m <- allNormalizedBuilds, m.inlinedMod.modDef@\loc.top == modLoc) {
     return <msgs, just(m)>;
   } else {
-    throw "Unable to locate normalized module in result";
+    return <msgs, nothing()>;
   }   
 }
 

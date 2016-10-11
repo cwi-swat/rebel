@@ -10,21 +10,21 @@ import simple_transaction.Account
 specification Transaction {
 	fields {
 		id: Integer @key
-		amount: Money
+		amount: Money 
 		from: IBAN @ref=Account
 		to: IBAN @ref=Account 
 		createdOn: DateTime
 		bookedOn: Date
 	}
-	 
-	events { 
-		start[]  
+	  
+	events {   
+		start[]   
 		book[]   
 		fail[]  
 	}
 	
 	lifeCycle {
-		initial init -> validated: start 
+		initial uninit -> validated: start 
 		validated    -> booked: book 
 					-> failed: fail
 		final booked

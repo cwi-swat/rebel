@@ -15,7 +15,7 @@ specification Account {
 	events {
 		openAccount[]
 		withdraw[]   
-		deposit[]
+		deposit[] 
 		interest[]
 		block[]  
 		unblock[]

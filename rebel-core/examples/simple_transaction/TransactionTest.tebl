@@ -1,0 +1,14 @@
+module simple_transaction.TranscationTest
+
+import simple_transaction.Transaction
+import simple_transaction.Account 
+
+state oneUninitializedTransactionsAnd2OpenedAccounts {
+  now is 26 Sep 2016, 16:42;
+  
+  uninitialized Transaction;
+  
+  2 opened Account
+    - one with accountNumber NL10INGB000001
+    - one with accountNumber NL10INGB000002 and balance EUR 40.00;
+}

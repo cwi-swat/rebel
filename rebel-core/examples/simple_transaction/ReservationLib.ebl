@@ -1,0 +1,21 @@
+module simple_transaction.ReservationLib
+
+event create(amount: Money) {
+  preconditions {
+    amount > EUR 0.00; 
+  }
+  postconditions {
+    new this.balance == amount;  
+  }
+}
+
+event check(amount: Money) {
+  preconditions {
+    this.balance >= amount;
+  }
+  postconditions {
+    new this.balance == this.balance - amount;
+  }
+}
+
+event close() {}

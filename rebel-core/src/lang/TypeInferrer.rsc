@@ -122,7 +122,7 @@ Type resolveType((Expr)`<Expr lhs> -\> <Expr rhs>`, Context ctx) = (Type)`Boolea
 Type resolveType((Expr)`<Expr lhs> in <Expr rhs>`, Context ctx)  = (Type)`Boolean` when (Type)`set [<Type rhsType>]` := resolveTypeCached(rhs, ctx) && rhsType == resolveTypeCached(lhs, ctx); 
 
 Type resolveType((Expr)`this`, Context ctx) = (Type)`$$SPEC_TYPE$$`;
-
+ 
 // Field access
 Type resolveType((Expr)`this.<VarName rhs>`, Context ctx) = tipe when Type tipe := getTypeOfVar("this.<rhs>", ctx.scp);
 Type resolveType((Expr)`<TypeName spc>[<Expr _>].<VarName rhs>`, Context ctx) = tipe when Type tipe := getTypeOfVar("this.<rhs>", ctx.scp);
@@ -142,6 +142,12 @@ Type resolveType((Expr)`not <Expr _>`, Context ctx) = (Type)`Boolean`;
 Type resolveType((Expr)`initialized <Expr exp>`, Context ctx) = (Type)`Boolean`;
 Type resolveType((Expr)`finalized <Expr exp>`, Context ctx) = (Type)`Boolean`;
 
+Type resolveType((Expr)`<Expr cond> ? <Expr then> : <Expr otherwise>`, Context ctx) = thenType 
+  when Type thenType := resolveTypeCached(then, ctx), 
+       Type otherwiseType := resolveTypeCached(otherwise, ctx), 
+       Type condType := resolveTypeCached(cond, ctx), 
+       thenType == otherwiseType && condType == (Type)`Boolean`; 
+
 Type resolveType((Expr)`<TypeName otherSpec>[<Expr _>]`, Context ctx) = resolveType((Expr)`<TypeName otherSpec>`, ctx);
 Type resolveType((Expr)`<TypeName otherSpec>`, Context ctx) = getTypeOfSpec("<otherSpec>", ctx.scp);
 
@@ -153,6 +159,7 @@ Type resolveType((Expr)`<VarName function>(<{Expr ","}* exprs>)`, Context ctx) =
 // Literals
 Type resolveType((Expr)`{<{Expr ","}* elements>}`, Context ctx)       = (Type)`set [<Type subType>]` when /Expr e := elements && subType := resolveTypeCached(e, ctx); // sets are homogenous so we take the type of the first element
 Type resolveType((Expr)`(<{MapElement ","}* elements>)`, Context ctx) = (Type)`map [<Type keyType> : <Type valueType>]` when /MapElement e := elements && keyType := resolveTypeCached(e.key, ctx) && valueType := resolveTypeCached(e.val, ctx); // maps are homogenous so we take the type of the first element 
+
 Type resolveType((Expr)`<Int _>`, Context _)        = (Type)`Integer`;
 Type resolveType((Expr)`<Bool _>`, Context _)       = (Type)`Boolean`;
 Type resolveType((Expr)`<String _>`, Context _)     = (Type)`String`;

@@ -17,7 +17,11 @@ import lang::Syntax;
 import lang::Builder;
 import lang::Resolver;
 import lang::Parser;
-import Checker;
+
+import testlang::Syntax;
+import testlang::Parser;
+import testlang::Loader;
+import testlang::Resolver;
 
 import visualize::VisualisationServer;
 
@@ -40,49 +44,40 @@ import util::HtmlDisplay;
 anno rel[loc, loc] Tree@hyperlinks; 
 
 void main() {
+	str REBEL_LANGUAGE = "Rebel Language";
+	str REBEL_TEST_LANGUAGE = "Rebel Test Language";
+
+	registerLanguage(REBEL_LANGUAGE,"ebl", parseModule);
+	registerLanguage(REBEL_TEST_LANGUAGE, "tebl", parseTestModule);
+	
+	registerContributions(REBEL_LANGUAGE, getRebelContribs());
+	registerContributions(REBEL_TEST_LANGUAGE, getRebelTestContribs());
+}
+
+set[Contribution] getRebelContribs() {
   int startPort = 4300;
   int endPort = 4310;
   map[loc rebelSrcRoot, loc baseUrl] runningVisInstances = ();
   list[int] visualisationPorts = [startPort..endPort];
-
-	REBEL_LANGUAGE = "Rebel Language";
-
-	registerLanguage(REBEL_LANGUAGE,"ebl", parseModule);
-	
-	contribs = {
-		annotator(Module (Module m) {
-		  <msgs, builtResult> = load(m@\loc.top, modulPt = just(m), log = println);
-		  // TEMP TEMP TEMP, print all error messages to the console because not all errors are visible in the editor
-		  iprintln(msgs);
-		  
-		  Module annotatedMod = m[@messages=msgs];
-		  if (just(Built built) := builtResult) {
-		    annotatedMod = annotatedMod[@hyperlinks=getAllHyperlinks(m@\loc, built.refs)];
-		  }
-		  
-	    return annotatedMod;
+ 
+  return {
+    annotator(Module (Module m) {
+      <msgs, builtResult> = load(m@\loc.top, modulPt = just(m), log = println);
+      // TEMP TEMP TEMP, print all error messages to the console because not all errors are visible in the editor
+      iprintln(msgs);
+      
+      Module annotatedMod = m[@messages=msgs];
+      if (just(Built built) := builtResult) {
+        annotatedMod = annotatedMod[@hyperlinks=getAllHyperlinks(m@\loc, built.refs)];
+      }
+      
+      return annotatedMod;
     }),
-		popup(
-			menu("Rebel actions", [
-				action("Simulate", (Module current, loc file) {
-					if (/Specification s := current) {
-						startSimulation(file.top, noOpTestRunner);
-					} else {
-						alert("Only specifications can be simulated");
-					}
-				}),
-
-				action("Run (bounded) model checker", (Module current, loc file) {
-					if (/Specification s := current) {
-						int k = 100;//toInt(prompt("What should be the maximum search depth?"));						
-						checkAndSimulate(file.top, k);
-					} else {
-						alert("Only can start simulations of Specifications");
-					}
-				
-				}),
-				action("Visualize", (Module current, loc file) {
-					if (/Specification s := current) {
+    syntaxProperties(#start[Module]),
+    popup(
+      menu("Rebel actions", [
+        action("Visualize", (Module current, loc file) {
+          if (/Specification s := current) {
             loc baseDirOfMod = resolveBaseDir(current);
             
             if (baseDirOfMod notin runningVisInstances) {
@@ -103,16 +98,28 @@ void main() {
             } else {
               alert("Unable to start visualisation server, no port available");
             }            
-					} else {
-						alert("Only can visualize Specifications");
-					}
-				})
-			])
-		)		
-	};
-	registerContributions(REBEL_LANGUAGE, contribs);
+          } else {
+            alert("Only can visualize Specifications");
+          }
+        })
+      ])
+    )   
+  };
 }
 
+set[Contribution] getRebelTestContribs() = 
+  {
+    annotator(TestModule (TestModule m) {
+      tuple[set[Message], TestLoaderResult] result = loadTestModule(m@\loc.top, modulePt = just(m));
+      
+      TestModule annotatedMod = m[@hyperlinks=getAllTestHyperlinks(m@\loc, result<1>.refs)];
+      annotatedMod = annotatedMod[@messages=result<0>];
+      
+      return annotatedMod;
+    }),
+    syntaxProperties(#start[TestModule])
+  };
+  
 loc resolveBaseDir(Module m) {
   loc base = m@\loc.top.parent;
   
@@ -128,6 +135,9 @@ void reset(){
 	clearLanguages();
 	main();
 }
+
+private Reff getAllTestHyperlinks(loc currentTestModule, TestRefs refs) =
+  getHyperlinks(currentTestModule, refs.imports + refs.specs + refs.states + refs.fields);
 
 private Reff getAllHyperlinks(loc currentUnit, Refs allRefs) =
 	getHyperlinks(currentUnit, 

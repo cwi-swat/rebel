@@ -118,6 +118,7 @@ syntax Expr
   > new: "new" Expr expr
 	| "not" Expr expr
 	| "-" Expr
+  > Expr cond "?" Expr whenTrue ":" Expr whenFalse
 	> left	( Expr lhs "*" Expr rhs
 	    | isMember: Expr lhs "in" Expr rhs
 	    | Expr lhs "/" Expr rhs
@@ -135,9 +136,7 @@ syntax Expr
 			)
   > left and: Expr lhs "&&" Expr rhs
 	> left Expr lhs "||" Expr rhs
-  > right ( Expr cond "?" Expr whenTrue ":" Expr whenFalse
-		| Expr cond "-\>" Expr implication
-		)
+	| right Expr cond "-\>" Expr implication
   | "initialized" Expr
   | "finalized" Expr
   | Expr lhs "instate" Expr rhs

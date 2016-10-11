@@ -49,3 +49,11 @@ Maybe[EventRef] findInlinedEventRef(loc evntToFind, set[Built] builds) {
     return nothing();
   } 
 } 
+
+Maybe[Module] findNormalizedSpecModuleContaining(loc specToFind, set[Built] builds) {
+  if (Built b <- builds, Module m := b.normalizedMod, m has spec, contains(m@\loc, specToFind)) {
+    return just(m);
+  } else {
+    nothing();
+  }
+}

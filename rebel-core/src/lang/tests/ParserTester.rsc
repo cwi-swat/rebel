@@ -18,6 +18,7 @@ import lang::Syntax;
 
 import IO;
 import ParseTree;
+import util::Maybe;
 
 bool parseAllTestFilesAndCheckForAmbiguity() =
 	parseFilesInDirAndCheckForAmbiguity(|project://rebel-core/tests|);
