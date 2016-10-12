@@ -1,7 +1,7 @@
 module analysis::tests::TestPreparerTester
 
 import analysis::TestPreparer;
-import analysis::Simulator;
+import analysis::CommonAnalysisFunctions;
 
 import testlang::Loader;
 import testlang::Syntax;

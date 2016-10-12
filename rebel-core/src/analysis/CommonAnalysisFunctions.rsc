@@ -13,11 +13,12 @@ import analysis::SmtResponseTranslator;
 import analysis::LocTranslator;
 
 import IO;
-import Set; 
+import Set;
 import String;
 import List;
 import util::Maybe;
 import ParseTree;
+import analysis::graphs::Graph;
 
 alias RebelLit = lang::ExtendedSyntax::Literal;
 
@@ -28,30 +29,21 @@ data Context(map[str,str] specLookup = (), map[loc, Type] types = ())
   | function()
   ;
 
+data Step = step(str entity, str event, list[Variable] transitionParameters); 
+
 data Variable 
   = var(str name, Type tipe, RebelLit val)
   | uninitialized(str name, Type tipe)
   ;
    
 data EntityInstance = instance(str entityType, list[RebelLit] id, list[Variable] vals);  
-data State = state(int nr, DateTime now, list[EntityInstance] instances);
+data State 
+  = state(int nr, DateTime now, list[EntityInstance] instances, Step step)
+  | initial(DateTime now, list[EntityInstance] instances)
+  ;
 
-list[EventDef] orderInSyncDependency(lrel[EventDef, EventDef] syncedEvents) {
-  syncedEvents = syncedEvents+;
-  
-  list[EventDef] sortEvents([], EventDef e) = [e];
-  list[EventDef] sortEvents([EventDef h, *EventDef t], EventDef e) = [e, h] + t when <e,h> in syncedEvents;
-  default list[EventDef] sortEvents([EventDef h, *EventDef t], EventDef e) = h + sortEvents(t, e);
-  
-  return ([] | sortEvents(it, e) | EventDef e <- {e1,e2 | <e1, e2> <- syncedEvents});
-}
-  
-lrel[EventDef, EventDef] getSyncedEvents(EventDef currentEvent, Built currentBuilt, set[Built] allBuilts) {
-  if (!(currentEvent has sync) || /SyncStatement stat !:= currentEvent.sync) {
-    return [];
-  } 
-  
-  lrel[EventDef, EventDef] syncedEvents = [];
+Graph[EventDef] getSyncedEvents(EventDef currentEvent, Built currentBuilt, set[Built] allBuilts) {
+  Graph[EventDef] syncedEvents = {<currentEvent, currentEvent>};
 
   for (<loc ref, loc def> <- currentBuilt.refs.syncedEventRefs, 
        contains(currentEvent@\loc, ref),
@@ -65,8 +57,17 @@ lrel[EventDef, EventDef] getSyncedEvents(EventDef currentEvent, Built currentBui
   return syncedEvents;
 }
 
-list[FunctionDef] toCallOrderedList(FunctionDef currentFunc, Built currentBuild, list[Built] allBuilts) {
-
+Graph[FunctionDef] getFunctionCallOrder(FunctionDef currentFunc, Built currentBuild, set[Built] allBuilts) {
+  rel[FunctionDef, FunctionDef] calledFunctions = {<currentFunc, currentFunc>};
+  
+  for (<loc ref, loc def> <- currentBuild.refs.functionRefs,
+       contains(currentFunc@\loc, ref),
+       just(FunctionDef calledFunc) := findFunctionDef(def, allBuilts)) {
+    
+    calledFunctions += <currentFunc, calledFunc>;
+  }
+  
+  return calledFunctions;
 }
 
 EventDef addSyncedInstances(EventDef evnt, Built current, set[Built] otherSpecs) {
@@ -80,13 +81,13 @@ EventDef addSyncedInstances(EventDef evnt, Built current, set[Built] otherSpecs)
     set[Statement] result = findSyncedInstances(key, evnt, current, otherSpecs);
   
     return visit(evnt) {
-      case (EventDef)`<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>){<Preconditions? pre> <Postconditions? post> <SyncBlock? sync>}` =>
+      case orig:(EventDef)`<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>){<Preconditions? pre> <Postconditions? post> <SyncBlock? sync>}` =>
         (EventDef)`<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>){
           ' <Preconditions? pre>
           ' <Postconditions? post>
           ' <SyncBlock? sync>
           ' <SyncInstances si>
-          '}`
+          '}`[@\loc=orig@\loc]
         when SyncInstances si := ((SyncInstances)`syncInstances {}` | merge(it, stat) | Statement stat <- result)
     }
   } else {
@@ -277,6 +278,8 @@ list[Command] declareSmtSpecLookup(set[Module] mods) {
   return smt;
 }
 
+list[Command] declareNow() = [declareFunction("now", [custom("State")], custom("DateTime"))];
+
 list[Command] declareSmtTypes(set[Module] specs) {
   // first declare the build in Rebel types
   list[Command] smt = declareRebelTypes();
@@ -289,6 +292,12 @@ list[Command] declareSmtTypes(set[Module] specs) {
   
   return smt; 
 }
+
+list[Command] translateInvariants(set[Built] specs, Context ctx) =
+  [defineFunction("invariant_<b.normalizedMod.modDef.fqn>.<inv.name>", 
+    [sortedVar("state", custom("State"))] + [sortedVar("param__<f.name>", translateSort(f.tipe)) | FieldDecl f <- b.normalizedMod.spec.fields.fields, /(Annotation)`@key` := f.meta],
+    boolean(),
+    \and([translateStat(st, ctx) | Statement st <- inv.stats])) | Built b <- specs, InvariantDef inv <- b.normalizedMod.spec.invariants.defs];  
 
 list[Command] translateFields(set[Module] specs) =
   [declareFunction("field_<m.modDef.fqn>_<f.name>", [custom("<m.modDef.fqn>")], translateSort(f.tipe)) | Module m <- specs, m has spec, FieldDecl f <- m.spec.fields.fields];
@@ -304,8 +313,7 @@ list[Command] translateState(State state) {
   list[Command] smt = [declareConst("current", custom("State")), declareConst("next", custom("State"))];
   
   // Assert the current value for 'now'
-  smt += [declareFunction("now", [custom("State")], custom("DateTime"))] +
-         [\assert(equal(functionCall(simple("now"), [var(simple("next"))]), translateLit(state.now)))];
+  smt += [\assert(equal(functionCall(simple("now"), [var(simple("next"))]), translateLit(state.now)))];
     
   // Assert all the current values of the entities
   smt += [\assert(equal(functionCall(simple("field_<ei.entityType>_<name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("current")), *[translateLit(i) | lang::ExtendedSyntax::Literal i <- ei.id]])]), translateLit(val))) | EntityInstance ei <- state.instances, var(str name, Type tipe, RebelLit val) <- ei.vals];
@@ -341,12 +349,12 @@ list[Command] translateEventsToFunctions(lrel[Built, EventDef] evnts, Context ct
     defineFunction("event_<m.modDef.fqn>_<evnt.name>", [sortedVar("current", custom("State")), sortedVar("next", custom("State"))] + 
       [sortedVar("param_<p.name>", translateSort(p.tipe)) | p <- evnt.transitionParams], \boolean(),
       \and([translateStat(s, ctx) | /Statement s := evnt] + 
-         [translateSyncStat(s, ctx) | /SyncStatement s := evnt]));
+           [translateSyncStat(s, ctx) | /SyncStatement s := evnt]));
   
   return [translate(b.normalizedMod, evnt) | Built b <- dup(evnts<0>), b.normalizedMod has spec, EventDef evnt <- evnts[b]];
 }
 
-list[Command] translateFrameConditionsForUnchangedInstances(EventDef evnt, State current, Context ctx) {
+list[Formula] translateFrameConditionsForUnchangedInstances(EventDef evnt, State current, Context ctx) {
   set[Expr] getKeysThatTakePartInTransition(str fqn) = {id | /(Statement)`<TypeName spc>[<Expr id>];` := evnt.syncInstances, ctx.specLookup["<spc>"] == fqn};
 
   set[EntityInstance] getInstancesOfType(str entityType) = {ei | EntityInstance ei <- current.instances, ei.entityType == entityType};
@@ -354,7 +362,7 @@ list[Command] translateFrameConditionsForUnchangedInstances(EventDef evnt, State
   RebelLit getId(EntityInstance ei) = id when [id] := ei.id;
   default RebelLit getId(EntityInstance ei) { throw "More then 1 field as id is not supported at this moment"; }
   
-  list[Command] result = [];
+  list[Formula] result = [];
   set[str] uniqueEntities = {ei.entityType | EntityInstance ei <- current.instances};
   
   for (str fqn <- uniqueEntities) {
@@ -363,13 +371,12 @@ list[Command] translateFrameConditionsForUnchangedInstances(EventDef evnt, State
     
     if (keys == {}) {
       // Entity type does not take part in transitions, all instances should be framed
-      result += [\assert(functionCall(simple("spec_<fqn>_frame"), [var(simple("current")), var(simple("next")), translateLit(getId(i))])) | EntityInstance i <- instances];
+      result += [functionCall(simple("spec_<fqn>_frame"), [var(simple("current")), var(simple("next")), translateLit(getId(i))]) | EntityInstance i <- instances];
     } else {
       // Check if the key is equal to one of the used keys and otherwise frame
       for (EntityInstance ei <- instances) {
-        result += \assert(or([equal(translateLit(getId(ei)), translateExpr(key, ctx)) | Expr key <- keys] +
-                             [functionCall(simple("spec_<fqn>_frame"), [var(simple("current")), var(simple("next")), translateLit(getId(ei))])]
-                         ));
+        result += or([equal(translateLit(getId(ei)), translateExpr(key, ctx)) | Expr key <- keys] +
+                      [functionCall(simple("spec_<fqn>_frame"), [var(simple("current")), var(simple("next")), translateLit(getId(ei))])]);
       }
     }
   }

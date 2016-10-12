@@ -82,6 +82,7 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs, map[l
 	set[FunctionDef] functions = {f | FunctionDef f <- inlinedSpc.spec.functions.defs};
 	set[FieldDecl] fields = {f | FieldDecl f <- inlinedSpc.spec.fields.fields};
   set[StateFrom] states = {s | /LifeCycle lc := inlinedSpc.spec.lifeCycle, StateFrom s <- lc.from};
+  set[InvariantDef] invariants = {i | InvariantDef i <- inlinedSpc.spec.invariants.defs};
 	
 	// Add frame conditions to the post conditions
 	events = addFrameConditions(events, fields);			
@@ -109,6 +110,8 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs, map[l
   resultRewritePercentage = rewritePercentageArithmetics(events, functions, resolvedInlinedTypes);
   events = resultRewritePercentage<0>;
   functions = resultRewritePercentage<1>;
+  
+  invariants = replaceReferencesToThisWithSpecificationName(invariants, inlinedSpc);
 	
 	Module normalized = visit(inlinedSpc) {
 		case orig:(Specification)`<Annotations annos> <SpecModifier? sm> specification <TypeName name> <Extend? ext> { <Fields fds> <FunctionDefs funcs> <EventRefs eventRefs> <EventDefs _> <InvariantRefs invariantRefs> <InvariantDefs invs> <LifeCycle lifeCycle>}` =>
@@ -118,13 +121,14 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs, map[l
 							'	<EventRefs eventRefs> 
 							'	<EventDefs mergedEv>
 							'	<InvariantRefs invariantRefs>
-							'	<InvariantDefs invs>
+							'	<InvariantDefs mergedInvariants>
 							'	<LifeCycle mergedLc>  
 							'}`[@\loc=orig@\loc]
 				when
 					Fields mergedFields := ((Fields)`fields {}` | merge(it, f) | f <- fields),
 					EventDefs mergedEv := ((EventDefs)`eventDefs {}` | merge(it, e) | e <- events),
 					FunctionDefs mergedFunctions := ((FunctionDefs)`functionDefs {}` | merge(it, f) | f <- functions),
+					InvariantDefs mergedInvariants := ((InvariantDefs)`invariantDefs {}` | merge(it, i) | i <- invariants),
 					LifeCycle mergedLc := ((LifeCycle)`lifeCycle {}` | merge(it, sf) | StateFrom sf <- states) 										
 	};
 	
@@ -142,6 +146,16 @@ tuple[set[EventDef], set[FunctionDef]] rewritePercentageArithmetics(set[EventDef
       
   return <{rewrite(e) | e <- events}, {rewrite(f) | f <- functions}>;
 } 
+
+set[InvariantDef] replaceReferencesToThisWithSpecificationName(set[InvariantDef] invariants, Module spc) {
+  list[str] idFields = ["_<f.name>" | FieldDecl f <- spc.spec.fields.fields, /(Annotation)`@key` := f.meta];
+  
+  InvariantDef rewrite(InvariantDef inv) = visit(inv) {
+      case (Expr)`this.<VarName n>` => [Expr]"<spc.spec.name>[<intercalate(",", idFields)>].<n>"
+  };
+  
+  return {rewrite(inv) | InvariantDef inv <- invariants};
+}
 
 set[Module] importedModules(Module moi, set[Module] allMods) {
 	set[str] impModNames = {"<imp.fqn>" | imp <- moi.imports};
@@ -292,7 +306,9 @@ set[EventDef] addFrameConditions(set[EventDef] events, set[FieldDecl] fields) {
        when /Statement* _ !:= post;
 	
 	EventDef addFrameConditionsToEvent(EventDef e) {
-		set[VarName] fieldNames = {field.name | FieldDecl field <- fields};
+		set[VarName] fieldNames = {field.name | FieldDecl field <- fields, /(Annotation)`@key` !:= field.meta};
+		set[VarName] keyFields = {field.name | FieldDecl field <- fields, /(Annotation)`@key` := field.meta};
+		
 		// Remove all the fields which are referenced
 		visit(e.post) {
 			case (Expr)`new this.<VarName field>`: fieldNames -= field;
@@ -300,6 +316,8 @@ set[EventDef] addFrameConditions(set[EventDef] events, set[FieldDecl] fields) {
 		
 		// Create the framecondition statements 
 		set[Statement] frameConditions = {(Statement)`new this.<VarName f> == this.<VarName f>;` | field <- fields, field.name in fieldNames, VarName f := field.name};
+		// Add extra condition to frame id field to transition id field
+		frameConditions += {(Statement)`new this.<VarName f> == <VarName pf>;` | f <- keyFields, VarName pf := [VarName]"_<f>"};
 	 	
 		return (e | mergePost(it, fc) | Statement fc <- frameConditions); 
 	}	

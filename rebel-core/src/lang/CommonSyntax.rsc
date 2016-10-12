@@ -1,5 +1,9 @@
 module lang::CommonSyntax
 
+extend lang::std::Layout;
+extend lang::std::Comment;
+extend lang::std::Id;
+
 syntax ModuleDef = "module" FullyQualifiedName fqn;
 
 syntax FullyQualifiedName = ({VarName "."}+ packages ".")? modulePath TypeName modName;
@@ -86,3 +90,4 @@ keyword Keywords = "Jan" | "Feb" | "Mar" | "Apr" | "May" | "Jun" | "Jul" | "Aug"
 keyword Keywords = "Daily" | "Monthly" | "Quarterly" | "Yearly" | "Day" | "Month" | "Quarter" | "Year" | "True" | "False"; 
 keyword Keywords = "Date" | "Integer" | "Period" | "Frequency" | "Percentage" | "Boolean" | "String" | "Time" | "Money" | "Currency" | "Term" | "IBAN";
 keyword Keywords = "EUR" | "USD" | "CUR";
+keyword Keywords = "Daily" | "Monthly" | "Quarterly" | "Yearly" | "Day" | "Month" | "Quarter" | "Year" | "True" | "False"; 

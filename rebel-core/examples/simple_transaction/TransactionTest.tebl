@@ -10,5 +10,7 @@ state oneUninitializedTransactionsAnd2OpenedAccounts {
   
   2 opened Account
     - one with accountNumber NL10INGB000001
-    - one with accountNumber NL10INGB000002 and balance EUR 40.00;
+    - one with accountNumber NL10INGB000002 and balance EUR 0.00;
 }
+
+check oneUninitializedTransactionsAnd2OpenedAccounts reachable in max 6 steps;

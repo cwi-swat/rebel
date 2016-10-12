@@ -17,6 +17,14 @@ Maybe[Built] findBuilt(loc locInNormalizedMod, set[Built] mods) {
   }
 } 
 
+Maybe[Built] findBuiltBeloningToEvent(loc locEventDef, set[Built] mods) {
+  if (Built b <- mods, Module m := b.normalizedMod, m has spec, EventDef evnt <- m.spec.events.events, evnt@\loc == locEventDef) {
+    return just(b);
+  } else {
+    return nothing();
+  }
+} 
+
 Maybe[Module] findInlinedSpec(loc specDef, set[Built] mods) {
   if (Built b <- mods, b.inlinedMod has spec, b.inlinedMod.spec@\loc == specDef) {
     return just(b.inlinedMod);
@@ -55,5 +63,13 @@ Maybe[Module] findNormalizedSpecModuleContaining(loc specToFind, set[Built] buil
     return just(m);
   } else {
     nothing();
+  }
+}
+
+Maybe[FunctionDef] findFunctionDef(loc funcToFind, set[Built] builds) {
+  if (Built b <- builds, Module m := b.normalizedMod, m has spec, FunctionDef f <- m.spec.functions.defs, f@\loc == funcToFind) {
+    return just(f);
+  } else {
+    return nothing();
   }
 }

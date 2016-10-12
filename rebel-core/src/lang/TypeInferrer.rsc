@@ -121,7 +121,7 @@ Type resolveType((Expr)`<Expr lhs> -\> <Expr rhs>`, Context ctx) = (Type)`Boolea
 // In for structured expressions
 Type resolveType((Expr)`<Expr lhs> in <Expr rhs>`, Context ctx)  = (Type)`Boolean` when (Type)`set [<Type rhsType>]` := resolveTypeCached(rhs, ctx) && rhsType == resolveTypeCached(lhs, ctx); 
 
-Type resolveType((Expr)`this`, Context ctx) = (Type)`$$SPEC_TYPE$$`;
+Type resolveType((Expr)`this`, Context ctx) = (Type)`$$SPEC_TYPE$$`; 
  
 // Field access
 Type resolveType((Expr)`this.<VarName rhs>`, Context ctx) = tipe when Type tipe := getTypeOfVar("this.<rhs>", ctx.scp);
@@ -138,7 +138,7 @@ Type resolveType((Expr)`<Expr lhs>.<VarName rhs>`, Context ctx) = (Type)`Integer
 
 Type resolveType((Expr)`new <Expr exp>`, Context ctx) = resolveTypeCached(exp, ctx); 
 
-Type resolveType((Expr)`not <Expr _>`, Context ctx) = (Type)`Boolean`;
+Type resolveType((Expr)`not <Expr _>`, Context ctx) = (Type)`Boolean`; 
 Type resolveType((Expr)`initialized <Expr exp>`, Context ctx) = (Type)`Boolean`;
 Type resolveType((Expr)`finalized <Expr exp>`, Context ctx) = (Type)`Boolean`;
 

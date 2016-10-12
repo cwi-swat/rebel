@@ -18,7 +18,7 @@ specification Account {
 		deposit[] 
 		interest[]
 		block[]  
-		unblock[]
+		unblock[]  
 		close[]
 	} 
 	
@@ -35,7 +35,6 @@ specification Account {
 		
 		blocked -> opened: unblock
 		
-		final closed	 		  	
-			
+		final closed		
 	}
 }

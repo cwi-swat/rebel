@@ -9,7 +9,9 @@ extend lang::std::Comment;
 start syntax TestModule = testModule: ModuleDef modDef Import* imports TestDef* testDefs;
 
 syntax TestDef 
-  = setup: StateSetup setup;
+  = setup: StateSetup setup
+  | check: Check check
+  ;
   
 syntax StateSetup = "state" VarName name "{" SetupStatement* body "}";
 
@@ -34,9 +36,23 @@ syntax MultipleInstanceFieldValueDeclaration = "-" "one" "with" {FieldValueDecla
 
 syntax FieldValueDeclaration = VarName field Expr val;
 
+syntax Check = "check" CheckStatement stat;
+
+syntax CheckStatement
+  = VarName ref "reachable" StepBounds bounds ";"
+  ;
+
+syntax StepBounds
+  = max:    "in" "max" Int stepNr Step
+  | exact:  "in" "exactly" Int stepNr Step
+  | between: "between" Int lower "and" Int upper Step 
+  ;
+
 syntax Expr
   = Literal l
   ;
+
+lexical Step = "step" | "steps";
 
 lexical DeclSeperator = "," | "and";
 

@@ -13,22 +13,14 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 @contributor{Jouke Stoel - jouke.stoel@cwi.nl - CWI}
 module lang::Syntax
 
-extend lang::std::Layout;
-extend lang::std::Comment;
-extend lang::std::Id;
-
+extend lang::CommonSyntax;
+ 
 start syntax Module
 	= ModuleDef modDef Import* imports Specification spec
 	| ModuleDef modDef Import* imports LibraryModule* decls
 	;
-	
-syntax ModuleDef = "module" FullyQualifiedName fqn;
 
-syntax FullyQualifiedName = ({VarName "."}+ packages ".")? modulePath TypeName modName;
-
-syntax FullyQualifiedVarName = (FullyQualifiedName fqn ".")? VarName name;
-
-syntax Import = "import" FullyQualifiedName fqn;
+syntax FullyQualifiedVarName = (FullyQualifiedName fqn ".")? VarName name; 
 
 syntax LibraryModule
 	= @Foldable EventDef eventDef
@@ -155,53 +147,6 @@ syntax Ref
 	| "it"
 	; 
 	
-syntax Type 
-	= @category="Type" "Boolean"
-  	| @category="Type" "Period"
-  	| @category="Type" "Integer"
-  	| @category="Type" "Money"
-  	| @category="Type" "Currency"
-  	| @category="Type" "Date"
-  	| @category="Type" "Frequency"
-  	| @category="Type" "Percentage"
-  	| @category="Type" "Period"
-  	| @category="Type" "Term"
-  	| @category="Type" "String"
-  	| @category="Type" "map" "[" Type ":" Type "]"
-  	| @category="Type" "set" "[" Type "]"
-  	| @category="Type" Term
-  	| @category="Type" "Time"
-  	| @category="Type" "IBAN"
-  	| @category="Type" Type "-\>" Type
-  	| bracket @category="Type" "(" {Type ","}+ ")" 
-  	| @category="Type"  TypeName custom
-  	;
-  	
-syntax Literal
- 	= @category="Constant" Int
-  	| @category="Constant" Bool
-  	| @category="Constant" Period
-  	| @category="Constant" Frequency
-  	| @category="Constant" Term term
-  	| @category="Constant" Date
-  	| @category="Constant" Time
-  	| @category="Constant" DateTime
-  	| @category="Constant" Percentage
-  	| @category="Constant" String
-  	| @category="Constant" Money
-  	| @category="Constant" Currency
-  	| @category="Constant" IBAN
-  	;
-
-syntax Date = Int day Month month Int? year;
-	
-syntax Time = hhmmss: [0-9][0-9]? hour ":" [0-9][0-9]? minutes (":" [0-9][0-9]? seconds)?;
-
-syntax DateTime 
-  = Date date "," Time time
-  | "now"
-  ;
-	
 syntax Annotations = Annotation* annos;	
 
 syntax Annotation 
@@ -212,10 +157,6 @@ syntax Annotation
 
 lexical TagString
 	= "\\" !<< "{" ( ![{}] | ("\\" [{}]) | TagString)* contents "\\" !<< "}";
-	
-syntax Term = Int factor Period period;
-
-syntax Money = Currency cur MoneyAmount amount;
 
 lexical SpecModifier 
 	= "abstract"
@@ -224,31 +165,6 @@ lexical SpecModifier
 
 lexical LifeCycleModifier = "initial" | "final";
 
-lexical Currency 
-	= "EUR" | "USD" 
-	| "CUR" '_' ([A-Z][A-Z][A-Z]) name
-	;
-
-lexical IBAN = iban: [A-Z] !<< ([A-Z][A-Z]) countryCode ([0-9][0-9]) checksum [0-9 A-Z]+ accountNumber !>> [0-9 A-Z];
-
-lexical TypeName = ([A-Z] !<< [A-Z][a-z 0-9 _][a-z A-Z 0-9 _]* !>> [a-z A-Z 0-9 _]) \Keywords; 
-lexical VarName = ([a-z] !<< [a-z][a-z A-Z 0-9 _]* !>> [a-z A-Z 0-9 _]) \Keywords;
-
-lexical Month = "Jan" | "Feb" | "Mar" | "Apr" | "May" | "Jun" | "Jul" | "Aug" | "Sep" | "Oct" | "Nov" | "Dec";
-lexical Frequency =  "Daily" | "Weekly" | "Monthly" | "Quarterly" | "Yearly";
-lexical Period =  "Day" | "Week" | "Month" | "Quarter" | "Year";
-lexical Bool =  "True" | "False";
-lexical Percentage = [0-9]+ per "%";
-lexical Int = [0-9]+ | "Inf";
-lexical String = "\"" ![\"]*  "\"";
-lexical MoneyAmount = [0-9]+ whole [.] ([0-9][0-9][0-9]?) decimals; 
-
-keyword Keywords = "Jan" | "Feb" | "Mar" | "Apr" | "May" | "Jun" | "Jul" | "Aug" | "Sep" | "Oct" | "Nov" | "Dec" ; 
-keyword Keywords = "Date" | "Integer" | "Period" | "Frequency" | "Percentage" | "Boolean" | "String" | "Time" | "Money" | "Currency" | "Term" | "IBAN";
-keyword Keywords = "this" | "now" | "new" | "exists" | "finalized";
-keyword Keywords = "EUR" | "USD" | "CUR";
-
-keyword Keywords = "Daily" | "Monthly" | "Quarterly" | "Yearly" | "Day" | "Month" | "Quarter" | "Year" | "True" | "False" | 
-					"case" | "Inf" | "preconditions" | "postconditions" | 
-					"all" | "no" | "some" | "lone" | "one" | "initial" | "final" | 
-					"it" | "in" | "mod" | "not" ; 
+keyword Keywords = "this" | "now" | "case" | "Inf" | "preconditions" | "postconditions" | 
+					         "all" | "no" | "some" | "lone" | "one" | "initial" | "final" | 
+					         "it" | "in" | "mod" | "not"; 
