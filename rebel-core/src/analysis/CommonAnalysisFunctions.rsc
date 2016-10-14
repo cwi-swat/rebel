@@ -20,6 +20,7 @@ import Map;
 import util::Maybe;
 import util::Math;
 import ParseTree;
+import Boolean;
 import analysis::graphs::Graph;
 
 alias RebelLit = lang::ExtendedSyntax::Literal;
@@ -264,23 +265,36 @@ list[str] getUnsatCoreStatements(SolverPID pid, EventDef raisedEvent) {
   return unsatCoreStats;
 } 
 
-State getNextStateModel(SolverPID pid, State current, list[EventDef] raisedEvents, map[str,str] specLookup, StringConstantPool scp) {
-  lrel[str, str] unchangedFields = [<specLookup["<spec>"], "<field>"> | EventDef evnt <- raisedEvents,
-    /(Statement)`new <TypeName spec>[<Expr _>].<VarName field> == <TypeName otherSpec>[<Expr _>].<VarName otherField>;` := evnt.post, 
-    "<spec>" == "<otherSpec>", "<field>" == "<otherField>"];
-
+State getNextStateModel(SolverPID pid, State current, str nextStateLabel, map[str,str] specLookup, str (int) stringLookup) {
   // TODO: filter out all unchanged, uninitialized fields
+  
+  EntityInstance getNextInstance(EntityInstance ei) {
+    if (isInitializedEntity(pid, ei.entityType, ei.id, nextStateLabel, stringLookup)) {
+      return instance(ei.entityType, ei.id, 
+        [getNewValue(pid, ei.entityType, ei.id, v, nextStateLabel, stringLookup) | Variable v <- ei.vals]);
+    } else {
+      ;
+    }  
+  }
   
   return state(current.nr + 1, current.now, 
                [instance(ei.entityType, ei.id, 
-                 [getNewValue(pid, ei.entityType, ei.id, v) | Variable v <- ei.vals]) 
+                 [getNewValue(pid, ei.entityType, ei.id, v, nextStateLabel, stringLookup) | Variable v <- ei.vals]) 
                | EntityInstance ei <- current.instances]);
     
 }
 
+bool isInitializedEntity(SolverPID pid, str entityType, list[RebelLit] id, str smtStateLabel, str (int) stringLookup) {
+  Command isInitializedCmd = getValue([functionCall(simple("spec_<entityType>_initialized"), 
+    [functionCall(simple("spec_<entityType>"), [var(simple(smtStateLabel))] + [translateLit(i) | lang::ExtendedSyntax::Literal i <- id])])]);
+  
+  str smtOutput = runSolver(pid, compile(isInitializedCmd), wait = 2);
+  return fromString(parseSmtResponse(smtOutput, stringLookup));
+}
+
 Variable getNewValue(SolverPID pid, str entityType, list[RebelLit] id, Variable current, str smtStateLabel, str (int) stringLookup) {
   Command newValCmd = getValue([functionCall(simple("field_<entityType>_<current.name>"), 
-                        [functionCall(simple("spec_<entityType>"), [var(simple(smtStateLabel)), *[translateLit(i) | lang::ExtendedSyntax::Literal i <- id]])])
+                        [functionCall(simple("spec_<entityType>"), [var(simple(smtStateLabel))] + [translateLit(i) | lang::ExtendedSyntax::Literal i <- id])])
                       ]);
                       
   str smtOutput = runSolver(pid, compile(newValCmd), wait = 10);
