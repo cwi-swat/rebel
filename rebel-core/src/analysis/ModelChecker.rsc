@@ -30,8 +30,6 @@ bool checkIfStateIsReachable(State state, StepConfig config, set[Built] allBuilt
   list[FunctionDef] functions = getAllFunctionsOrderedByCallOrder(allBuilts);
   lrel[Built, EventDef] events = getAllEventsOrderedByCallOrder(allBuilts);
  
-  map[str, int] eventMapping = getEventMapping(events); 
-   
   list[Command] smt = comment("Declare needed sorts") +
                       declareSmtTypes(specs) +
                       comment("Declare all fields") +
@@ -53,25 +51,17 @@ bool checkIfStateIsReachable(State state, StepConfig config, set[Built] allBuilt
                       comment("Declare initial function") +
                       declareInitialFunction(allBuilts, state) +
                       comment("Declare transition function") + 
-                      declareTransitionFunction(events, state, allBuilts, specLookup, types, eventMapping) +
+                      declareTransitionFunction(events, state, allBuilts, specLookup, types) +
                       comment("Declare the goal state") +
                       declareGoalFunction(state) +
                       comment("Unroll unbounded check") +
                       unrollBoundedCheck(config);
+  
+   tuple[list[Command], StringConstantPool] result = replaceStringsWithInts(smt, ());
+   smt = result<0>;
+   println(result<1>);
    
-   writeFile(|project://rebel-core/examples/output-reachable.smt2|, intercalate("\n", compile(smt)));
-}
-
-map[str, int] getEventMapping(lrel[Built,EventDef] events) {
-  int i = 1;
-  
-  map[str, int] mapping = ();
-  for (<Built b, EventDef e> <- events) {
-    mapping += ("<b.normalizedMod.modDef.fqn>.<e.name>":i);
-    i+=1;
-  }
-  
-  return mapping;  
+   writeFile(|project://rebel-core/examples/output-reachable.smt2|, intercalate("\n", compile(smt + checkSatisfiable())));
 }
 
 list[FunctionDef] getAllFunctionsOrderedByCallOrder(set[Built] specs) {
@@ -92,9 +82,9 @@ lrel[Built, EventDef] getAllEventsOrderedByCallOrder(set[Built] specs) {
   return events; 
 }
 
-Command declareStepFunction() = declareFunction("step", [custom("State")], \integer()); 
+list[Command] declareStepFunction() = [declareFunction("step_entity", [custom("State")], \string()), declareFunction("step_transition", [custom("State")], \string())]; 
 
-Command declareTransitionFunction(lrel[Built, EventDef] events, State state, set[Built] allBuilts, map[str, str] specLookup, map[loc, Type] types, map[str, int] eventMapping) {
+Command declareTransitionFunction(lrel[Built, EventDef] events, State state, set[Built] allBuilts, map[str, str] specLookup, map[loc, Type] types) {
   events = [<b, addSyncedInstances(e, b, allBuilts)> | <Built b, EventDef e> <- events];
   
   list[Formula] body = [];
@@ -104,7 +94,8 @@ Command declareTransitionFunction(lrel[Built, EventDef] events, State state, set
       [functionCall(simple("event_<b.normalizedMod.modDef.fqn>_<e.name>"), [var(simple("current")), var(simple("next"))] + 
         [functionCall(simple("eventParam_<b.normalizedMod.modDef.fqn>_<e.name>_<p.name>"), [var(simple("next"))]) | Parameter p <- e.transitionParams]
       )] +
-      [equal(functionCall(simple("step"), [var(simple("next"))]), lit(intVal(eventMapping["<b.normalizedMod.modDef.fqn>.<e.name>"])))] + 
+      [equal(functionCall(simple("step_entity"), [var(simple("next"))]), lit(strVal("<b.normalizedMod.modDef.fqn>"))),
+      equal(functionCall(simple("step_transition"), [var(simple("next"))]), lit(strVal("<e.name>")))] +
       translateFrameConditionsForUnchangedInstances(e, state, flattenedEvent("<b.normalizedMod.modDef.fqn>", "<e.name>", specLookup = specLookup, types = types))
       );
   }
@@ -133,8 +124,6 @@ Command declareGoalFunction(State goalState) {
   list[Formula] body = [];
   
   for (EntityInstance ei <- goalState.instances, Variable v <- ei.vals) {
-    //body += functionCall(simple("spec_<ei.entityType>_initialized"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("state"))] + [translateLit(id) | RebelLit id <- ei.id])]);
-    
     if (uninitialized(_,_) !:= v, (Literal)`ANY` !:= v.val) {
       body += equal(functionCall(simple("field_<ei.entityType>_<v.name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("state"))] + [translateLit(id) | RebelLit id <- ei.id])]), translateLit(v.val));
     }

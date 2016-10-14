@@ -16,11 +16,15 @@ import IO;
 import Set;
 import String;
 import List;
+import Map;
 import util::Maybe;
+import util::Math;
 import ParseTree;
 import analysis::graphs::Graph;
 
 alias RebelLit = lang::ExtendedSyntax::Literal;
+
+alias StringConstantPool = map[str, int];//scp(str (int) toStr, int (str) toInt);
 
 data Context(map[str,str] specLookup = (), map[loc, Type] types = ())
   = context(str spec, str event)
@@ -41,6 +45,57 @@ data State
   = state(int nr, DateTime now, list[EntityInstance] instances, Step step)
   | initial(DateTime now, list[EntityInstance] instances)
   ;
+
+tuple[list[Command], StringConstantPool] replaceStringsWithInts(list[Command] commands, StringConstantPool scp) {
+   int convertToInt(str astr) {
+     result = fromStrToInt(astr, scp);
+     scp = result<1>;
+     return result<0>;
+   }
+   
+  commands = visit(commands) {
+    case \string() => integer()
+    case strVal(str s) => intVal(convertToInt(s))
+  }
+  
+  return <commands, scp>;
+}
+
+tuple[int, StringConstantPool] fromStrToInt(str astr, StringConstantPool constantPool) = <constantPool[astr], constantPool> when astr in constantPool;
+default tuple[int, map[str, int]] fromStrToInt(str astr, map[str, int] constantPool) {
+  int getNewInt(map[str, int] cp) = 0 when size(cp) == 0;
+  default int getNewInt(map[str, int] cp) = (getOneFrom(onlyInts) | max(it, e) | int e <- onlyInts) + 1 when set[int] onlyInts := cp<1>;
+
+  constantPool[astr] = getNewInt(constantPool);
+  return <constantPool[astr], constantPool>;  
+}
+
+tuple[str, StringConstantPool] fromIntToStr(int anint, StringConstantPool constantPool) = <inverted[anint], constantPool> when map[int,str] inverted := invertUnique(constantPool), anint in inverted;
+default tuple[str, map[str, int]] fromIntToStr(int anint, map[str, int] constantPool) {
+  int strLength = 10;
+  
+  str randomStrGen(int lengthLimit) {
+    list[str] abc = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"];
+    return ("" | it + abc[arbInt(25) + 1] | int i <- [0..lengthLimit], str l := (i % 2 == 0 ? toUpperCase(abc[arbInt(25) + 1]) : abc[arbInt(25) + 1]));
+  }
+  
+  str getNewStr(map[str, int] cp) =  randomStrGen(strLength) when size(cp) == 0;
+  default str getNewStr(map[str, int] constantPool) {
+    bool inserted;
+    str newStr = "";
+    
+    while (!inserted) {
+      newStr = randomStrGen(strLength);
+    
+      if (newStr notin constantPool) {
+        constantPool[newStr] = anint;
+        inserted = true;
+      }
+    }
+    
+    return newStr;
+  }
+}
 
 Graph[EventDef] getSyncedEvents(EventDef currentEvent, Built currentBuilt, set[Built] allBuilts) {
   Graph[EventDef] syncedEvents = {<currentEvent, currentEvent>};
@@ -209,7 +264,7 @@ list[str] getUnsatCoreStatements(SolverPID pid, EventDef raisedEvent) {
   return unsatCoreStats;
 } 
 
-State getNextStateModel(SolverPID pid, State current, list[EventDef] raisedEvents, map[str,str] specLookup) {
+State getNextStateModel(SolverPID pid, State current, list[EventDef] raisedEvents, map[str,str] specLookup, StringConstantPool scp) {
   lrel[str, str] unchangedFields = [<specLookup["<spec>"], "<field>"> | EventDef evnt <- raisedEvents,
     /(Statement)`new <TypeName spec>[<Expr _>].<VarName field> == <TypeName otherSpec>[<Expr _>].<VarName otherField>;` := evnt.post, 
     "<spec>" == "<otherSpec>", "<field>" == "<otherField>"];
@@ -223,17 +278,25 @@ State getNextStateModel(SolverPID pid, State current, list[EventDef] raisedEvent
     
 }
 
-Variable getNewValue(SolverPID pid, str entityType, list[RebelLit] id, Variable current) {
+Variable getNewValue(SolverPID pid, str entityType, list[RebelLit] id, Variable current, str smtStateLabel, str (int) stringLookup) {
   Command newValCmd = getValue([functionCall(simple("field_<entityType>_<current.name>"), 
-                        [functionCall(simple("spec_<entityType>"), [var(simple("next")), *[translateLit(i) | lang::ExtendedSyntax::Literal i <- id]])])
+                        [functionCall(simple("spec_<entityType>"), [var(simple(smtStateLabel)), *[translateLit(i) | lang::ExtendedSyntax::Literal i <- id]])])
                       ]);
+                      
   str smtOutput = runSolver(pid, compile(newValCmd), wait = 10);
-  str formattedRebelLit = parseSmtResponse(smtOutput);
+  str formattedRebelLit = parseSmtResponse(smtOutput, stringLookup);
+  if (isStringType(current.tipe)) {
+    formattedRebelLit = stringLookup(toInt(formattedRebelLit));
+  }
   
   RebelLit newVal = [lang::ExtendedSyntax::Literal]"<formattedRebelLit>";
   
   return var(current.name, current.tipe, newVal);
 }
+
+bool isStringType((Type)`String`) = true;
+bool isStringType((Type)`Currency`) = true;
+default bool isStringType(Type _) = false;
 
 set[Built] loadAllSpecs(loc file, set[loc] visited) {
   set[Built] result = {};
@@ -558,7 +621,7 @@ list[Command] declareRebelTypes() {
                              
   return [defineSort(name, [], sort) | <str name, Sort sort> <- rebelTypes] +
          [declareDataTypes([], [dataTypeDef("IBAN", [combinedCons("consIBAN", [sortedVar("countryCode", string()), sortedVar("checksum",\integer()), sortedVar("accountNumber", string())])])]),
-          declareDataTypes([], [dataTypeDef("Money", [combinedCons("consMoney", [sortedVar("currency", string()), sortedVar("amount", \integer())])])]),
+          declareDataTypes([], [dataTypeDef("Money", [combinedCons("consMoney", [sortedVar("currency", custom("Currency")), sortedVar("amount", \integer())])])]),
           declareDataTypes([], [dataTypeDef("Date", [
             combinedCons("consDate", [sortedVar("date", \integer()), sortedVar("month", \integer()), sortedVar("year", \integer())]), 
             cons("undefDate")])]),

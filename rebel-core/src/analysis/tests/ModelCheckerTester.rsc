@@ -18,7 +18,7 @@ import util::Maybe;
 test bool testIfStateIsReachable() {
   if (<_, loaded> := loadTestModule(|project://rebel-core/examples/simple_transaction/TransactionTest.tebl|), /StateSetup setup := loaded<0>.testDefs) {
     State state = constructStateSetup(setup, loaded<1>, loaded<2>);
-    checkIfStateIsReachable(state, max(5), loaded<2>);
+    checkIfStateIsReachable(state, max(6), loaded<2>);
     
     return true; 
   } 

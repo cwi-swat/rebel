@@ -10,7 +10,7 @@ import String;
 import util::Math;
 import IO;
 
-str parseSmtResponse(str smtOutput) {
+str parseSmtResponse(str smtOutput, str (int) stringConstantLookup) {
   GetValue resp = [GetValue]"<smtOutput>";
   
   if ((GetValue)`((<Formula _> <Formula newVal>))` := resp) {
@@ -33,19 +33,18 @@ list[str] parseSmtUnsatCore(str unsatCoreOutput) {
   return result;
 }
 
-str formatAsRebelLit((Formula)`(consDate <Formula date> <Formula month>)`) = "<date> <formatMonth(toInt("<month>"))>";
-str formatAsRebelLit((Formula)`(consDate <Formula date> <Formula month> <Formula year>)`) = "<date> <formatMonth(toInt("<month>"))> <year>";
+str formatAsRebelLit((Formula)`(consDate <Formula date> <Formula month>)`, str (int) scl) = "<date> <formatMonth(toInt("<month>"))>";
+str formatAsRebelLit((Formula)`(consDate <Formula date> <Formula month> <Formula year>)`, str (int) scl) = "<date> <formatMonth(toInt("<month>"))> <year>";
 
-str formatAsRebelLit((Formula)`(consTime <Formula hour> <Formula minutes>)`) = "<hour>:<minutes>";
-str formatAsRebelLit((Formula)`(consTime <Formula hour> <Formula minutes> <Formula seconds>)`) = "<hour>:<minutes>:<seconds>";
+str formatAsRebelLit((Formula)`(consTime <Formula hour> <Formula minutes>)`, str (int) scl) = "<hour>:<minutes>";
+str formatAsRebelLit((Formula)`(consTime <Formula hour> <Formula minutes> <Formula seconds>)`, str (int) scl) = "<hour>:<minutes>:<seconds>";
 
-str formatAsRebelLit((Formula)`(consDateTime <Formula date> <Formula time>)`) = "<formatAsRebelLit(date)>, <formatAsRebelLit(time)>";
+str formatAsRebelLit((Formula)`(consDateTime <Formula date> <Formula time>)`, str (int) scl) = "<formatAsRebelLit(date)>, <formatAsRebelLit(time)>";
 
-str formatAsRebelLit((Formula)`(consIBAN <String cc> <Formula checksum> <String nr>)`) = "<cc.val><right("<checksum>", 2, "0")><nr.val>";
-str formatAsRebelLit((Formula)`(consMoney <String currency> <Formula amount>)`) = "<currency.val><floor(toInt("<amount>") / 100)>.<left("<toInt("<amount>") % 100>", 2, "0")>";
+str formatAsRebelLit((Formula)`(consIBAN <Int cc> <Formula checksum> <Int nr>)`, str (int) scl) = "<scl(toInt("<cc>"))><right("<checksum>", 2, "0")><scl(toInt("<nr>"))>";
+str formatAsRebelLit((Formula)`(consMoney <Int currency> <Formula amount>)`, str (int) scl) = "<scl(toInt("<currency>"))><floor(toInt("<amount>") / 100)>.<left("<toInt("<amount>") % 100>", 2, "0")>";
 
 default str formatAsRebelLit((Formula)`<Formula f>`) = "<f>";
-
 
 str formatMonth(1)  = "Jan";
 str formatMonth(2)  = "Feb";
