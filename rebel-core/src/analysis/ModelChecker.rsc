@@ -149,7 +149,8 @@ list[Command] unrollBoundedCheck(StepConfig config) {
   if (max(int nrOfSteps) := config) {
     if (nrOfSteps < 1) { throw "Cannot perform check with less than 1 step"; }
     
-    list[Formula] possibleTraces = [\and([functionCall(simple("transition"), [var(simple("S<j>")), var(simple("S<j+1>"))]) | int j <- [0..i]] + [functionCall(simple("goal"), [var(simple("S<i>"))])]) | int i <- [1..nrOfSteps]];
+    list[Formula] possibleTraces = [functionCall(simple("goal"), [var(simple("S0"))])] + 
+      [\and([functionCall(simple("transition"), [var(simple("S<j>")), var(simple("S<j+1>"))]) | int j <- [0..i]] + [functionCall(simple("goal"), [var(simple("S<i>"))])]) | int i <- [1..nrOfSteps]];
     
     result = [declareConst("S<i>", custom("State")) | int i <- [0 .. nrOfSteps]] +
       [\assert(functionCall(simple("initial"), [var(simple("S0"))]))] +
