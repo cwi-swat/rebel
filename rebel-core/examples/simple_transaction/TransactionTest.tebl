@@ -6,11 +6,10 @@ import simple_transaction.Account
 state oneUninitializedTransactionsAnd2OpenedAccounts {
   now is 26 Sep 2016, 16:42;
   
-  uninitialized Transaction;
+  booked Transaction with amount EUR 104.00;
   
-  2 opened Account
-    - one with accountNumber NL10INGB000001
-    - one with accountNumber NL10INGB000002 and balance EUR 40.00;
+  opened Account with accountNumber NL10INGB000001 and balance EUR 10.00;
+  closed Account with accountNumber NL10INGB000002;
 }
 
-check oneUninitializedTransactionsAnd2OpenedAccounts reachable in max 5 steps;
+check oneUninitializedTransactionsAnd2OpenedAccounts reachable in max 3 steps;

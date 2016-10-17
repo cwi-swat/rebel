@@ -85,7 +85,7 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs, map[l
   set[InvariantDef] invariants = {i | InvariantDef i <- inlinedSpc.spec.invariants.defs};
 	
 	// Add frame conditions to the post conditions
-	events = addFrameConditions(events, fields);			
+	events = addFrameConditions(events, fields);
 	
 	// Label the events with a number and add the step to the specification
 	fields += (FieldDecl)`_step : Integer`;
@@ -101,6 +101,9 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs, map[l
 	
 	// 8. Add the identity fields as transition parameters of the event
 	events = {addIdentityAsTransitionParams(fields, e) | EventDef e <- events};
+	
+	 // Add part of universe constraint
+  events = addPartOfUniverseConstraint(events);     
 	
   // 9. Replace all the references to this with the name of the specification
   tuple[set[Message], set[EventDef]] thisReplacingResult = replaceReferencesToThisWithSpecificationName(events, inlinedSpc.spec.eventRefs, "<inlinedSpc.spec.name>", fields);
@@ -213,6 +216,19 @@ tuple[set[Message], set[InvariantDef]] resolveReferencedInvariants(Module spc, s
 EventDef addIdentityAsTransitionParams(set[FieldDecl] fields, EventDef evnt)
   = (evnt | addTransitionParam(evnt, (Parameter)`<VarName paramName>: <Type tipe>`) | (FieldDecl)`<VarName field>: <Type tipe> @key` <- fields, VarName paramName := [VarName]"_<field>"); 
 
+set[EventDef] addPartOfUniverseConstraint(set[EventDef] events) {
+  EventDef add(EventDef evnt) = visit(evnt) {
+    case (Preconditions) `preconditions { <Statement* const> }` => 
+         (Preconditions) `preconditions {
+                         '  <Statement* const>
+                         '  <Statement partOfUniverseCons>
+                         '}` 
+      when Statement partOfUniverseCons := (Statement)`inUni (this);`
+  };
+  
+  return {add(e) | e <- events};
+}
+
 tuple[set[Message], set[EventDef]] replaceReferencesToThisWithSpecificationName(set[EventDef] events, EventRefs eventRefs, str specName, set[FieldDecl] fields) {
   set[Message] msgs = {};
     
@@ -235,6 +251,7 @@ tuple[set[Message], set[EventDef]] replaceReferencesToThisWithSpecificationName(
       altered += visit(evnt) {
         case (Expr)`this.<VarName n>` => [Expr]"<specName>[<intercalate(",", idFields)>].<n>" when hasField(n)
         case (Expr)`this.<VarName n>` => (Expr)`this.<VarName n>` when !hasField(n), addMsg(n, evnt)
+        case (Expr)`inUni (this)` => [Expr]"inUni (<specName>[<intercalate(",", idFields)>])"
       }
     }
   }

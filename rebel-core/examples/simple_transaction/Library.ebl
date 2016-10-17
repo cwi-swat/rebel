@@ -9,6 +9,7 @@ import simple_transaction.Account
 event openAccount(initialDeposit: Money) {
 	preconditions {
 		initialDeposit >= EUR 50.00;
+		initialDeposit.currency == EUR;
 	}
 	postconditions {
 		new this.balance == initialDeposit;
@@ -21,7 +22,9 @@ event openAccount(initialDeposit: Money) {
 event withdraw(amount: Money) {
 	preconditions {
 		amount > EUR 0.00;
-		this.balance - amount > EUR 0.00;
+		amount.currency == EUR;
+		
+		this.balance - amount >= EUR 0.00;
 	}
 	postconditions {
 		new this.balance == this.balance - amount;
@@ -86,7 +89,7 @@ invariant positiveBalance {
 	Start a new transaction.
 	The transaction can only be booked on the specified date.
 }
-event start(amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
+event start(amount: Money, from: IBAN, to: IBAN) {//, bookOn: Date) {
 	preconditions {
 		@doc{From account must exist.}
 		initialized Account[from];
@@ -97,16 +100,17 @@ event start(amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
 		to != from;
 		
 		amount > EUR 0.00;
+		amount.currency == EUR;
 	}
 	postconditions {
 		new this.amount == amount;
 		new this.from == from;
 		new this.to == to;
 		
-		@doc{The created on date is set to the current date}
-		new this.createdOn == now;
+		//@doc{The created on date is set to the current date}
+		//new this.createdOn == now;
 		
-		new this.bookedOn == bookOn;
+		//new this.bookedOn == bookOn;
 	}
 }
 
@@ -116,7 +120,7 @@ event start(amount: Money, from: IBAN, to: IBAN, bookOn: Date) {
 }
 event book() {
 	preconditions {
-		this.bookedOn == now.date;	
+		//this.bookedOn == now.date;	
 	} 
 	sync { 
 	   // implicitly checks for initialized state

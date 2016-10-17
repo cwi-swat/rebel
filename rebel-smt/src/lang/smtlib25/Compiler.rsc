@@ -17,7 +17,7 @@ import lang::smtlib25::AST;
 import List;
 
 list[str] compile(Script script) = compile(script.commands);
-list[str] compile(list[Command] commands) = [compile(command) | command <- commands]; 
+list[str] compile(list[Command] commands, bool ignoreComments = true) = [compile(command) | command <- commands, comment(_) !:= command || !ignoreComments]; 
 
 // Commands
 str compile(setLogic(logic)) = "(not yet implemented)";

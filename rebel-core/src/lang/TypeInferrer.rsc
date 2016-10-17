@@ -126,7 +126,6 @@ Type resolveType((Expr)`this`, Context ctx) = (Type)`$$SPEC_TYPE$$`;
 // Field access
 Type resolveType((Expr)`this.<VarName rhs>`, Context ctx) = tipe when Type tipe := getTypeOfVar("this.<rhs>", ctx.scp);
 Type resolveType((Expr)`<TypeName spc>[<Expr _>].<VarName rhs>`, Context ctx) = tipe when Type tipe := getTypeOfVar("this.<rhs>", ctx.scp);
-
 Type resolveType((Expr)`<Expr lhs>.currency`, Context ctx)      = (Type)`Currency` when resolveTypeCached(lhs, ctx) == (Type)`Money`;
 Type resolveType((Expr)`<Expr lhs>.amount`, Context ctx)        = (Type)`Integer` when resolveTypeCached(lhs, ctx) == (Type)`Money`;
 Type resolveType((Expr)`<Expr lhs>.countryCode`, Context ctx)   = (Type)`String` when resolveTypeCached(lhs, ctx) == (Type)`IBAN`;
@@ -141,6 +140,8 @@ Type resolveType((Expr)`new <Expr exp>`, Context ctx) = resolveTypeCached(exp, c
 Type resolveType((Expr)`not <Expr _>`, Context ctx) = (Type)`Boolean`; 
 Type resolveType((Expr)`initialized <Expr exp>`, Context ctx) = (Type)`Boolean`;
 Type resolveType((Expr)`finalized <Expr exp>`, Context ctx) = (Type)`Boolean`;
+
+Type resolveType((Expr)`inUni (<Expr exp>)`, Context ctx) = (Type)`Boolean` when bprintln("<exp>");
 
 Type resolveType((Expr)`<Expr cond> ? <Expr then> : <Expr otherwise>`, Context ctx) = thenType 
   when Type thenType := resolveTypeCached(then, ctx), 

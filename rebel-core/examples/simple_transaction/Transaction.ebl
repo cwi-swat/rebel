@@ -13,13 +13,13 @@ specification Transaction {
 		amount: Money 
 		from: IBAN @ref=Account
 		to: IBAN @ref=Account 
-		createdOn: DateTime
-		bookedOn: Date
+		//createdOn: DateTime
+		//bookedOn: Date
 	}
 	  
 	events {   
 		start[]   
-		book[]   
+		book[] 
 		fail[]  
 	}
 	

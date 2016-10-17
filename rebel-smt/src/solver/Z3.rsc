@@ -58,6 +58,10 @@ str \run(PID z3, str command, bool debug = false, int wait = 0) {
 private str read(PID z3, int wait) {
 	str output = readWithWait(z3, wait);
 	
+	while(output == "") {
+    output = trim(readWithWait(z3, wait));
+  }
+	
 	return replaceLast(replaceAll(output, "success\n", ""), "\n", "");
 }
 

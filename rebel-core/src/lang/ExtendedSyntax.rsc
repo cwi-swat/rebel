@@ -30,5 +30,8 @@ syntax EventDef =
 
 syntax SyncInstances = "syncInstances" "{" Statement* stats "}";
 
+syntax Expr = "inUni" Expr this; 
+
 lexical VarName = ([_] !<< [_][a-z A-Z 0-9 _]* !>> [a-z A-Z 0-9 _]) \Keywords;
 
+keyword Keywords = "inUni";

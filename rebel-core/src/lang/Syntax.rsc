@@ -100,7 +100,7 @@ syntax Expr
   | VarName function "(" {Expr ","}* exprs ")"
   | left fieldAccess: Expr lhs "." VarName field 
   | "{" Expr lower ".." Expr upper"}"
-  | left Expr var!accessor "[" Expr indx "]"
+  | Expr var!accessor "[" Expr indx "]"
 	| "(" {MapElement ","}* mapElems ")"
 	| staticSet: "{" {Expr ","}* setElems "}"
 	| comprehension: "{" VarName elemName ":" Expr set "|" {Expr ","}+ conditions "}"

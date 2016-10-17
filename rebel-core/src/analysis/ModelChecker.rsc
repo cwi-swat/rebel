@@ -1,10 +1,13 @@
 module analysis::ModelChecker
 
 import analysis::CommonAnalysisFunctions;
+import analysis::SmtResponseTranslator;
 
 import lang::Builder;
 import lang::ExtendedSyntax;
 import lang::Finder;
+
+import solver::SolverRunner;
 
 import lang::smtlib25::AST;
 import lang::smtlib25::Compiler;
@@ -13,6 +16,7 @@ import IO;
 import List;
 import ParseTree;
 import util::Maybe;
+import Boolean;
 import analysis::graphs::Graph;
 
 data StepConfig
@@ -21,7 +25,28 @@ data StepConfig
   | between(int lower, int upper)
   ;
 
-bool checkIfStateIsReachable(State state, StepConfig config, set[Built] allBuilts) {
+data ReachabilityResult
+  = reachable(list[State] trace)
+  | unreachable()
+  ;
+
+ReachabilityResult checkIfStateIsReachable(State state, StepConfig config, set[Built] allBuilts) {
+  map[str, int] stringIntMapping = ();
+   
+  int convertToInt(str astr) {
+    tuple[int, map[str,int]] result = fromStrToInt(astr, stringIntMapping);
+    stringIntMapping = result<1>;
+    return result<0>;
+  }
+   
+  str convertToStr(int anint) {
+    tuple[str, map[str,int]] result = fromIntToStr(anint, stringIntMapping);
+    stringIntMapping = result<1>;
+    return result<0>;
+  }
+  
+  StringConstantPool scp = scp(convertToStr, convertToInt);
+  
   set[Module] specs = {b.normalizedMod | Built b <- allBuilts}; 
    
   map[str,str] specLookup = ("<m.modDef.fqn.modName>":"<m.modDef.fqn>" | m <- specs);
@@ -37,11 +62,11 @@ bool checkIfStateIsReachable(State state, StepConfig config, set[Built] allBuilt
                       comment("Declare all transition paramters") +
                       translateAllTransitionParameters(specs) +
                       comment("Declare specification entity instance functions") +
-                      declareSmtSpecLookup(specs) +
+                      declareSmtSpecLookup(specs, state) +
                       comment("Declare now") + 
                       declareNow() + 
                       comment("Declare step function") +
-                      declareStepFunction() +
+                      declareStepFunction() + 
                       comment("Declare frame functions") +
                       translateEntityFrameFunctions(allBuilts) +
                       comment("Declare all functions") +
@@ -57,11 +82,66 @@ bool checkIfStateIsReachable(State state, StepConfig config, set[Built] allBuilt
                       comment("Unroll unbounded check") +
                       unrollBoundedCheck(config);
   
-   tuple[list[Command], StringConstantPool] result = replaceStringsWithInts(smt, ());
-   smt = result<0>;
-   println(result<1>);
+   smt = replaceStringsWithInts(smt, scp);
+
+   SolverPID pid = startSolver();
+   ReachabilityResult result;
+  
+  try { 
+    writeFile(|project://rebel-core/examples/output-reachable.smt2|, intercalate("\n", compile(smt + checkSatisfiable())));
+    
+    list[str] rawSmt = compile(smt);
+    for (s <- rawSmt) {
+      runSolver(pid, s, wait = 1);
+    }
+    
+    if (checkSat(pid)) {
+      result = reachable(getTrace(pid, createInitialState(state), config, specLookup, scp, allBuilts));
+    } else {
+      result = unreachable();
+    }
+  } 
+  catch ex: throw ex;
+  finally {
+    stopSolver(pid);
+  }
    
-   writeFile(|project://rebel-core/examples/output-reachable.smt2|, intercalate("\n", compile(smt + checkSatisfiable())));
+  return result; 
+}
+
+list[State] getTrace(SolverPID pid, State initialState, StepConfig cfg, map[str, str] specLookup, StringConstantPool scp, set[Built] allBuilts) {
+  int getLower(between(int lower, int _)) = lower == 0 ? 1 : lower;
+  default int getLower(StepConfig _) = 1;
+  
+  int getUpper(max(int nr)) = nr;
+  int getUpper(exact(int nr)) = nr;
+  int getUpper(between(int _, int upper)) = upper;
+  
+  list[State] trace = [initialState];
+
+  bool goalReached = false; 
+  
+  for (int i <- [getLower(cfg) .. getUpper(cfg)]) {
+    if (!goalReached) {
+      goalReached = isGoalState(pid, "S<i>");    
+      trace = getNextStateModel(pid, trace[0], "S<i>", specLookup, scp, allBuilts) + trace;
+    }
+  }
+  
+  return reverse(trace);    
+}
+
+State createInitialState(State objective) = 
+  state(0, 
+    objective.now,
+    [instance(ei.entityType, ei.id, [uninitialized(v.name, v.tipe) | Variable v <- ei.vals]) | EntityInstance ei <- objective.instances],
+    noStep());
+
+bool isGoalState(SolverPID pid, str currentStateLabel) {
+  Command isGoalStateCmd = getValue([functionCall(simple("goal"), [var(simple(currentStateLabel))])]);
+  
+  str smtOutput = runSolver(pid, compile(isGoalStateCmd), wait = 2);
+  return fromString(parseSmtResponse(smtOutput, emptyLookup));
 }
 
 list[FunctionDef] getAllFunctionsOrderedByCallOrder(set[Built] specs) {
@@ -81,8 +161,6 @@ lrel[Built, EventDef] getAllEventsOrderedByCallOrder(set[Built] specs) {
   
   return events; 
 }
-
-list[Command] declareStepFunction() = [declareFunction("step_entity", [custom("State")], \string()), declareFunction("step_transition", [custom("State")], \string())]; 
 
 Command declareTransitionFunction(lrel[Built, EventDef] events, State state, set[Built] allBuilts, map[str, str] specLookup, map[loc, Type] types) {
   events = [<b, addSyncedInstances(e, b, allBuilts)> | <Built b, EventDef e> <- events];

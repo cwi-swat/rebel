@@ -5,7 +5,7 @@ import lang::smtlib25::response::Syntax;
 import lang::smtlib25::response::Parser;
 
 import solver::SolverRunner;
-
+ 
 import String;
 import util::Math;
 import IO;
@@ -14,7 +14,7 @@ str parseSmtResponse(str smtOutput, str (int) stringConstantLookup) {
   GetValue resp = [GetValue]"<smtOutput>";
   
   if ((GetValue)`((<Formula _> <Formula newVal>))` := resp) {
-    return formatAsRebelLit(newVal);
+    return formatAsRebelLit(newVal, stringConstantLookup);
   } 
   
   throw "Unable to parse new value";
@@ -39,12 +39,12 @@ str formatAsRebelLit((Formula)`(consDate <Formula date> <Formula month> <Formula
 str formatAsRebelLit((Formula)`(consTime <Formula hour> <Formula minutes>)`, str (int) scl) = "<hour>:<minutes>";
 str formatAsRebelLit((Formula)`(consTime <Formula hour> <Formula minutes> <Formula seconds>)`, str (int) scl) = "<hour>:<minutes>:<seconds>";
 
-str formatAsRebelLit((Formula)`(consDateTime <Formula date> <Formula time>)`, str (int) scl) = "<formatAsRebelLit(date)>, <formatAsRebelLit(time)>";
+str formatAsRebelLit((Formula)`(consDateTime <Formula date> <Formula time>)`, str (int) scl) = "<formatAsRebelLit(date, scl)>, <formatAsRebelLit(time, scl)>";
 
-str formatAsRebelLit((Formula)`(consIBAN <Int cc> <Formula checksum> <Int nr>)`, str (int) scl) = "<scl(toInt("<cc>"))><right("<checksum>", 2, "0")><scl(toInt("<nr>"))>";
-str formatAsRebelLit((Formula)`(consMoney <Int currency> <Formula amount>)`, str (int) scl) = "<scl(toInt("<currency>"))><floor(toInt("<amount>") / 100)>.<left("<toInt("<amount>") % 100>", 2, "0")>";
+str formatAsRebelLit((Formula)`(consIBAN <Formula cc> <Formula checksum> <Formula nr>)`, str (int) scl) = "<scl(toInt("<cc>"))><right("<checksum>", 2, "0")><scl(toInt("<nr>"))>";
+str formatAsRebelLit((Formula)`(consMoney <Formula currency> <Formula amount>)`, str (int) scl) = "<scl(toInt("<currency>"))><floor(toInt("<amount>") / 100)>.<left("<toInt("<amount>") % 100>", 2, "0")>";
 
-default str formatAsRebelLit((Formula)`<Formula f>`) = "<f>";
+default str formatAsRebelLit((Formula)`<Formula f>`, str (int) scl) = "<f>";
 
 str formatMonth(1)  = "Jan";
 str formatMonth(2)  = "Feb";
