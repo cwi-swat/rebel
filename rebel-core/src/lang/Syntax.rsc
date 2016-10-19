@@ -126,13 +126,18 @@ syntax Expr
 			| equals: Expr lhs "==" Expr rhs
 			| notEqual: Expr lhs "!=" Expr rhs
 			)
+  > "initialized" Expr
+  | "finalized" Expr
+  | Expr lhs "instate" StateRef sr
   > left and: Expr lhs "&&" Expr rhs
 	> left Expr lhs "||" Expr rhs
 	| right Expr cond "-\>" Expr implication
-  | "initialized" Expr
-  | "finalized" Expr
-  | Expr lhs "instate" Expr rhs
 	;
+ 
+syntax StateRef
+  = VarName state
+  | "{" VarName+ states "}"
+  ; 
  
 syntax MapElement =  Expr key ":" Expr val;
  

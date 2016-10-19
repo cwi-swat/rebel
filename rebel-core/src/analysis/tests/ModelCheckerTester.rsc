@@ -19,10 +19,12 @@ test bool testIfStateIsReachable() {
   if (<_, loaded> := loadTestModule(|project://rebel-core/examples/simple_transaction/TransactionTest.tebl|), /StateSetup setup := loaded<0>.testDefs) {
     State state = constructStateSetup(setup, loaded<1>, loaded<2>);
 
-    if (reachable(list[State] trace) := checkIfStateIsReachable(state, max(9), loaded<2>)) {
+    if (reachable(list[State] trace) := checkIfStateIsReachable(state, max(7), loaded<2>)) {
       printTrace(trace);
       
       return true; 
+    } else {
+      return false;
     }
   } 
   else {

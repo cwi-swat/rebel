@@ -141,7 +141,7 @@ Type resolveType((Expr)`not <Expr _>`, Context ctx) = (Type)`Boolean`;
 Type resolveType((Expr)`initialized <Expr exp>`, Context ctx) = (Type)`Boolean`;
 Type resolveType((Expr)`finalized <Expr exp>`, Context ctx) = (Type)`Boolean`;
 
-Type resolveType((Expr)`inUni (<Expr exp>)`, Context ctx) = (Type)`Boolean` when bprintln("<exp>");
+Type resolveType((Expr)`inUni (<Expr exp>)`, Context ctx) = (Type)`Boolean`;
 
 Type resolveType((Expr)`<Expr cond> ? <Expr then> : <Expr otherwise>`, Context ctx) = thenType 
   when Type thenType := resolveTypeCached(then, ctx), 
@@ -152,7 +152,7 @@ Type resolveType((Expr)`<Expr cond> ? <Expr then> : <Expr otherwise>`, Context c
 Type resolveType((Expr)`<TypeName otherSpec>[<Expr _>]`, Context ctx) = resolveType((Expr)`<TypeName otherSpec>`, ctx);
 Type resolveType((Expr)`<TypeName otherSpec>`, Context ctx) = getTypeOfSpec("<otherSpec>", ctx.scp);
 
-Type resolveType((Expr)`<Expr _> instate <Expr _>`) = (Type)`Boolean`;
+Type resolveType((Expr)`<Expr _> instate <StateRef _>`, Context ctx) = (Type)`Boolean`;
  
 // Function calls
 Type resolveType((Expr)`<VarName function>(<{Expr ","}* exprs>)`, Context ctx) = getTypeOfFunction("<function>", ctx.scp);

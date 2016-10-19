@@ -27,10 +27,11 @@ data StepConfig
 
 data ReachabilityResult
   = reachable(list[State] trace)
+  | reachable()
   | unreachable()
   ;
 
-ReachabilityResult checkIfStateIsReachable(State state, StepConfig config, set[Built] allBuilts) {
+ReachabilityResult checkIfStateIsReachable(State state, StepConfig config, set[Built] allBuilts, bool requireTrace) {
   map[str, int] stringIntMapping = ();
    
   int convertToInt(str astr) {
@@ -96,7 +97,11 @@ ReachabilityResult checkIfStateIsReachable(State state, StepConfig config, set[B
     }
     
     if (checkSat(pid)) {
-      result = reachable(getTrace(pid, createInitialState(state), config, specLookup, scp, allBuilts));
+      if (requireTrace) {
+        result = reachable(getTrace(pid, createInitialState(state), config, specLookup, scp, allBuilts));
+      } else {
+        result = reachable();
+      }
     } else {
       result = unreachable();
     }
@@ -113,9 +118,9 @@ list[State] getTrace(SolverPID pid, State initialState, StepConfig cfg, map[str,
   int getLower(between(int lower, int _)) = lower == 0 ? 1 : lower;
   default int getLower(StepConfig _) = 1;
   
-  int getUpper(max(int nr)) = nr;
-  int getUpper(exact(int nr)) = nr;
-  int getUpper(between(int _, int upper)) = upper;
+  int getUpper(max(int nr)) = nr+1;
+  int getUpper(exact(int nr)) = nr+1;
+  int getUpper(between(int _, int upper)) = upper+1;
   
   list[State] trace = [initialState];
 
@@ -217,9 +222,9 @@ list[Command] unrollBoundedCheck(StepConfig config) {
     if (nrOfSteps < 1) { throw "Cannot perform check with less than 1 step"; }
     
     list[Formula] possibleTraces = [functionCall(simple("goal"), [var(simple("S0"))])] + 
-      [\and([functionCall(simple("transition"), [var(simple("S<j>")), var(simple("S<j+1>"))]) | int j <- [0..i]] + [functionCall(simple("goal"), [var(simple("S<i>"))])]) | int i <- [1..nrOfSteps]];
+      [\and([functionCall(simple("transition"), [var(simple("S<j>")), var(simple("S<j+1>"))]) | int j <- [0..i]] + [functionCall(simple("goal"), [var(simple("S<i>"))])]) | int i <- [1..nrOfSteps+1]];
     
-    result = [declareConst("S<i>", custom("State")) | int i <- [0 .. nrOfSteps]] +
+    result = [declareConst("S<i>", custom("State")) | int i <- [0 .. nrOfSteps+1]] +
       [\assert(functionCall(simple("initial"), [var(simple("S0"))]))] +
       [\assert(\or(possibleTraces))];
   }    

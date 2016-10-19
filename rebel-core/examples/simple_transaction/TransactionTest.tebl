@@ -3,13 +3,28 @@ module simple_transaction.TranscationTest
 import simple_transaction.Transaction
 import simple_transaction.Account 
 
-state oneUninitializedTransactionsAnd2OpenedAccounts {
+state oneBookedTransaction1OpenedAccountAnd1ClosedAccount {
   now is 26 Sep 2016, 16:42;
   
-  booked Transaction with amount EUR 104.00;
+  booked Transaction;
   
-  opened Account with accountNumber NL10INGB000001 and balance EUR 10.00;
+  opened Account with accountNumber NL10INGB000001;
   closed Account with accountNumber NL10INGB000002;
 }
 
-check oneUninitializedTransactionsAnd2OpenedAccounts reachable in max 3 steps;
+state initialPoc1 {
+  now is 19 Oct 2016, 14:00;
+  
+  uninitialized Transaction;
+  
+  5 opened Account 
+    - one with accountNumber NL10INGB000001 and balance EUR 60.00
+    - one with accountNumber NL10INGB000002 and balance EUR 70.00
+    - one with accountNumber NL10INGB000003 and balance EUR 80.00
+    - one with accountNumber NL10INGB000004 and balance EUR 90.00
+    - one with accountNumber NL10INGB000005 and balance EUR 100.00;  
+}
+
+check initialPoc1 reachable in max 6 steps;
+
+check oneBookedTransaction1OpenedAccountAnd1ClosedAccount reachable in max 6 steps;

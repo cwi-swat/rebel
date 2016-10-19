@@ -22,6 +22,9 @@ import testlang::Syntax;
 import testlang::Parser;
 import testlang::Loader;
 import testlang::Resolver;
+import testlang::Interpreter;
+import analysis::ModelChecker;
+import analysis::CommonAnalysisFunctions; 
 
 import visualize::VisualisationServer;
 
@@ -117,7 +120,38 @@ set[Contribution] getRebelTestContribs() =
       
       return annotatedMod;
     }),
-    syntaxProperties(#start[TestModule])
+    syntaxProperties(#start[TestModule]),
+    popup(
+      menu("Rebel actions", [
+        action("Check", (TestModule current, loc x) {
+          if (just(Check ck) := isCheckDefinition(x, current)) {
+            tuple[set[Message], TestLoaderResult] tlr = loadTestModule(current@\loc.top, modulePt = just(current));
+
+            if (reachable() := interpretCheck(ck, tlr<1>)) {
+              alert("Check is satisfiable");
+            } else {
+              alert("Check is NOT satisfiable within given bounds");
+            }
+          } else {
+            alert("Selected code is not a check");
+          } 
+        }),
+        action("Check and visualize", (TestModule current, loc x) {
+          if (just(Check ck) := isCheckDefinition(x, current)) {
+            tuple[set[Message], TestLoaderResult] tlr = loadTestModule(current@\loc.top, modulePt = just(current));
+
+            if (reachable(list[State] trace) := interpretCheck(ck, tlr<1>, requireTrace = true)) {
+              alert("Check is satisfiable");
+              printTrace(trace);
+            } else {
+              alert("Check is NOT satisfiable within given bounds");
+            }
+          } else {
+            alert("Selected code is not a check");
+          } 
+        })
+      ])
+    )
   };
   
 loc resolveBaseDir(Module m) {
@@ -137,7 +171,7 @@ void reset(){
 }
 
 private Reff getAllTestHyperlinks(loc currentTestModule, TestRefs refs) =
-  getHyperlinks(currentTestModule, refs.imports + refs.specs + refs.states + refs.fields);
+  getHyperlinks(currentTestModule, refs.imports + refs.specs + refs.states + refs.fields + refs.setupRefs);
 
 private Reff getAllHyperlinks(loc currentUnit, Refs allRefs) =
 	getHyperlinks(currentUnit, 
@@ -154,3 +188,32 @@ private Reff getAllHyperlinks(loc currentUnit, Refs allRefs) =
 
 private Reff getHyperlinks(loc currentUnit, Reff refs) =
 	{<from, to> | <from, to> <- refs, currentUnit.top == from.top};
+	
+void printTrace(list[State] t) {
+  for (State st <- t) {
+    println("<st.nr>:
+            '  now = <st.now>");
+
+    if (step(str entity, str event, list[Variable] transitionParameters) := st.step) {
+      println("  step: <entity>.<event> <for (v <- transitionParameters) {>
+              '    var <v.name> (type: <v.tipe>) = <v.val> <}>
+              '");
+    }
+    
+    println("<for (i <- st.instances) {>
+            '  instance: <i.entityType>, key = <intercalate(",", i.id)> <for (v <- i.vals) {>
+            '    var <v.name> (type: <v.tipe>) = <((uninitialized(_,_) !:= v) ? v.val : "uninitialized")> <}>  
+            '<}>
+            '");
+  }
+}
+
+void printState(State st) {
+  println("<st.nr>:
+          'now = <st.now>
+          '<for (i <- st.instances) {>
+          'instance: <i.entityType>, key = <intercalate(",", i.id)> <for (v <- i.vals) {>
+          '  var <v.name> (type: <v.tipe>) = <v.val> <}>  
+          '<}>
+          '");  
+}	

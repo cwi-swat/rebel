@@ -16,7 +16,7 @@ specification Account {
 		openAccount[]
 		withdraw[]   
 		deposit[] 
-		interest[]
+		interest[] 
 		block[]  
 		unblock[]  
 		close[]

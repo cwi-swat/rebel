@@ -9,10 +9,10 @@ import lang::ExtendedSyntax;
 
 import ParseTree;
 
-alias TestRefs = tuple[Reff imports, Reff specs, Reff states, Reff fields];
+alias TestRefs = tuple[Reff imports, Reff specs, Reff states, Reff fields, Reff setupRefs];
 
 TestRefs resolveTestRefs(TestModule m, set[Built] imports) =
-  <resolveImports(m, imports), resolveSpecs(m, imports), resolveStates(m, imports), resolveFields(m, imports)>;
+  <resolveImports(m, imports), resolveSpecs(m, imports), resolveStates(m, imports), resolveFields(m, imports), resolveSetupRefs(m, imports)>;
   
 Reff resolveImports(TestModule m, set[Built] imports) {
   map[str,loc] defs = ("<b.normalizedMod.modDef.fqn>" : b.normalizedMod@\loc | Built b <- imports);
@@ -34,4 +34,9 @@ Reff resolveFields(TestModule m, set[Built] imports) {
   return {<field@\loc, defs["<spec>"]["<field>"]> | 
     (TestDef)`<StateSetup setup>` <- m.testDefs, /(SetupStatement)`<Int? _> <VarName _> <TypeName spec> <FieldValueDeclarations? fvd>;` := setup, "<spec>" in defs, 
     /(FieldValueDeclaration)`<VarName field> <Expr _>` := fvd, "<field>" in defs["<spec>"]};
+}
+
+Reff resolveSetupRefs(TestModule m, set[Built] imports) {
+  map[str,loc] defs = ("<s.name>" : s@\loc | (TestDef)`<StateSetup s>` <- m.testDefs);
+  return {<r@\loc, defs["<r>"]> | /(CheckStatement)`<VarName r> reachable <StepBounds _>;` := m.testDefs, "<r>" in defs};
 }

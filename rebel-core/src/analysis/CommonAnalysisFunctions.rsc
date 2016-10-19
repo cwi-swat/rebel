@@ -641,6 +641,7 @@ Formula translateLit((Literal)`<DateTime tm>`) = translateLit(tm);
 Formula translateLit((Literal)`<Date d>`) = translateLit(d);
 Formula translateLit((Literal)`<Time t>`) = translateLit(t);
 Formula translateLit((Literal)`<Currency c>`) = translateLit(c);
+Formula translateLit((Literal)`<String s>`) = translateLit(s);
 
 Formula translateLit(Money m) = lit(adt("consMoney", [lit(strVal("<m.cur>")), translateLit(m.amount)]));
 Formula translateLit(MoneyAmount ma) = lit(intVal(toInt("<ma.whole>") * 100 + toInt("<ma.decimals>")));
@@ -654,6 +655,7 @@ Formula translateLit(Time t) = lit(adt("consTime", [translateLit(toInt("<t.hour>
 Formula translateLit(Time t) = lit(adt("consTime", [translateLit(toInt("<t.hour>")), translateLit(toInt("<t.minutes>")), translateLit(0)])) when !t has seconds; 
 Formula translateLit(IBAN i) = lit(adt("consIBAN", [translateLit("<i.countryCode>"), translateLit(toInt("<i.checksum>")), translateLit("<i.accountNumber>")])); 
 
+Formula translateLit(String s) = lit(strVal("<s>"));
 Formula translateLit(Currency c) = lit(strVal("<c>"));
 
 Formula translateLit((Month)`Jan`) = lit(intVal(1)); 

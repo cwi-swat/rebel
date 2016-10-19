@@ -40,6 +40,7 @@ event withdraw(amount: Money) {
 event deposit(amount: Money) {
 	preconditions {
 		amount > EUR 0.00;
+		amount.currency == EUR;
 	}
 	postconditions {
 		new this.balance == this.balance + amount;
@@ -70,8 +71,7 @@ function singleInterest(balance: Money, interest: Percentage): Money =  balance 
 
 event interest[maxInterest: Percentage = 10%](currentInterest: Percentage) {
   preconditions {
-    currentInterest <= maxInterest;
-    currentInterest > 0%; 
+    currentInterest <= maxInterest; 
   }
   postconditions {
     new this.balance == this.balance + singleInterest(this.balance, currentInterest);
