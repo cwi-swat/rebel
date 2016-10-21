@@ -61,8 +61,15 @@ State constructStateSetup(StateSetup setup, TestRefs refs, set[Built] builtSpecs
      
       instances += constructInstance(m, (/StateRef sr := state) ? just(sr) : nothing(), [fvd | FieldValueDeclaration fvd <- fvds]); 
     } else {
-      for (/(MultipleInstanceFieldValueDeclaration)`- one with <{FieldValueDeclaration DeclSeperator}+ decls>` <- values) {
-        instances += constructInstance(m, (/StateRef sr := state) ? just(sr) : nothing(), [fvd | FieldValueDeclaration fvd <- decls]);
+      list[MultipleInstanceFieldValueDeclaration] fds = [fvd | /fvd:(MultipleInstanceFieldValueDeclaration)`- one with <{FieldValueDeclaration DeclSeperator}+ decls>` <- values];
+      
+      for (int i <- [0..toInt("<nr>")]) {
+        list[FieldValueDeclaration] fvds = [];
+        if (size(fds) > i) {
+          fvds = [fvd | FieldValueDeclaration fvd <- fds[i].decls];
+        }
+        
+        instances += constructInstance(m, (/StateRef sr := state) ? just(sr) : nothing(), fvds);
       }
     }
   }
