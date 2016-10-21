@@ -18,8 +18,8 @@ specification Transaction {
 	}
 	  
 	events {   
-		start[]   
-		book[] 
+		start[]  
+		book[]  
 		fail[]  
 	}
 	

@@ -84,6 +84,11 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs, map[l
   set[StateFrom] states = {s | /LifeCycle lc := inlinedSpc.spec.lifeCycle, StateFrom s <- lc.from};
   set[InvariantDef] invariants = {i | InvariantDef i <- inlinedSpc.spec.invariants.defs};
 	
+	// Rewrite some constraints
+  rewriteResult = rewrite(events, functions, resolvedInlinedTypes);
+  events = rewriteResult<0>;
+  functions = rewriteResult<1>;
+	
 	// Add frame conditions to the post conditions
 	events = addFrameConditions(events, fields);
 	
@@ -108,12 +113,7 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs, map[l
   // 9. Replace all the references to this with the name of the specification
   tuple[set[Message], set[EventDef]] thisReplacingResult = replaceReferencesToThisWithSpecificationName(events, inlinedSpc.spec.eventRefs, "<inlinedSpc.spec.name>", fields);
   events = thisReplacingResult<1>;
-  
-  // Rewrite percentage arithmetics
-  resultRewritePercentage = rewritePercentageArithmetics(events, functions, resolvedInlinedTypes);
-  events = resultRewritePercentage<0>;
-  functions = resultRewritePercentage<1>;
-  
+    
   invariants = replaceReferencesToThisWithSpecificationName(invariants, inlinedSpc);
 	
 	Module normalized = visit(inlinedSpc) {
@@ -138,6 +138,12 @@ NormalizeResult desugar(Module inlinedSpc, set[Module] modules, Refs refs, map[l
 	return <desugaringStatesResult<0> + thisReplacingResult<0>, normalized>;	
 }
 
+tuple[set[EventDef], set[FunctionDef]] rewrite(set[EventDef] events, set[FunctionDef] functions, map[loc, Type] types) {
+  result = rewritePercentageArithmetics(events, functions, types);
+  result = rewriteMoneyExpressions(result<0>, result<1>, types);
+  
+  return result;
+}
 
 tuple[set[EventDef], set[FunctionDef]] rewritePercentageArithmetics(set[EventDef] events, set[FunctionDef] functions, map[loc, Type] types) {
   EventDef rewrite(EventDef orig) = bottom-up visit(orig) {
@@ -149,6 +155,28 @@ tuple[set[EventDef], set[FunctionDef]] rewritePercentageArithmetics(set[EventDef
       
   return <{rewrite(e) | e <- events}, {rewrite(f) | f <- functions}>;
 } 
+
+tuple[set[EventDef], set[FunctionDef]] rewriteMoneyExpressions(set[EventDef] events, set[FunctionDef] functions, map[loc, Type] types) {
+  bool bothMoneyTypes(Expr lhs, Expr rhs) = lhs@\loc in types && rhs@\loc in types && types[lhs@\loc] == (Type)`Money` && types[rhs@\loc] == (Type)`Money`;
+  
+  Statement rewrite(Statement st) = bottom-up visit(st) {
+    case e:(Expr)`<Expr lhs> \> <Expr rhs>` => (Expr)`<Expr lhs>.currency == <Expr rhs>.currency && <Expr lhs>.amount \> <Expr rhs>.amount`[@\loc=e@\loc] when bothMoneyTypes(lhs, rhs)
+    case e:(Expr)`<Expr lhs> \>= <Expr rhs>` => (Expr)`<Expr lhs>.currency == <Expr rhs>.currency && <Expr lhs>.amount \>= <Expr rhs>.amount`[@\loc=e@\loc] when bothMoneyTypes(lhs, rhs)
+    case e:(Expr)`<Expr lhs> \< <Expr rhs>` => (Expr)`<Expr lhs>.currency == <Expr rhs>.currency && <Expr lhs>.amount \< <Expr rhs>.amount`[@\loc=e@\loc] when bothMoneyTypes(lhs, rhs)
+    case e:(Expr)`<Expr lhs> \<= <Expr rhs>` => (Expr)`<Expr lhs>.currency == <Expr rhs>.currency && <Expr lhs>.amount \<= <Expr rhs>.amount`[@\loc=e@\loc] when bothMoneyTypes(lhs, rhs)
+    case e:(Expr)`<Expr lhs> == <Expr rhs>` => (Expr)`<Expr lhs>.currency == <Expr rhs>.currency && <Expr lhs>.amount == <Expr rhs>.amount`[@\loc=e@\loc] when bothMoneyTypes(lhs, rhs)
+  };
+
+  EventDef rewrite(EventDef orig) = bottom-up visit(orig) {
+    case Statement s => rewrite(s)
+  };
+  
+  FunctionDef rewrite(FunctionDef orig) = bottom-up visit(orig) {
+    case Statement s => rewrite(s)
+  };
+  
+  return <{rewrite(e) | e <- events}, {rewrite(f) | f <- functions}>;
+}
 
 set[InvariantDef] replaceReferencesToThisWithSpecificationName(set[InvariantDef] invariants, Module spc) {
   list[str] idFields = ["_<f.name>" | FieldDecl f <- spc.spec.fields.fields, /(Annotation)`@key` := f.meta];
@@ -382,11 +410,11 @@ set[EventDef] createEventMapping(set[EventDef] events) {
 set[StateFrom] createStateMapping(set[StateFrom] states) {
 	int index = 1;
 	
-	StateFrom labelState((StateFrom)`<LifeCycleModifier? modi> <VarName from> <StateTo* destinations>`) {
+	StateFrom labelState(orig:(StateFrom)`<LifeCycleModifier? modi> <VarName from> <StateTo* destinations>`) {
 		Int i = [Int]"<index>";
 		index += 1;
 		
-		return (StateFrom)`<Int i>: <LifeCycleModifier? modi> <VarName from> <StateTo* destinations>`;	
+		return (StateFrom)`<Int i>: <LifeCycleModifier? modi> <VarName from> <StateTo* destinations>`[@\loc = orig@\loc];	
 	}
 	
 	return {labelState(s) | s <- states};
@@ -428,10 +456,10 @@ tuple[set[Message], set[EventDef], set[StateFrom]] desugarStates(set[EventDef] e
     }
   }  
   
-  StateFrom labelState((StateFrom)`<LifeCycleModifier? modi> <VarName from> <StateTo* destinations>`, int index) {
+  StateFrom labelState(orig: (StateFrom)`<LifeCycleModifier? modi> <VarName from> <StateTo* destinations>`, int index) {
     Int i = [Int]"<index>";
 
-    return (StateFrom)`<Int i>: <LifeCycleModifier? modi> <VarName from> <StateTo* destinations>`;  
+    return (StateFrom)`<Int i>: <LifeCycleModifier? modi> <VarName from> <StateTo* destinations>`[@\loc = orig@\loc];  
   }
   
 	set[Message] msgs = {};

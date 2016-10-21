@@ -7,7 +7,6 @@ import util::FileSystem;
 import lang::Importer;
 import lang::Flattener;
 import lang::Resolver;
-import lang::Checker;
 import lang::Normalizer;
 import lang::Parser;
 import lang::ExtendedSyntax; 

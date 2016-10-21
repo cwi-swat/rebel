@@ -152,12 +152,12 @@ StateFrom mergeStateTo((StateFrom) `<LifeCycleModifier? lcm> <VarName from> <Sta
 	when
 		!existingStateTo(new.to, dest);
 
-StateFrom mergeStateTo((StateFrom) `<LifeCycleModifier? lcm> <VarName from> <StateTo* dest>`, StateTo new) = 
-	(StateFrom) `<LifeCycleModifier? lcm> <VarName from> <StateTo* merged>`
+StateFrom mergeStateTo(orig:(StateFrom) `<LifeCycleModifier? lcm> <VarName from> <StateTo* dest>`, StateTo new) = 
+	(StateFrom) `<LifeCycleModifier? lcm> <VarName from> <StateTo* merged>`[@\loc = orig@\loc]
 	when
 		existingStateTo(new.to, dest),
 		StateTo* merged := visit(dest) {
-			case (StateTo)`-\> <VarName st> : <StateVia oldVia>` => (StateTo)`-\> <VarName st> : <StateVia merged>`
+			case s:(StateTo)`-\> <VarName st> : <StateVia oldVia>` => (StateTo)`-\> <VarName st> : <StateVia merged>`[@\loc = s@\loc]
 				when 
 					st == new.to,
 					StateVia merged := (oldVia | mergeStateVia(it, evnt) | /StateVia via := new.via, /VarName evnt := via.refs)

@@ -6,6 +6,7 @@ import lang::Resolver;
 
 import util::Maybe;
 import ParseTree;
+import IO;
 
 bool contains(loc l1, loc l2) = l1.top == l2.top && l1 >= l2;
 
@@ -62,8 +63,16 @@ Maybe[Module] findNormalizedSpecModuleContaining(loc specToFind, set[Built] buil
   if (Built b <- builds, Module m := b.normalizedMod, m has spec, contains(m@\loc, specToFind)) {
     return just(m);
   } else {
-    nothing();
+    return nothing();
   }
+}
+
+Maybe[StateFrom] findNormalizedStateFrom(loc stateToFind, set[Built] builds) {
+  if (Built b <- builds, Module m := b.normalizedMod, m has spec, StateFrom sf <- m.spec.lifeCycle.from, sf@\loc == stateToFind) {
+    return just(sf);
+  } else {
+    return nothing();
+  }  
 }
 
 Maybe[FunctionDef] findFunctionDef(loc funcToFind, set[Built] builds) {

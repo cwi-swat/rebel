@@ -38,7 +38,7 @@ Refs resolve(Module current, set[Module] imports) =
 		      resolveFunctionReferences(current + imports),
 		      resolveInvariantReferences(current, imports),
 		      resolveLifeCycleEventReferences(current + imports),
-		      resolveLifeCycleStateReferences(current + imports),
+		      resolveLifeCycleStateReferences(current + imports) + resolveInStateReferences(current + imports),
 		      resolveKeywordReferences(current, imports),	
 		      resolveInheritance(current + imports),
 		      resolveSyncedEventReferences(current + imports),
@@ -160,8 +160,21 @@ Reff resolveLifeCycleStateReferences(set[Module] modules) {
 	return refs;
 }
 
+Reff resolveInStateReferences(set[Module] modules) {
+  Reff refs = {};
+  
+  map[str, loc] defs = ("<m.modDef.fqn>.<sf.from>" : sf@\loc | Module m <- modules, m has spec, /LifeCycle lc := m.spec.lifeCycle, StateFrom sf <- lc.from);
+  map[str, str] fqnLookup = ("<m.spec.name>" : "<m.modDef.fqn>"  | m <- modules, m has spec);
+  
+  for (Module libMod <- modules, libMod has decls, /EventDef evnt := libMod.decls, /(Expr)`<Expr spc>[<Expr _>] instate <StateRef sr>` := evnt, "<spc>" in fqnLookup, /(StateRef)`<VarName state>` := sr, "<fqnLookup["<spc>"]>.<state>" in defs) {
+    refs += <sr@\loc, defs["<fqnLookup["<spc>"]>.<sr>"]>;
+  } 
+  
+  return refs;
+}
+
 Reff resolveInheritance(set[Module] modules) {
-	Reff refs = {};
+	Reff refs = {}; 
 	
 	for (m <- allSpecificationModules(modules), 
 		/Extend ext := m.spec.\extend, 

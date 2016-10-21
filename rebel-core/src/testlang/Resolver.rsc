@@ -21,7 +21,7 @@ Reff resolveImports(TestModule m, set[Built] imports) {
 
 Reff resolveSpecs(TestModule m, set[Built] imports) {
   map[str,loc] defs = ("<b.normalizedMod.spec.name>" : b.normalizedMod.spec@\loc | Built b <- imports, b.normalizedMod has spec);
-  return {<spec@\loc, defs["<spec>"]> | (TestDef)`<StateSetup setup>` <- m.testDefs, /(SetupStatement)`<Int? _> <StateRef? _> <TypeName spec> <FieldValueDeclarations? _>;` := setup, "<spec>" in defs};
+  return {<ss.entity@\loc, defs["<ss.entity>"]> | (TestDef)`<StateSetup setup>` <- m.testDefs, /SetupStatement ss := setup, ss has entity, "<ss.entity>" in defs};
 }
 
 Reff resolveStates(TestModule m, set[Built] imports) {

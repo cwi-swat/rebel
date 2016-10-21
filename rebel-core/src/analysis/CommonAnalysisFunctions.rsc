@@ -99,163 +99,6 @@ default tuple[str, map[str, int]] fromIntToStr(int anint, map[str, int] constant
   return <newStr, constantPool>;
 }
 
-Graph[EventDef] getSyncedEvents(EventDef currentEvent, Built currentBuilt, set[Built] allBuilts) {
-  Graph[EventDef] syncedEvents = {<currentEvent, currentEvent>};
-
-  for (<loc ref, loc def> <- currentBuilt.refs.syncedEventRefs, 
-       contains(currentEvent@\loc, ref),
-       just(Built b) := findBuilt(def, allBuilts), 
-       {loc eventDef} := b.refs.eventRefs[def], 
-       just(EventDef syncedEvnt) := findNormalizedEventDef(eventDef, allBuilts)) {
-    
-    syncedEvents += <currentEvent, syncedEvnt>;
-  }
-  
-  return syncedEvents;
-}
-
-Graph[FunctionDef] getFunctionCallOrder(FunctionDef currentFunc, Built currentBuild, set[Built] allBuilts) {
-  rel[FunctionDef, FunctionDef] calledFunctions = {<currentFunc, currentFunc>};
-  
-  for (<loc ref, loc def> <- currentBuild.refs.functionRefs,
-       contains(currentFunc@\loc, ref),
-       just(FunctionDef calledFunc) := findFunctionDef(def, allBuilts)) {
-    
-    calledFunctions += <currentFunc, calledFunc>;
-  }
-  
-  return calledFunctions;
-}
-
-EventDef addSyncedInstances(EventDef evnt, Built current, set[Built] otherSpecs) {
-  SyncInstances merge((SyncInstances)`syncInstances { <Statement* stats> }`, Statement newStat) = 
-    (SyncInstances)`syncInstances {
-                   '  <Statement* stats>
-                   '  <Statement newStat>
-                   '}`; 
-  
-  if ([Expr key] := [[Expr]"_<field>" | (FieldDecl)`<VarName field>: <Type tipe> @key` <- current.normalizedMod.spec.fields.fields]) {
-    set[Statement] result = findSyncedInstances(key, evnt, current, otherSpecs);
-  
-    return visit(evnt) {
-      case orig:(EventDef)`<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>){<Preconditions? pre> <Postconditions? post> <SyncBlock? sync>}` =>
-        (EventDef)`<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>){
-          ' <Preconditions? pre>
-          ' <Postconditions? post>
-          ' <SyncBlock? sync>
-          ' <SyncInstances si>
-          '}`[@\loc=orig@\loc]
-        when SyncInstances si := ((SyncInstances)`syncInstances {}` | merge(it, stat) | Statement stat <- result)
-    }
-  } else {
-    throw "Currently no Specification with more (or less) than 1 key are supported";
-  }
-    
-  
-}
-
-EventDef addToStateAndIdToSyncedEventCalls(EventDef evnt, Built parent, set[Built] allBuilds) {
-  SyncExpr merge(orig:(SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)`, Expr newParam) =
-    (SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>, <Expr newParam>)`[@\loc=orig@\loc];
-  
-  Expr consToStateArg(str evnt, Module spc) {
-    list[int] possibleStates = [];
-    for (/LifeCycle lc := spc.spec.lifeCycle, StateFrom sf <- lc.from, (StateTo)`-\> <VarName to>: <StateVia via>` <- sf.destinations) {
-      if (VarName e <- via.refs, "<e>" == evnt) {
-        possibleStates += toInt("<sf.nr>");      
-      }
-    }
-    
-    return [Expr]"<intercalate(" || ",  dup(possibleStates))>";
-  }
-  
-  Maybe[Module] findMod(loc eventRefLoc) {
-    for (Built b <- allBuilds, contains(b.normalizedMod@\loc, eventRefLoc)) {
-      return just(b.normalizedMod);
-    }
-    
-    return nothing();
-  } 
-  
-  SyncExpr addParams(orig:(SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)`) {
-    SyncExpr result = orig;
-    
-    if ({loc eventRef} := parent.refs.syncedEventRefs[event@\loc], just(Module m) := findMod(eventRef)) {
-      result = merge(orig, consToStateArg("<event>", m));
-      result = merge(result, id);
-    } 
-    
-    return result;
-  }  
-  
-  default SyncExpr addParams(SyncExpr exp) { throw "Adding parameters to \'<exp>\' not yet implemented"; }
-  
-  EventDef addParamNames(EventDef orig) {
-    if (/SyncBlock _ !:= orig.sync) {
-      return orig;
-    }
-    
-    return visit(orig) {
-      case se:(SyncExpr)`<TypeName specName>[<Expr id>].<VarName event>(<{Expr ","}* params>)` => addParams(se)
-    }
-  }
-  
-  return addParamNames(evnt);
-}
-
-set[Statement] findSyncedInstances(Expr newId, EventDef evnt, Built origin, set[Built] allSpecs) {
-  Expr findEnclosingSyncExprId(loc ref) = id
-    when evnt has sync,
-         /e:(SyncExpr)`<TypeName _>[<Expr id>].<VarName _>(<{Expr ","}* _>)` := evnt.sync,
-         contains(e@\loc, ref);
-           
-  set[Statement] instances = {}; 
-  
-  if ([str key] := ["_<field>" | (FieldDecl)`<VarName field>: <Type tipe> @key` <- origin.normalizedMod.spec.fields.fields]) {
-
-    evnt = visit(evnt) {
-      case (Expr)`<Expr spc>[<Expr id>]` => (Expr)`<Expr spc>[<Expr newId>]` 
-        when "<spc>" == "<origin.normalizedMod.spec.name>",
-             "<id>" == "<key>"
-    } 
-    
-    top-down visit(evnt) {
-      case e:(Expr)`<Expr spc>[<Expr _>]`: {
-        if ("<spc>" == "<origin.normalizedMod.spec.name>") {
-          instances += [Statement]"<e>;";
-        }
-      }
-    } 
-
-    for (<loc ref, loc def> <- origin.refs.syncedEventRefs, contains(evnt@\loc, ref), Expr syncedId := findEnclosingSyncExprId(ref)) {
-      if (just(Built b) := findBuilt(def, allSpecs), {loc eventDef} := b.refs.eventRefs[def], just(EventDef syncedEvnt) := findNormalizedEventDef(eventDef, allSpecs)) {
-        instances += findSyncedInstances(syncedId, syncedEvnt, b, allSpecs);
-      }  
-    }
-  }
-  
-  return instances;
-}
-
-lrel[Built,EventDef] filterSynchronizedEventsOnly(Built origin, str eventName, set[Built] allSpecs, set[str] alreadyVisited) {
-  if (eventName in alreadyVisited) {
-    return [];
-  }
-  
-  EventDef evnt = findEventDef(eventName, origin);
-  evnt = addToStateAndIdToSyncedEventCalls(evnt, origin, allSpecs);
-  
-  lrel[Built, EventDef] result = [];
-  
-  for (<loc ref, loc def> <- origin.refs.syncedEventRefs, contains(evnt@\loc, ref)) {
-    if (just(Built b) := findBuilt(def, allSpecs), {loc eventDef} := b.refs.eventRefs[def], just(EventDef syncedEvnt) := findNormalizedEventDef(eventDef, allSpecs)) {
-      result += filterSynchronizedEventsOnly(b, "<syncedEvnt.name>", allSpecs, alreadyVisited + eventName);      
-    }  
-  }
-  
-  return result + <origin, evnt>;
-}
-
 list[str] getUnsatCoreStatements(SolverPID pid, EventDef raisedEvent) {
   str smtResponse = runSolver(pid, compile(getUnsatCore()), wait = 20);
   list[loc] unsatCoreLocs = [strToLoc(l) | str l <- parseSmtUnsatCore(smtResponse)];
@@ -430,19 +273,6 @@ list[Command] translateAllTransitionParameters(set[Module] specs) =
 list[Command] translateTransitionParameters(str fqnSpecName, str eventName, set[Parameter] transitionParams) =
   [declareFunction("eventParam_<fqnSpecName>_<eventName>_<p.name>", [custom("State")], translateSort(p.tipe)) | Parameter p <- transitionParams];  
 
-list[Command] translateState(State state) {
-  // Declare the current and next state variables
-  list[Command] smt = [declareConst("current", custom("State")), declareConst("next", custom("State"))];
-  
-  // Assert the current value for 'now'
-  smt += [\assert(equal(functionCall(simple("now"), [var(simple("next"))]), translateLit(state.now)))];
-    
-  // Assert all the current values of the entities
-  smt += [\assert(equal(functionCall(simple("field_<ei.entityType>_<name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("current")), *[translateLit(i) | lang::ExtendedSyntax::Literal i <- ei.id]])]), translateLit(val))) | EntityInstance ei <- state.instances, var(str name, Type tipe, RebelLit val) <- ei.vals];
-  
-  return smt; 
-}
-
 list[Command] translateEntityFrameFunctions(set[Built] allSpecs) {
   Formula frameField(Module m, FieldDecl field, list[FieldDecl] keyFields) 
     = equal(functionCall(simple("field_<m.modDef.fqn>_<field.name>"), [functionCall(simple("spec_<m.modDef.fqn>"), [var(simple("next"))] + [var(simple("_<f.name>")) | FieldDecl f <- keyFields])]),
@@ -470,7 +300,8 @@ list[Command] translateEventsToFunctions(lrel[Built, EventDef] evnts, Context ct
   Command translate(Module m, EventDef evnt) =
     defineFunction("event_<m.modDef.fqn>_<evnt.name>", [sortedVar("current", custom("State")), sortedVar("next", custom("State"))] + 
       [sortedVar("param_<p.name>", translateSort(p.tipe)) | p <- evnt.transitionParams], \boolean(),
-      \and([translateStat(s, ctx) | /Statement s := evnt] + 
+      \and([translateStat(s, ctx) | /Statement s := evnt.pre] +
+           [translateStat(s, ctx) | /Statement s := evnt.post] + 
            [translateSyncStat(s, ctx) | /SyncStatement s := evnt]));
   
   return [translate(b.normalizedMod, evnt) | Built b <- dup(evnts<0>), b.normalizedMod has spec, EventDef evnt <- evnts[b]];

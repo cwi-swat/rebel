@@ -16,6 +16,8 @@ import DateTime;
 import IO;
 
 State constructStateSetup(StateSetup setup, TestRefs refs, set[Built] builtSpecs) {
+  println(setup);
+  
   Literal (Type) idGenerator = idGenerator();
   
   DateTime getValueOfNow() {
@@ -32,7 +34,7 @@ State constructStateSetup(StateSetup setup, TestRefs refs, set[Built] builtSpecs
     map[str, Literal] setupVals = ( "<decl.field>": l | FieldValueDeclaration decl <- decls, /Literal l := decl.val);   
     
     map[str, Type] nonKeySpecFields = ( "<f.name>" : f.tipe | FieldDecl f <- m.spec.fields.fields, /(Annotation)`@key` !:= f.meta, !startsWith("<f.name>", "_"));
-    map[str, Type] keyFields = ( "<name>" : tipe | (FieldDecl)`<VarName name> : <Type tipe> @key` <- m.spec.fields.fields);
+    map[str, Type] keyFields = ( "<f.name>" : f.tipe | FieldDecl f <- m.spec.fields.fields, /(Annotation)`@key` := f.meta);
     
     list[Variable] vars = [var(name, nonKeySpecFields[name], val) | str name <- nonKeySpecFields, Literal val := ((name in setupVals) ? setupVals[name] : (Literal)`ANY`)];
     list[Variable] keys = [var(name, keyFields[name], val) | str name <- keyFields, Literal val := ((name in setupVals) ? setupVals[name] : idGenerator(keyFields[name]))];     
@@ -80,7 +82,7 @@ private Literal (Type) idGenerator(str IBANPrefix = "NL10INGB000000") {
   int accountIter = 0;
   int intIter = 0;
 
-  Literal generateId((Type)`IBAN`) { accountIter += 1; return [Literal]"<IBANPrefix><accountIter>"; }
+  Literal generateId((Type)`IBAN`) { accountIter += 1; println("Generated IBAN = <IBANPrefix><accountIter>"); return [Literal]"<IBANPrefix><accountIter>"; }
   Literal generateId((Type)`Integer`) {intIter += 1; return [Literal]"<intIter>"; }
   default Literal generateId(Type t) { throw "Id proposal for type \'<t>\' not yet implemented"; }
   

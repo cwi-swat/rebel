@@ -1,7 +1,7 @@
 module analysis::tests::ModelCheckerTester
 
 import analysis::ModelChecker;
-import analysis::TestPreparer;
+import testlang::TestPreparer;
 import analysis::CommonAnalysisFunctions;
 
 import testlang::Loader;
@@ -15,11 +15,13 @@ import IO;
 import List;
 import util::Maybe;
 
-test bool testIfStateIsReachable() {
-  if (<_, loaded> := loadTestModule(|project://rebel-core/examples/simple_transaction/TransactionTest.tebl|), /StateSetup setup := loaded<0>.testDefs) {
+test bool testIfStateIsReachable() = testIfStateIsReachable(|project://rebel-core/examples/simple_transaction/TransactionTest.tebl|);
+
+bool testIfStateIsReachable(loc testFile) {
+  if (<_, loaded> := loadTestModule(testFile), /StateSetup setup := loaded<0>.testDefs) {
     State state = constructStateSetup(setup, loaded<1>, loaded<2>);
 
-    if (reachable(list[State] trace) := checkIfStateIsReachable(state, max(7), loaded<2>)) {
+    if (reachable(list[State] trace) := checkIfStateIsReachable(state, max(7), loaded<2>, true)) {
       printTrace(trace);
       
       return true; 

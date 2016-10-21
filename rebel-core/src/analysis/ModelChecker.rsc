@@ -2,6 +2,7 @@ module analysis::ModelChecker
 
 import analysis::CommonAnalysisFunctions;
 import analysis::SmtResponseTranslator;
+import analysis::PreProcessor;
 
 import lang::Builder;
 import lang::ExtendedSyntax;
@@ -53,8 +54,10 @@ ReachabilityResult checkIfStateIsReachable(State state, StepConfig config, set[B
   map[str,str] specLookup = ("<m.modDef.fqn.modName>":"<m.modDef.fqn>" | m <- specs);
   map[loc, Type] types = (() | it + b.resolvedTypes | b <- allBuilts);
   
-  list[FunctionDef] functions = getAllFunctionsOrderedByCallOrder(allBuilts);
-  lrel[Built, EventDef] events = getAllEventsOrderedByCallOrder(allBuilts);
+  PreProcessorResult ppr = preprocess(allBuilts);
+  
+  list[FunctionDef] functions = ppr.functions;
+  lrel[Built, EventDef] events = ppr.events;
  
   list[Command] smt = comment("Declare needed sorts") +
                       declareSmtTypes(specs) +
@@ -149,27 +152,7 @@ bool isGoalState(SolverPID pid, str currentStateLabel) {
   return fromString(parseSmtResponse(smtOutput, emptyLookup));
 }
 
-list[FunctionDef] getAllFunctionsOrderedByCallOrder(set[Built] specs) {
-  Graph[FunctionDef] callOrder = ({} | it + getFunctionCallOrder(f, b, specs) | Built b <- specs, b.normalizedMod has spec, FunctionDef f <- b.normalizedMod.spec.functions.defs);
-  
-  return reverse(dup(order(callOrder)));
-}
-
-lrel[Built, EventDef] getAllEventsOrderedByCallOrder(set[Built] specs) {
-  Graph[EventDef] callOrder = ({} | it + getSyncedEvents(e, b, specs) | Built b <- specs, b.normalizedMod has spec, EventDef e <- b.normalizedMod.spec.events.events);
-  
-  list[EventDef] ordered = reverse(dup(order(callOrder)));
-
-  lrel[Built, EventDef] events = [<b, e> | EventDef e <- ordered, just(Built b) := findBuiltBeloningToEvent(e@\loc, specs)];
-  
-  events = [<b, addToStateAndIdToSyncedEventCalls(e, b, specs)> | <Built b, EventDef e> <- events];
-  
-  return events; 
-}
-
 Command declareTransitionFunction(lrel[Built, EventDef] events, State state, set[Built] allBuilts, map[str, str] specLookup, map[loc, Type] types) {
-  events = [<b, addSyncedInstances(e, b, allBuilts)> | <Built b, EventDef e> <- events];
-  
   list[Formula] body = [];
   
   for (<Built b, EventDef e> <- events) {
