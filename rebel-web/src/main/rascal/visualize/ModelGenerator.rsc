@@ -222,6 +222,7 @@ private set[JsTransition] processLinksToExternalMachines(str id, EventDef evnt, 
   str getFqnOfSpec(str specName) = "<imp.fqn>"
     when Import imp <- b.inlinedMod.imports,
          "<imp.fqn.modName>" == specName;  
+  default str getFqnOfSpec(str specName) { throw "Spec with name \'<specName>\' is not imported"; }
   
   return {transToExternal(id, getFqnOfSpec("<specName>"), "<syncedEvnt>") | /(SyncExpr)`<TypeName specName>[<Expr _>].<VarName syncedEvnt>(<{Expr ","}* params>)` := evnt} +
 	       {transToExternal(id, getFqnOfSpec("<specName>")) | /(Expr)`<TypeName specName>[<Expr _>]` := evnt.pre} +
