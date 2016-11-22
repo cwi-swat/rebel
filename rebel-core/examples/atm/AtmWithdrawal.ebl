@@ -1,0 +1,31 @@
+module atm.AtmWithdrawal
+
+import atm.Library
+import simple_transaction.Account
+
+@doc{
+	This is a specification of a toy ATM withdrawal.
+	The point of this specification is to illustrate withdrawals that can not be rolled back.
+}
+specification AtmWithdrawal {
+	fields {
+		id: Integer @key
+		amount: Money
+		from: IBAN @ref=Account
+	}
+	  
+	events {   
+		initialise[]  
+		validate[]
+		dispense[]  
+		cancel[]  
+	}
+	
+	lifeCycle {
+		initial uninit -> validated: initialise
+		validated      -> dispensed: dispense
+                   -> canceled: cancel
+		final dispensed
+		final canceled
+	}	
+}

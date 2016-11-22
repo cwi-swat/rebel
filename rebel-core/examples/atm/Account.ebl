@@ -1,0 +1,40 @@
+module atm.Account
+
+import atm.Library
+
+@doc {
+	This is a specification of a toy Account.
+	The account can be opened, blocked and closed and can never be overdrawn.
+}
+specification Account {
+	fields {
+		accountNumber: IBAN @key
+		balance: Money		
+	}
+	
+	events {
+		openAccount[minimalDeposit = EUR 50.00]
+		withdraw[]   
+		deposit[] 
+		interest[]  
+		block[]  
+		unblock[]  
+		close[]
+	} 
+	
+	invariants {
+		positiveBalance
+	}
+	
+	lifeCycle {
+		initial init -> opened: openAccount
+		
+		opened -> opened: withdraw, deposit, interest
+			     -> blocked: block
+			     -> closed: close
+		
+		blocked -> opened: unblock
+		
+		final closed		
+	}
+}

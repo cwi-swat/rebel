@@ -1,0 +1,43 @@
+module atm.Library
+
+import simple_transaction.Account
+
+@doc {
+	Start a new atm withdrawal.
+}
+event initialise(amount: Money, from: IBAN) {
+	preconditions {
+		@doc{From account must exist.}
+		initialized Account[from];
+		
+		amount > EUR 0.00;
+		amount.currency == EUR;
+	}
+	postconditions {
+		new this.amount == amount;
+		new this.from == from;
+	}
+}
+
+@doc{
+  Transaction is validated because client put in correct pin
+}
+event validate() {}
+
+@doc{
+  Dispense the Money
+}
+event dispense() {
+	preconditions {
+	} 
+	sync { 
+		Account[this.from].withdraw(this.amount);
+	}
+}
+
+@doc{
+	Fails the withdrawal.
+	If it is not possible to dispense the money, the withdrawal can be canceled
+	No money is withdrawn from the account
+}
+event cancel() {}
