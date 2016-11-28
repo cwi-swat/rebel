@@ -4,6 +4,7 @@ import testlang::Syntax;
 import testlang::Parser;
 import testlang::Resolver;
 import testlang::Checker;
+import testlang::TypeChecker;
 
 import lang::Builder;
 
@@ -13,7 +14,7 @@ import IO;
 import String;
 import Message;
 
-alias TestLoaderResult = tuple[TestModule testModule, TestRefs refs, set[Built] importedSpecs];
+alias TestLoaderResult = tuple[TestModule testModule, TestRefs refs, map[loc, Type] resolvedTypes, set[Built] importedSpecs];
 
 Log stdOutLog(str message) = println(message);
 
@@ -27,8 +28,9 @@ tuple[set[Message], TestLoaderResult] loadTestModule(loc modLoc,
   
   TestRefs refs = resolveTestRefs(subject, imports);
   set[Message] msgs = checkReferences(subject, refs);
+  TypeCheckerResult tcr = checkTypes(subject, imports); 
   
-  return <msgs, <subject, refs, imports>>; 
+  return <msgs + tcr.messages, <subject, refs, tcr.resolvedTypes, imports>>; 
 } 
 
 private set[Built] loadImports(TestModule testModule) {

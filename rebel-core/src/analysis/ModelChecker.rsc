@@ -20,6 +20,10 @@ import util::Maybe;
 import Boolean;
 import analysis::graphs::Graph;
 
+data Context(map[str,str] specLookup = (), map[loc, Type] types = ())
+ = inGoalState(str spec, list[Expr] ids)
+ ;
+
 data StepConfig
   = max(int nrOfSteps)
   | exact(int nrOfSteps) 
@@ -32,7 +36,7 @@ data ReachabilityResult
   | unreachable()
   ;
 
-ReachabilityResult checkIfStateIsReachable(State state, StepConfig config, set[Built] allBuilts, bool requireTrace) {
+ReachabilityResult checkIfStateIsReachable(State state, StepConfig config, set[Built] allBuilts, map[loc, Type] resolvedTypes, bool requireTrace) {
   map[str, int] stringIntMapping = ();
    
   int convertToInt(str astr) {
@@ -52,7 +56,6 @@ ReachabilityResult checkIfStateIsReachable(State state, StepConfig config, set[B
   set[Module] specs = {b.normalizedMod | Built b <- allBuilts}; 
    
   map[str,str] specLookup = ("<m.modDef.fqn.modName>":"<m.modDef.fqn>" | m <- specs);
-  map[loc, Type] types = (() | it + b.resolvedTypes | b <- allBuilts);
   
   PreProcessorResult ppr = preprocess(allBuilts);
   
@@ -74,15 +77,15 @@ ReachabilityResult checkIfStateIsReachable(State state, StepConfig config, set[B
                       comment("Declare frame functions") +
                       translateEntityFrameFunctions(allBuilts) +
                       comment("Declare all functions") +
-                      translateFunctions(functions, function(types=types)) + 
+                      translateFunctions(functions, function(types = resolvedTypes)) + 
                       comment("Declare functions for every event") +
-                      translateEventsToFunctions(events, eventAsFunction(specLookup = specLookup, types = types)) +
+                      translateEventsToFunctions(events, eventAsFunction(specLookup = specLookup, types = resolvedTypes)) +
                       comment("Declare initial function") +
                       declareInitialFunction(allBuilts, state) +
                       comment("Declare transition function") + 
-                      declareTransitionFunction(events, state, allBuilts, specLookup, types) +
+                      declareTransitionFunction(events, state, allBuilts, specLookup, resolvedTypes) +
                       comment("Declare the goal state") +
-                      declareGoalFunction(state) +
+                      declareGoalFunction(state, specLookup, resolvedTypes) +
                       comment("Unroll unbounded check") +
                       unrollBoundedCheck(config);
   
@@ -186,12 +189,17 @@ Command declareInitialFunction(set[Built] allBuilts, State state) {
   return defineFunction("initial", [sortedVar("state", custom("State"))], boolean(), and(body));
 }
 
-Command declareGoalFunction(State goalState) {
+Command declareGoalFunction(State goalState, map[str,str] specLookup, map[loc, Type] types) {
   list[Formula] body = [];
   
   for (EntityInstance ei <- goalState.instances, Variable v <- ei.vals) {
-    if (uninitialized(_,_) !:= v, (Expr)`ANY` !:= v.val) {
-      body += equal(functionCall(simple("field_<ei.entityType>_<v.name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("state"))] + [translateExpr(id, emptyCtx()) | Expr id <- ei.id])]), translateExpr(v.val, emptyCtx()));
+    switch(v) {
+      case var(str name, Type tipe, Expr val): {
+        body += equal(functionCall(simple("field_<ei.entityType>_<name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("state"))] + [translateExpr(id, emptyCtx()) | Expr id <- ei.id])]), translateExpr(val, emptyCtx()));
+      } 
+      case constraintedVar(Expr constraint): {
+        body += translateExpr(constraint, inGoalState("<ei.entityType>", ei.id, specLookup = specLookup, types = types));
+      }
     }
   }
   
@@ -214,3 +222,7 @@ list[Command] unrollBoundedCheck(StepConfig config) {
   
   return result;   
 }
+
+Formula translateExpr((Expr)`<Ref r>`, Context ctx) 
+  = functionCall(simple("field_<spec>_<r>"), [functionCall(simple("spec_<spec>"), [var(simple("state"))] + [translateExpr(id, emptyCtx()) | Expr id <- ids])])
+  when inGoalState(str spec, list[Expr] ids) := ctx;

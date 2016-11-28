@@ -42,6 +42,7 @@ data Step
 
 data Variable
   = var(str name, Type tipe, Expr val) 
+  | constraintedVar(Expr constraint)
   | uninitialized(str name, Type tipe)
   ;
    

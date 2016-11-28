@@ -8,7 +8,7 @@ extend lang::std::Comment;
 
 start syntax TestModule = testModule: ModuleDef modDef Import* imports TestDef* testDefs;
 
-syntax TestDef 
+syntax TestDef  
   = setup: StateSetup setup
   | check: Check check
   ;
@@ -17,24 +17,24 @@ syntax StateSetup = "state" VarName name "{" SetupStatement* body "}";
 
 syntax SetupStatement 
   = nowSetup:     "now" "is" DateTime now ";"
-  | entitySetup:  Int? nr StateRef? state TypeName entity FieldValueDeclarations? values ";"  
-  ;
+  | entitySetup:  Int? nr StateRef? state TypeName entity FieldValueConstraints? constraints ";"  
+  ; 
  
 syntax StateRef
   = VarName state
   | "uninitialized"
   ; 
   
-syntax FieldValueDeclarations
-  = single: SingleInstanceFieldValueDeclaration singleInstance
-  | multiple: MultipleInstanceFieldValueDeclaration+ multipleInstances
+syntax FieldValueConstraints
+  = single: SingleInstanceFieldValueConstraints singleInstance
+  | multiple: MultipleInstanceFieldValueConstraints+ multipleInstances
   ;
 
-syntax SingleInstanceFieldValueDeclaration = "with" {FieldValueDeclaration DeclSeperator}+ decls;
+syntax SingleInstanceFieldValueConstraints = "with" {FieldValueConstraint DeclSeperator}+ decls;
 
-syntax MultipleInstanceFieldValueDeclaration = "-" "one" "with" {FieldValueDeclaration DeclSeperator}+ decls;
+syntax MultipleInstanceFieldValueConstraints = "-" "one" "with" {FieldValueConstraint DeclSeperator}+ decls;
 
-syntax FieldValueDeclaration = VarName field "=" Expr val;
+syntax FieldValueConstraint = Expr constraint;
 
 syntax Check = "check" CheckStatement stat;
 
@@ -47,11 +47,6 @@ syntax StepBounds
   | exact:  "in" "exactly" Int stepNr Step
   | between: "between" Int lower "and" Int upper Step 
   ;
-
-//syntax Expr
-//  = Literal l
-//  | "-" Expr exp
-//  ;
 
 lexical Step = "step" | "steps";
 

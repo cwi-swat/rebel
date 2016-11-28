@@ -13,7 +13,7 @@ syntax Import = "import" FullyQualifiedName fqn;
 
 syntax Expr
   = bracket "(" Expr ")"
-  | literal: Literal!reference lit 
+  > literal: Literal!reference lit 
   | reference: Ref ref
   | VarName function "(" {Expr ","}* exprs ")"
   | left fieldAccess: Expr lhs "." VarName field 
@@ -141,6 +141,7 @@ lexical Int = [0-9]+ | "Inf";
 lexical String = "\"" ![\"]*  "\"";
 lexical MoneyAmount = [0-9]+ whole [.] ([0-9][0-9][0-9]?) decimals; 
 
+keyword Keywords = "this" | "now";
 keyword Keywords = "Jan" | "Feb" | "Mar" | "Apr" | "May" | "Jun" | "Jul" | "Aug" | "Sep" | "Oct" | "Nov" | "Dec" ; 
 keyword Keywords = "Daily" | "Monthly" | "Quarterly" | "Yearly" | "Day" | "Month" | "Quarter" | "Year" | "True" | "False"; 
 keyword Keywords = "Date" | "Integer" | "Period" | "Frequency" | "Percentage" | "Boolean" | "String" | "Time" | "Money" | "Currency" | "Term" | "IBAN";
