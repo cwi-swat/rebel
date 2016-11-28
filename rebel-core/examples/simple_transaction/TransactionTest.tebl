@@ -9,7 +9,7 @@ state oneBookedTransaction1OpenedAccountAnd1ClosedAccount {
   booked Transaction;
   
   opened Account with balance EUR 0.00;
-  opened Account;
+  closed Account;
 }
 
-check oneBookedTransaction1OpenedAccountAnd1ClosedAccount reachable in max 6 steps;
+check oneBookedTransaction1OpenedAccountAnd1ClosedAccount reachable in max 5 steps;
