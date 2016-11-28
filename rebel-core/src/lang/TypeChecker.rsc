@@ -118,3 +118,9 @@ TypeCheckerResult checkTypes(Module modul, set[Module] imports) {
     
   return <msgs, types>;  
 }
+
+@memo
+Type resolveTypeCached(SyncExpr exp, Context ctx) = resolveType(exp, ctx);
+
+Type resolveType((SyncExpr)`not <SyncExpr expr>`, Context ctx) = (Type)`Boolean`;
+Type resolveType((SyncExpr)`<TypeName specName>[<Expr _>].<VarName _>(<{Expr ","}* _>)`, Context ctx) = getTypeOfSpec("<specName>", ctx.scp);

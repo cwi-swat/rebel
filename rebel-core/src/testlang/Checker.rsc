@@ -22,4 +22,4 @@ set[Message] checkStates(TestModule m, Reff stateRefs) =
   {error("Unable to locate referenced state in specification", state@\loc) | (TestDef)`<StateSetup setup>` <- m.testDefs, /(SetupStatement)`<Int? _> <VarName state> <TypeName _> <FieldValueDeclarations? _>;` := setup, stateRefs[state@\loc] == {}};
 
 set[Message] checkFields(TestModule m, Reff fieldRefs) =
-  {error("Unable to locate referenced field in specification", field@\loc) | (TestDef)`<StateSetup setup>` <- m.testDefs, /(FieldValueDeclaration)`<VarName field> <Expr _>` := setup, fieldRefs[field@\loc] == {}};
+  {error("Unable to locate referenced field in specification", field@\loc) | (TestDef)`<StateSetup setup>` <- m.testDefs, /(FieldValueDeclaration)`<VarName field> = <Expr _>` := setup, fieldRefs[field@\loc] == {}};

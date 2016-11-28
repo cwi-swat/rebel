@@ -34,7 +34,7 @@ syntax SingleInstanceFieldValueDeclaration = "with" {FieldValueDeclaration DeclS
 
 syntax MultipleInstanceFieldValueDeclaration = "-" "one" "with" {FieldValueDeclaration DeclSeperator}+ decls;
 
-syntax FieldValueDeclaration = VarName field Expr val;
+syntax FieldValueDeclaration = VarName field "=" Expr val;
 
 syntax Check = "check" CheckStatement stat;
 
@@ -48,9 +48,10 @@ syntax StepBounds
   | between: "between" Int lower "and" Int upper Step 
   ;
 
-syntax Expr
-  = Literal l
-  ;
+//syntax Expr
+//  = Literal l
+//  | "-" Expr exp
+//  ;
 
 lexical Step = "step" | "steps";
 

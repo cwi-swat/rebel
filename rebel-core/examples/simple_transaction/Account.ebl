@@ -12,13 +12,13 @@ specification Account {
 		balance: Money		
 	}
 	
-	events {
+	events { 
 		openAccount[minimalDeposit = EUR 50.00]
 		withdraw[]   
 		deposit[] 
 		interest[]  
 		block[]  
-		unblock[]  
+		unblock[] 
 		close[]
 	} 
 	

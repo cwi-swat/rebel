@@ -20,13 +20,11 @@ start syntax Module
 	| ModuleDef modDef Import* imports LibraryModule* decls
 	;
 
-syntax FullyQualifiedVarName = (FullyQualifiedName fqn ".")? VarName name; 
-
 syntax LibraryModule
 	= @Foldable EventDef eventDef
 	| @Foldable FunctionDef functionDef 
 	| @Foldable InvariantDef invariantDef 
-	; 
+	;  
   
 // Library rules
 
@@ -93,46 +91,46 @@ syntax Statement
   	
 syntax Case = Literal lit "=\>" Statement stat;
 
-syntax Expr
-	= bracket "(" Expr ")"
-  | literal: Literal!reference lit 
-	| reference: Ref ref
-  | VarName function "(" {Expr ","}* exprs ")"
-  | left fieldAccess: Expr lhs "." VarName field 
-  | "{" Expr lower ".." Expr upper"}"
-  | Expr var!accessor "[" Expr indx "]"
-	| "(" {MapElement ","}* mapElems ")"
-	| staticSet: "{" {Expr ","}* setElems "}"
-	| comprehension: "{" VarName elemName ":" Expr set "|" {Expr ","}+ conditions "}"
-	| cardanality: "|" Expr set "|"
-	| universalQuantifier: "forall" VarName elemName ":" Expr set "|" {Expr ","}+ conditions
-	| existentialQuantifier: "exists" VarName elemName ":" Expr set "|" {Expr ","}+ conditions
-  > new: "new" Expr expr
-	| "not" Expr expr
-	| "-" Expr
-  > Expr cond "?" Expr whenTrue ":" Expr whenFalse
-	> left	( Expr lhs "*" Expr rhs
-	    | isMember: Expr lhs "in" Expr rhs
-	    | Expr lhs "/" Expr rhs
-	    | Expr lhs "%" Expr rhs
-	  	)
-	> left 	( Expr lhs "+" Expr rhs
-  		| subtract: Expr lhs "-" Expr rhs
-  		)
-  > non-assoc	( smallerThan: Expr lhs "\<" Expr rhs
-			| smallerThanEquals: Expr lhs "\<=" Expr rhs
-			| greaterThan: Expr lhs "\>" Expr rhs
-			| greaterThanEquals: Expr lhs "\>=" Expr rhs
-			| equals: Expr lhs "==" Expr rhs
-			| notEqual: Expr lhs "!=" Expr rhs
-			)
-  > "initialized" Expr
-  | "finalized" Expr
-  | Expr lhs "instate" StateRef sr
-  > left and: Expr lhs "&&" Expr rhs
-	> left Expr lhs "||" Expr rhs
-	| right Expr cond "-\>" Expr implication
-	;
+//syntax Expr
+//	= bracket "(" Expr ")"
+//  //| literal: Literal!reference lit 
+//	| reference: Ref ref
+//  | VarName function "(" {Expr ","}* exprs ")"
+//  | left fieldAccess: Expr lhs "." VarName field 
+//  | "{" Expr lower ".." Expr upper"}"
+//  | Expr var!accessor "[" Expr indx "]"
+//	| "(" {MapElement ","}* mapElems ")"
+//	| staticSet: "{" {Expr ","}* setElems "}"
+//	| comprehension: "{" VarName elemName ":" Expr set "|" {Expr ","}+ conditions "}"
+//	| cardanality: "|" Expr set "|"
+//	| universalQuantifier: "forall" VarName elemName ":" Expr set "|" {Expr ","}+ conditions
+//	| existentialQuantifier: "exists" VarName elemName ":" Expr set "|" {Expr ","}+ conditions
+//  > new: "new" Expr expr
+//	| "not" Expr expr
+//	//| "-" Expr
+//  > Expr cond "?" Expr whenTrue ":" Expr whenFalse
+//	> left	( Expr lhs "*" Expr rhs
+//	    | isMember: Expr lhs "in" Expr rhs
+//	    | Expr lhs "/" Expr rhs
+//	    | Expr lhs "%" Expr rhs
+//	  	)
+//	> left 	( Expr lhs "+" Expr rhs
+//  		| subtract: Expr lhs "-" Expr rhs
+//  		)
+//  > non-assoc	( smallerThan: Expr lhs "\<" Expr rhs
+//			| smallerThanEquals: Expr lhs "\<=" Expr rhs
+//			| greaterThan: Expr lhs "\>" Expr rhs
+//			| greaterThanEquals: Expr lhs "\>=" Expr rhs
+//			| equals: Expr lhs "==" Expr rhs
+//			| notEqual: Expr lhs "!=" Expr rhs
+//			)
+//  > "initialized" Expr
+//  | "finalized" Expr
+//  | Expr lhs "instate" StateRef sr
+//  > left and: Expr lhs "&&" Expr rhs
+//	> left Expr lhs "||" Expr rhs
+//	| right Expr cond "-\>" Expr implication
+//	;
  
 syntax StateRef
   = VarName state

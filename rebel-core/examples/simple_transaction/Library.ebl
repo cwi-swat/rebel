@@ -12,7 +12,7 @@ event openAccount[minimalDeposit: Money = EUR 0.00](initialDeposit: Money) {
 	}
 	postconditions {
 		new this.balance == initialDeposit;
-	} 
+	}  
 } 
 
 @doc {

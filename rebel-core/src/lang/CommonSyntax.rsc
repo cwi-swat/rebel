@@ -7,9 +7,64 @@ extend lang::std::Id;
 syntax ModuleDef = "module" FullyQualifiedName fqn;
 
 syntax FullyQualifiedName = ({VarName "."}+ packages ".")? modulePath TypeName modName;
+syntax FullyQualifiedVarName = (FullyQualifiedName fqn ".")? VarName name; 
 
 syntax Import = "import" FullyQualifiedName fqn;
 
+syntax Expr
+  = bracket "(" Expr ")"
+  | literal: Literal!reference lit 
+  | reference: Ref ref
+  | VarName function "(" {Expr ","}* exprs ")"
+  | left fieldAccess: Expr lhs "." VarName field 
+  | "{" Expr lower ".." Expr upper"}"
+  | Expr var!accessor "[" Expr indx "]"
+  | "(" {MapElement ","}* mapElems ")"
+  | staticSet: "{" {Expr ","}* setElems "}"
+  | comprehension: "{" VarName elemName ":" Expr set "|" {Expr ","}+ conditions "}"
+  | cardanality: "|" Expr set "|"
+  | universalQuantifier: "forall" VarName elemName ":" Expr set "|" {Expr ","}+ conditions
+  | existentialQuantifier: "exists" VarName elemName ":" Expr set "|" {Expr ","}+ conditions
+  > new: "new" Expr expr
+  | "not" Expr expr
+  | "-" Expr
+  > Expr cond "?" Expr whenTrue ":" Expr whenFalse
+  > left  ( Expr lhs "*" Expr rhs
+      | isMember: Expr lhs "in" Expr rhs
+      | Expr lhs "/" Expr rhs
+      | Expr lhs "%" Expr rhs
+      )
+  > left  ( Expr lhs "+" Expr rhs
+      | subtract: Expr lhs "-" Expr rhs
+      )
+  > non-assoc ( smallerThan: Expr lhs "\<" Expr rhs
+      | smallerThanEquals: Expr lhs "\<=" Expr rhs
+      | greaterThan: Expr lhs "\>" Expr rhs
+      | greaterThanEquals: Expr lhs "\>=" Expr rhs
+      | equals: Expr lhs "==" Expr rhs
+      | notEqual: Expr lhs "!=" Expr rhs
+      )
+  > "initialized" Expr
+  | "finalized" Expr
+  | Expr lhs "instate" StateRef sr
+  > left and: Expr lhs "&&" Expr rhs
+  > left Expr lhs "||" Expr rhs
+  | right Expr cond "-\>" Expr implication
+  ;
+
+syntax StateRef
+  = VarName state
+  | "{" VarName+ states "}"
+  ; 
+ 
+syntax MapElement =  Expr key ":" Expr val;
+     
+syntax Ref 
+  = FullyQualifiedVarName field
+  | FullyQualifiedName tipe
+  | this: "this"
+  | "it"
+  ; 
 
 syntax Type 
   = @category="Type" "Boolean"

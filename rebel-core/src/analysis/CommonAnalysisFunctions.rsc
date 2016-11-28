@@ -23,7 +23,7 @@ import ParseTree;
 import Boolean;
 import analysis::graphs::Graph;
 
-alias RebelLit = lang::ExtendedSyntax::Literal;
+//alias RebelLit = lang::ExtendedSyntax::Literal;
 
 data StringConstantPool = scp(str (int) toStr, int (str) toInt);
 
@@ -32,6 +32,7 @@ data Context(map[str,str] specLookup = (), map[loc, Type] types = ())
   | flattenedEvent(str spec, str event)
   | eventAsFunction()
   | function()
+  | emptyCtx()
   ;
 
 data Step 
@@ -39,12 +40,12 @@ data Step
   | noStep()
   ; 
 
-data Variable 
-  = var(str name, Type tipe, RebelLit val)
+data Variable
+  = var(str name, Type tipe, Expr val) 
   | uninitialized(str name, Type tipe)
   ;
    
-data EntityInstance = instance(str entityType, list[RebelLit] id, list[Variable] vals);  
+data EntityInstance = instance(str entityType, list[Expr] id, list[Variable] vals);  
 data State 
   = state(int nr, DateTime now, list[EntityInstance] instances, Step step)
   ;
@@ -143,12 +144,12 @@ Step getStep(SolverPID pid, str smtStateLabel, StringConstantPool scp, set[Built
   if (Built b <- allBuilts, "<b.normalizedMod.modDef.fqn>" == entity, EventDef evnt <- b.normalizedMod.spec.events.events, "<evnt.name>" == event) {
     for (Parameter p <- evnt.transitionParams) {
       Command transitionVal = getValue([functionCall(simple("eventParam_<entity>_<event>_<p.name>"), [var(simple(smtStateLabel))])]);
-      str formattedRebelLit = parseSmtResponse(runSolver(pid, compile(transitionVal), wait = 5), scp.toStr);
+      str formattedRebelExpr = parseSmtResponse(runSolver(pid, compile(transitionVal), wait = 5), scp.toStr);
       if (isStringType(p.tipe)) {
-        formattedRebelLit = scp.toStr(toInt(formattedRebelLit));
+        formattedRebelExpr = scp.toStr(toInt(formattedRebelExpr));
       }
       
-      RebelLit val = [lang::ExtendedSyntax::Literal]"<formattedRebelLit>";
+      Expr val = [lang::ExtendedSyntax::Expr]"<formattedRebelExpr>";
       transitionValues += var("<p.name>", p.tipe, val);
     }
   }
@@ -156,28 +157,28 @@ Step getStep(SolverPID pid, str smtStateLabel, StringConstantPool scp, set[Built
   return step(entity, event, transitionValues);
 }
 
-bool isInitializedEntity(SolverPID pid, str entityType, list[RebelLit] id, str smtStateLabel, StringConstantPool scp) {
+bool isInitializedEntity(SolverPID pid, str entityType, list[Expr] id, str smtStateLabel, StringConstantPool scp) {
   Command isInitializedCmd = getValue([functionCall(simple("spec_<entityType>_initialized"), 
-    [functionCall(simple("spec_<entityType>"), [var(simple(smtStateLabel))] + [translateLit(i) | lang::ExtendedSyntax::Literal i <- id])] +
-    [translateLit(i) | lang::ExtendedSyntax::Literal i <- id])]);
+    [functionCall(simple("spec_<entityType>"), [var(simple(smtStateLabel))] + [translateExpr(i, emptyCtx()) | Expr i <- id])] +
+    [translateExpr(i, emptyCtx()) | Expr i <- id])]);
   
   str smtOutput = runSolver(pid, compile(replaceStringsWithInts(isInitializedCmd, scp)), wait = 2);
   return fromString(parseSmtResponse(smtOutput, emptyLookup));
 }
 
-Variable getNewVarValue(SolverPID pid, str entityType, list[RebelLit] id, Variable current, str smtStateLabel, StringConstantPool scp) {
+Variable getNewVarValue(SolverPID pid, str entityType, list[Expr] id, Variable current, str smtStateLabel, StringConstantPool scp) {
   Command newValCmd = getValue([functionCall(simple("field_<entityType>_<current.name>"), 
-                        [functionCall(simple("spec_<entityType>"), [var(simple(smtStateLabel))] + [translateLit(i) | lang::ExtendedSyntax::Literal i <- id])])
+                        [functionCall(simple("spec_<entityType>"), [var(simple(smtStateLabel))] + [translateExpr(i, emptyCtx()) | Expr i <- id])])
                       ]);
            
   str smtOutput = runSolver(pid, compile(replaceStringsWithInts(newValCmd, scp)), wait = 10);
 
-  str formattedRebelLit = parseSmtResponse(smtOutput, scp.toStr);
+  str formattedRebelExpr = parseSmtResponse(smtOutput, scp.toStr);
   if (isStringType(current.tipe)) {
-    formattedRebelLit = scp.toStr(toInt(formattedRebelLit));
+    formattedRebelExpr = scp.toStr(toInt(formattedRebelExpr));
   }
-  println(formattedRebelLit);
-  RebelLit newVal = [lang::ExtendedSyntax::Literal]"<formattedRebelLit>";
+  println(formattedRebelExpr);
+  Expr newVal = [Expr]"<formattedRebelExpr>";
   
   return var(current.name, current.tipe, newVal);
 }
@@ -225,7 +226,7 @@ list[Command] declareSmtSpecLookup(set[Module] mods, State st) {
 
     // declare an exist function to check whether keys are part of the predefined model universe
     smt += defineFunction("spec_<m.modDef.fqn>_exists", [sortedVar("<k.name>", translateSort(k.tipe)) | k <- keys], \boolean(),
-      or([and([equal(var(simple("<keys[i].name>")), translateLit(ei.id[i])) | int i <- [0..size(keys)]]) | ei <- getInstances("<m.modDef.fqn>")])
+      or([and([equal(var(simple("<keys[i].name>")), translateExpr(ei.id[i], emptyCtx())) | int i <- [0..size(keys)]]) | ei <- getInstances("<m.modDef.fqn>")])
     );
 
     // define the initialized function
@@ -312,8 +313,8 @@ list[Formula] translateFrameConditionsForUnchangedInstances(EventDef evnt, State
 
   set[EntityInstance] getInstancesOfType(str entityType) = {ei | EntityInstance ei <- current.instances, ei.entityType == entityType};
 
-  RebelLit getId(EntityInstance ei) = id when [id] := ei.id;
-  default RebelLit getId(EntityInstance ei) { throw "More then 1 field as id is not supported at this moment"; }
+  Expr getId(EntityInstance ei) = id when [id] := ei.id;
+  default Expr getId(EntityInstance ei) { throw "More then 1 field as id is not supported at this moment"; }
   
   list[Formula] result = [];
   set[str] uniqueEntities = {ei.entityType | EntityInstance ei <- current.instances};
@@ -324,12 +325,12 @@ list[Formula] translateFrameConditionsForUnchangedInstances(EventDef evnt, State
     
     if (keys == {}) {
       // Entity type does not take part in transitions, all instances should be framed
-      result += [functionCall(simple("spec_<fqn>_frame"), [var(simple("current")), var(simple("next")), translateLit(getId(i))]) | EntityInstance i <- instances];
+      result += [functionCall(simple("spec_<fqn>_frame"), [var(simple("current")), var(simple("next")), translateExpr(getId(i), emptyCtx())]) | EntityInstance i <- instances];
     } else {
       // Check if the key is equal to one of the used keys and otherwise frame
       for (EntityInstance ei <- instances) {
-        result += or([equal(translateLit(getId(ei)), translateExpr(key, ctx)) | Expr key <- keys] +
-                      [functionCall(simple("spec_<fqn>_frame"), [var(simple("current")), var(simple("next")), translateLit(getId(ei))])]);
+        result += or([equal(translateExpr(getId(ei), emptyCtx()), translateExpr(key, ctx)) | Expr key <- keys] +
+                      [functionCall(simple("spec_<fqn>_frame"), [var(simple("current")), var(simple("next")), translateExpr(getId(ei), emptyCtx())])]);
       }
     }
   }
@@ -409,7 +410,15 @@ Formula translateExpr((Expr)`<Expr lhs> / <Expr rhs>`, Context ctx)
 Formula translateExpr((Expr)`<Expr lhs> % <Expr rhs>`, Context ctx)
   = translateExpr(lhs, rhs, ctx.types[lhs@\loc], ctx.types[rhs@\loc], ctx, Formula (Formula l, Formula r) { return \mod(l, r); });
 
-Formula translateExpr((Expr)`-<Expr expr>`, Context ctx) = neg(translateExpr(expr, ctx));
+Formula translateNeg(Expr expr, (Type)`Integer`, Context ctx) = neg(translateExpr(expr, ctx));
+
+Formula translateNeg(Expr expr, (Type)`Money`, Context ctx) 
+  = functionCall(simple("consMoney"), [functionCall(simple("currency"), [translateExpr(expr, ctx)]), 
+      neg(functionCall(simple("amount"), [translateExpr(expr, ctx)]))]);
+
+default Formula translateNeg(Expr expr, Type t, Context ctx) { throw "Negating <t> not (yet) supported"; }
+
+Formula translateExpr((Expr)`- <Expr expr>`, Context ctx) = translateNeg(expr, ctx.types[expr@\loc], ctx);
 
 Formula translateExpr((Expr)`not <Expr expr>`, Context ctx) = not(translateExpr(expr, ctx));
 
@@ -510,7 +519,7 @@ Formula translateLit(Percentage p) = lit(intVal(toInt("<p.per>")));
 Formula translateLit(String s) = lit(strVal("<s>"));
 Formula translateLit(str s) = lit(strVal(s));
 
-default Literal translateLit(value l) { throw "translateLit(..) not implemented for <l>"; }
+default Formula translateLit(value l) { throw "translateLit(..) not implemented for <l>"; }
 
 list[Command] declareRebelTypes() {   
   set[tuple[str,Sort]] rebelTypes = {<"Currency", \string()>,

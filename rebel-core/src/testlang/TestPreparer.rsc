@@ -7,7 +7,7 @@ import lang::ExtendedSyntax;
 import lang::Builder;
 import lang::Finder;
 
-import analysis::Simulator;
+import analysis::CommonAnalysisFunctions;
 
 import ParseTree;
 import util::Maybe;
@@ -18,7 +18,7 @@ import IO;
 State constructStateSetup(StateSetup setup, TestRefs refs, set[Built] builtSpecs) {
   println(setup);
   
-  Literal (Type) idGenerator = idGenerator();
+  Expr (Type) idGenerator = idGenerator();
   
   DateTime getValueOfNow() {
     if ((SetupStatement)`now is <DateTime now>;` <- setup.body) {
@@ -31,19 +31,19 @@ State constructStateSetup(StateSetup setup, TestRefs refs, set[Built] builtSpecs
   }
   
   EntityInstance constructInstance(Module m, Maybe[StateRef] state, list[FieldValueDeclaration] decls) {
-    map[str, Literal] setupVals = ( "<decl.field>": l | FieldValueDeclaration decl <- decls, /Literal l := decl.val);   
+    map[str, Expr] setupVals = ( "<decl.field>": val | FieldValueDeclaration decl <- decls, /Expr val := decl.val);   
     
     map[str, Type] nonKeySpecFields = ( "<f.name>" : f.tipe | FieldDecl f <- m.spec.fields.fields, /(Annotation)`@key` !:= f.meta, !startsWith("<f.name>", "_"));
     map[str, Type] keyFields = ( "<f.name>" : f.tipe | FieldDecl f <- m.spec.fields.fields, /(Annotation)`@key` := f.meta);
     
-    list[Variable] vars = [var(name, nonKeySpecFields[name], val) | str name <- nonKeySpecFields, Literal val := ((name in setupVals) ? setupVals[name] : (Literal)`ANY`)];
-    list[Variable] keys = [var(name, keyFields[name], val) | str name <- keyFields, Literal val := ((name in setupVals) ? setupVals[name] : idGenerator(keyFields[name]))];     
-    
+    list[Variable] vars = [var(name, nonKeySpecFields[name], val) | str name <- nonKeySpecFields, Expr val := ((name in setupVals) ? setupVals[name] : (Expr)`ANY`)];
+    list[Variable] keys = [var(name, keyFields[name], val) | str name <- keyFields, Expr val := ((name in setupVals) ? setupVals[name] : idGenerator(keyFields[name]))];     
+     
     if (just(StateRef sr) := state) {
       if ((StateRef)`uninitialized` := sr, /(StateFrom)`<Int nr>: <LifeCycleModifier? lcm> <VarName _> <StateTo* _>` := m.spec.lifeCycle, /(LifeCycleModifier)`initial` := lcm) {
-        vars += var("_state", (Type)`Integer`, (Literal)`<Int nr>`);
+        vars += var("_state", (Type)`Integer`, (Expr)`<Int nr>`);
       } else if ((StateFrom)`<Int nr> : <LifeCycleModifier? lcm> <VarName from> <StateTo* _>` <- m.spec.lifeCycle.from, "<from>" == "<sr>") {
-        vars += var("_state", (Type)`Integer`, (Literal)`<Int nr>`);
+        vars += var("_state", (Type)`Integer`, (Expr)`<Int nr>`);
       }
     }
     
@@ -74,7 +74,7 @@ State constructStateSetup(StateSetup setup, TestRefs refs, set[Built] builtSpecs
     }
   }
   
-  return state(0, getValueOfNow(), instances);
+  return state(0, getValueOfNow(), instances, noStep());
 }
 
 private Maybe[SetupStatement] findSetupStatementContaining(loc ref, StateSetup setup) {
@@ -85,13 +85,13 @@ private Maybe[SetupStatement] findSetupStatementContaining(loc ref, StateSetup s
   return nothing();
 }
 
-private Literal (Type) idGenerator(str IBANPrefix = "NL10INGB000000") {
+private Expr (Type) idGenerator(str IBANPrefix = "NL10INGB000000") {
   int accountIter = 0;
   int intIter = 0;
 
-  Literal generateId((Type)`IBAN`) { accountIter += 1; println("Generated IBAN = <IBANPrefix><accountIter>"); return [Literal]"<IBANPrefix><accountIter>"; }
-  Literal generateId((Type)`Integer`) {intIter += 1; return [Literal]"<intIter>"; }
-  default Literal generateId(Type t) { throw "Id proposal for type \'<t>\' not yet implemented"; }
+  Expr generateId((Type)`IBAN`) { accountIter += 1; println("Generated IBAN = <IBANPrefix><accountIter>"); return [Expr]"<IBANPrefix><accountIter>"; }
+  Expr generateId((Type)`Integer`) {intIter += 1; return [Expr]"<intIter>"; }
+  default Expr generateId(Type t) { throw "Id proposal for type \'<t>\' not yet implemented"; }
   
   return generateId;
 }

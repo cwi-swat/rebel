@@ -14,7 +14,10 @@ str parseSmtResponse(str smtOutput, str (int) stringConstantLookup) {
   GetValue resp = [GetValue]"<smtOutput>";
   
   if ((GetValue)`((<Formula _> <Formula newVal>))` := resp) {
-    return formatAsRebelLit(newVal, stringConstantLookup);
+    str result = formatAsRebelLit(newVal, stringConstantLookup);
+    println(result);
+    
+    return result;
   } 
   
   throw "Unable to parse new value";

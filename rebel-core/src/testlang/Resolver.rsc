@@ -33,7 +33,7 @@ Reff resolveFields(TestModule m, set[Built] imports) {
   map[str, map[str,loc]] defs = ("<b.normalizedMod.spec.name>" : ("<f.name>":f@\loc | FieldDecl f <-  b.normalizedMod.spec.fields.fields) | Built b <- imports, b.normalizedMod has spec);
   return {<field@\loc, defs["<spec>"]["<field>"]> | 
     (TestDef)`<StateSetup setup>` <- m.testDefs, /(SetupStatement)`<Int? _> <VarName _> <TypeName spec> <FieldValueDeclarations? fvd>;` := setup, "<spec>" in defs, 
-    /(FieldValueDeclaration)`<VarName field> <Expr _>` := fvd, "<field>" in defs["<spec>"]};
+    /(FieldValueDeclaration)`<VarName field> = <Expr _>` := fvd, "<field>" in defs["<spec>"]};
 }
 
 Reff resolveSetupRefs(TestModule m, set[Built] imports) {

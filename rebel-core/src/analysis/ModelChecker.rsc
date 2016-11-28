@@ -22,7 +22,7 @@ import analysis::graphs::Graph;
 
 data StepConfig
   = max(int nrOfSteps)
-  | exact(int nrOfSteps)
+  | exact(int nrOfSteps) 
   | between(int lower, int upper)
   ;
 
@@ -86,10 +86,10 @@ ReachabilityResult checkIfStateIsReachable(State state, StepConfig config, set[B
                       comment("Unroll unbounded check") +
                       unrollBoundedCheck(config);
   
-   smt = replaceStringsWithInts(smt, scp);
+  smt = replaceStringsWithInts(smt, scp);
 
-   SolverPID pid = startSolver();
-   ReachabilityResult result;
+  SolverPID pid = startSolver();
+  ReachabilityResult result;
   
   try { 
     writeFile(|project://rebel-core/examples/output-reachable.smt2|, intercalate("\n", compile(smt + checkSatisfiable())));
@@ -109,7 +109,7 @@ ReachabilityResult checkIfStateIsReachable(State state, StepConfig config, set[B
       result = unreachable();
     }
   } 
-  catch ex: throw ex;
+  catch ex: throw (ex);
   finally {
     stopSolver(pid);
   }
@@ -175,9 +175,9 @@ Command declareInitialFunction(set[Built] allBuilts, State state) {
   for (Built b <- allBuilts, b.normalizedMod has spec) {
     if (/(StateFrom)`<Int nr>: <LifeCycleModifier? lc> <VarName _> <StateTo* _>` := b.normalizedMod.spec.lifeCycle, "<lc>" == "initial") {
       for (EntityInstance ei <- state.instances, ei.entityType ==  "<b.normalizedMod.modDef.fqn>") {
-        body += equal(functionCall(simple("field_<b.normalizedMod.modDef.fqn>__state"), [functionCall(simple("spec_<b.normalizedMod.modDef.fqn>"), [var(simple("state"))] + [translateLit(id) | RebelLit id <- ei.id])]),
+        body += equal(functionCall(simple("field_<b.normalizedMod.modDef.fqn>__state"), [functionCall(simple("spec_<b.normalizedMod.modDef.fqn>"), [var(simple("state"))] + [translateExpr(id, emptyCtx()) | Expr id <- ei.id])]),
                       translateLit(nr));
-      }  
+      }   
     } else {
       println("No initial state?!?!?!");
     }
@@ -190,8 +190,8 @@ Command declareGoalFunction(State goalState) {
   list[Formula] body = [];
   
   for (EntityInstance ei <- goalState.instances, Variable v <- ei.vals) {
-    if (uninitialized(_,_) !:= v, (Literal)`ANY` !:= v.val) {
-      body += equal(functionCall(simple("field_<ei.entityType>_<v.name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("state"))] + [translateLit(id) | RebelLit id <- ei.id])]), translateLit(v.val));
+    if (uninitialized(_,_) !:= v, (Expr)`ANY` !:= v.val) {
+      body += equal(functionCall(simple("field_<ei.entityType>_<v.name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("state"))] + [translateExpr(id, emptyCtx()) | Expr id <- ei.id])]), translateExpr(v.val, emptyCtx()));
     }
   }
   

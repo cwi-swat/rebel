@@ -18,7 +18,7 @@ import Node;
 import ParseTree;
 import Set;
 
-extend lang::ExtendedSyntax;
+extend lang::CommonSyntax;
 
 syntax Type 
   = "$$INVALID_TYPE$$"
@@ -58,8 +58,6 @@ private bool inCurrentScope(str name, Scope scope) = name == scope.name || name 
 
 @memo
 Type resolveTypeCached(Expr exp, Context ctx) = resolveType(exp, ctx);
-@memo
-Type resolveTypeCached(SyncExpr exp, Context ctx) = resolveType(exp, ctx);
 
 // Negative
 Type resolveNegative((Type)`Integer`)     = (Type)`Integer`;
@@ -180,7 +178,5 @@ Type resolveType((Expr)`<Ref r>`, Context ctx)      = getTypeOfVar("<r>", ctx.sc
 
 Type resolveType((Expr)`(<Expr expr>)`, Context ctx) = resolveTypeCached(expr, ctx);
  
-Type resolveType((SyncExpr)`not <SyncExpr expr>`, Context ctx) = (Type)`Boolean`;
-Type resolveType((SyncExpr)`<TypeName specName>[<Expr _>].<VarName _>(<{Expr ","}* _>)`, Context ctx) = getTypeOfSpec("<specName>", ctx.scp);
 
 default Type resolveType((Expr)`<Expr e>`, Context _) = (Type)`$$INVALID_TYPE$$`;
