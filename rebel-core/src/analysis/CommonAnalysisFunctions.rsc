@@ -42,7 +42,7 @@ data Step
 
 data Variable
   = var(str name, Type tipe, Expr val) 
-  | constraintedVar(Expr constraint)
+  | constraintedVar(str name, Type tipe, Expr constraint)
   | uninitialized(str name, Type tipe)
   ;
    
@@ -373,6 +373,8 @@ Formula translateExpr((Expr)`<Ref r>`, Context ctx)
   = var(simple("param_<r>"))
   when function() := ctx || eventAsFunction() := ctx;
 
+default Formula translateExpr((Expr)`<Ref r>`, Context ctx) { throw "Unsupported translation for reference <r> with context <ctx>"; }
+
 Formula translateExpr((Expr)`<VarName function>(<{Expr ","}* params>)`, Context ctx) = functionCall(simple("func_<function>"), [translateExpr(p, ctx) | Expr p <- params]);
 
 Formula translateFormula(Expr lhs, Expr rhs, (Type)`Money`, (Type)`Money`, Context ctx, Formula (Formula, Formula) createComp) 
@@ -412,6 +414,7 @@ Formula translateExpr((Expr)`<Expr lhs> % <Expr rhs>`, Context ctx)
   = translateExpr(lhs, rhs, ctx.types[lhs@\loc], ctx.types[rhs@\loc], ctx, Formula (Formula l, Formula r) { return \mod(l, r); });
 
 Formula translateNeg(Expr expr, (Type)`Integer`, Context ctx) = neg(translateExpr(expr, ctx));
+Formula translateNeg(Expr expr, (Type)`Percentage`, Context ctx) = neg(translateExpr(expr, ctx));
 
 Formula translateNeg(Expr expr, (Type)`Money`, Context ctx) 
   = functionCall(simple("consMoney"), [functionCall(simple("currency"), [translateExpr(expr, ctx)]), 

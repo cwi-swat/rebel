@@ -1,6 +1,6 @@
 module analysis::ModelChecker
 
-import analysis::CommonAnalysisFunctions;
+extend analysis::CommonAnalysisFunctions;
 import analysis::SmtResponseTranslator;
 import analysis::PreProcessor;
 
@@ -195,9 +195,11 @@ Command declareGoalFunction(State goalState, map[str,str] specLookup, map[loc, T
   for (EntityInstance ei <- goalState.instances, Variable v <- ei.vals) {
     switch(v) {
       case var(str name, Type tipe, Expr val): {
-        body += equal(functionCall(simple("field_<ei.entityType>_<name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("state"))] + [translateExpr(id, emptyCtx()) | Expr id <- ei.id])]), translateExpr(val, emptyCtx()));
+        if ((Expr)`ANY` !:= val) {
+          body += equal(functionCall(simple("field_<ei.entityType>_<name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("state"))] + [translateExpr(id, emptyCtx()) | Expr id <- ei.id])]), translateExpr(val, emptyCtx()));
+        }
       } 
-      case constraintedVar(Expr constraint): {
+      case constraintedVar(str name, Type tipe, Expr constraint): {
         body += translateExpr(constraint, inGoalState("<ei.entityType>", ei.id, specLookup = specLookup, types = types));
       }
     }

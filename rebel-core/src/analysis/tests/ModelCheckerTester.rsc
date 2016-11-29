@@ -18,10 +18,12 @@ import util::Maybe;
 test bool testIfStateIsReachable() = testIfStateIsReachable(|project://rebel-core/examples/simple_transaction/TransactionTest.tebl|);
 
 bool testIfStateIsReachable(loc testFile) {
-  if (<_, loaded> := loadTestModule(testFile), /StateSetup setup := loaded<0>.testDefs) {
-    State state = constructStateSetup(setup, loaded<1>, loaded<2>);
+  if (<_, TestLoaderResult loaded> := loadTestModule(testFile), /StateSetup setup := loaded.testModule.testDefs) {
+    State state = constructStateSetup(setup, loaded.refs, loaded.importedSpecs);
 
-    if (reachable(list[State] trace) := checkIfStateIsReachable(state, max(7), loaded<2>, true)) {
+    map[loc, Type] allResolvedTypes = loaded.resolvedTypes + (() | it + b.resolvedTypes | Built b <- loaded.importedSpecs);
+
+    if (reachable(list[State] trace) := checkIfStateIsReachable(state, max(7), loaded.importedSpecs, allResolvedTypes, true)) {
       printTrace(trace);
       
       return true; 

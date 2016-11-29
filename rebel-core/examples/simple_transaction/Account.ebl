@@ -21,7 +21,7 @@ specification Account {
 		unblock[] 
 		close[]
 	} 
-	
+	 
 	invariants {
 		positiveBalance
 	}

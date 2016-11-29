@@ -5,6 +5,7 @@ import testlang::Loader;
 import testlang::TestPreparer;
 
 import lang::Finder;
+import lang::Builder;
 
 import ParseTree;
 import util::Maybe;
@@ -31,7 +32,9 @@ ReachabilityResult interpretCheck(Check check, TestLoaderResult tlr, bool requir
     State state = constructStateSetup(setup, tlr.refs, tlr.importedSpecs);
     StepConfig bounds = constructStepConfig(sb); 
     
-    return checkIfStateIsReachable(state, bounds, tlr.importedSpecs, requireTrace);
+    map[loc, Type] allResolvedTypes = tlr.resolvedTypes + (() | it + b.resolvedTypes | Built b <- tlr.importedSpecs);
+        
+    return checkIfStateIsReachable(state, bounds, tlr.importedSpecs, allResolvedTypes, requireTrace);
   }
 }
 

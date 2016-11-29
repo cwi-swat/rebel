@@ -1,10 +1,10 @@
-module analysis::tests::TestPreparerTester
+module testlang::tests::TestPreparerTester
 
-import analysis::TestPreparer;
 import analysis::CommonAnalysisFunctions;
 
 import testlang::Loader;
 import testlang::Syntax;
+import testlang::TestPreparer;
 
 import lang::Builder;
 
@@ -13,9 +13,9 @@ import IO;
 import List;
 
 test bool testSimpleSetup() {
-  if (<_, loaded> := loadTestModule(|project://rebel-core/examples/simple_transaction/TransactionTest.tebl|)) {
-    for (/StateSetup setup := loaded<0>.testDefs) {
-      State state = constructStateSetup(setup, loaded<1>, loaded<2>);
+  if (<_, TestLoaderResult loaded> := loadTestModule(|project://rebel-core/examples/simple_transaction/TransactionTest.tebl|)) {
+    for (/StateSetup setup := loaded.testModule.testDefs) {
+      State state = constructStateSetup(setup, loaded.refs, loaded.importedSpecs);
       printState(state);
     } 
     
@@ -31,7 +31,8 @@ void printState(State st) {
           'now = <st.now>
           '<for (i <- st.instances) {>
           'instance: <i.entityType>, key = <intercalate(",", i.id)> <for (v <- i.vals) {>
-          '  var <v.name> (type: <v.tipe>) = <v.val> <}>  
+          '  <if (var(name,tipe,val) := v) {> var <v.name> (type: <v.tipe>) = <v.val><}>
+          '  <if (constraintedVar(const) := v) {> constraint <const> <}><}>  
           '<}>
           '");  
 }

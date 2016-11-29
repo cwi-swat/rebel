@@ -8,7 +8,7 @@ state oneBookedTransaction1OpenedAccountAnd1ClosedAccount {
   
   booked Transaction;
   
-  opened Account with balance == EUR 10.00;
+  opened Account with balance < EUR 0.00;
   opened Account;
 }
 

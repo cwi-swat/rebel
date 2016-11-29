@@ -126,7 +126,7 @@ set[Contribution] getRebelTestContribs() =
         action("Check", (TestModule current, loc x) {
           if (just(Check ck) := isCheckDefinition(x, current)) {
             tuple[set[Message], TestLoaderResult] tlr = loadTestModule(current@\loc.top, modulePt = just(current));
-
+             
             if (reachable() := interpretCheck(ck, tlr<1>)) {
               alert("Check is satisfiable");
             } else {

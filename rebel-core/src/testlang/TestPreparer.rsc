@@ -30,14 +30,18 @@ State constructStateSetup(StateSetup setup, TestRefs refs, set[Built] builtSpecs
     }
   }
   
-  EntityInstance constructInstance(Module m, Maybe[StateRef] state, list[FieldValueDeclaration] decls) {
-    map[str, Expr] setupVals = ( "<decl.field>": val | FieldValueDeclaration decl <- decls, /Expr val := decl.val);   
+  EntityInstance constructInstance(Module m, Maybe[StateRef] state, list[FieldValueConstraint] constraints) {
+    map[str, Expr] constraintedFields = ("<field>" : const.constraint | FieldValueConstraint const <- constraints, /(Expr)`<Ref field>` := const.constraint);  
+    //map[str, Expr] setupVals = ( "<decl.field>": val | FieldValueConstraint const <- constraints, /Expr val := const.constraint, /(Expr)`<Ref field>`);   
     
     map[str, Type] nonKeySpecFields = ( "<f.name>" : f.tipe | FieldDecl f <- m.spec.fields.fields, /(Annotation)`@key` !:= f.meta, !startsWith("<f.name>", "_"));
     map[str, Type] keyFields = ( "<f.name>" : f.tipe | FieldDecl f <- m.spec.fields.fields, /(Annotation)`@key` := f.meta);
-    
-    list[Variable] vars = [var(name, nonKeySpecFields[name], val) | str name <- nonKeySpecFields, Expr val := ((name in setupVals) ? setupVals[name] : (Expr)`ANY`)];
-    list[Variable] keys = [var(name, keyFields[name], val) | str name <- keyFields, Expr val := ((name in setupVals) ? setupVals[name] : idGenerator(keyFields[name]))];     
+     
+    list[Variable] vars = [var(name, nonKeySpecFields[name], (Expr)`ANY`) | str name <- nonKeySpecFields, name notin constraintedFields] +
+                          [constraintedVar(name, nonKeySpecFields[name], constraintedFields[name]) | str name <- constraintedFields, name in nonKeySpecFields];
+   
+    list[Variable] keys = [var(name, keyFields[name], idGenerator(keyFields[name])) | str name <- keyFields, name notin constraintedFields] +
+                          [var(name, keyFields[name], val) | str name <- keyFields, name in constraintedFields, (Expr)`<Expr _> == <Expr val>` := constraintedFields[name]];     
      
     if (just(StateRef sr) := state) {
       if ((StateRef)`uninitialized` := sr, /(StateFrom)`<Int nr>: <LifeCycleModifier? lcm> <VarName _> <StateTo* _>` := m.spec.lifeCycle, /(LifeCycleModifier)`initial` := lcm) {
@@ -54,22 +58,22 @@ State constructStateSetup(StateSetup setup, TestRefs refs, set[Built] builtSpecs
   
   for (<loc specRef, loc specDef> <- refs.specs, 
         just(Module m) := findNormalizedSpecModuleContaining(specDef, builtSpecs), 
-        just((SetupStatement)`<Int? nr> <StateRef? state> <TypeName entity> <FieldValueDeclarations? values>;`) := findSetupStatementContaining(specRef, setup)) {
+        just((SetupStatement)`<Int? nr> <StateRef? state> <TypeName entity> <FieldValueConstraints? values>;`) := findSetupStatementContaining(specRef, setup)) {
     
     if (/Int _ !:= nr || toInt("<nr>") == 1) {
-      list[FieldValueDeclaration] fvds = [d | /(SingleInstanceFieldValueDeclaration)`with <{FieldValueDeclaration DeclSeperator}+ decls>` := values, FieldValueDeclaration d <- decls];
+      list[FieldValueConstraint] fvcs = [c | /(SingleInstanceFieldValueConstraints)`with <{FieldValueConstraint DeclSeperator}+ consts>` := values, FieldValueConstraint c <- consts];
      
-      instances += constructInstance(m, (/StateRef sr := state) ? just(sr) : nothing(), [fvd | FieldValueDeclaration fvd <- fvds]); 
+      instances += constructInstance(m, (/StateRef sr := state) ? just(sr) : nothing(), [fvc | FieldValueConstraint fvc <- fvcs]); 
     } else {
-      list[MultipleInstanceFieldValueDeclaration] fds = [fvd | /fvd:(MultipleInstanceFieldValueDeclaration)`- one with <{FieldValueDeclaration DeclSeperator}+ decls>` <- values];
+      list[MultipleInstanceFieldValueConstraints] fds = [fvc | /fvc:(MultipleInstanceFieldValueConstraints)`- one with <{FieldValueConstraint DeclSeperator}+ consts>` <- values];
       
       for (int i <- [0..toInt("<nr>")]) {
-        list[FieldValueDeclaration] fvds = [];
+        list[FieldValueConstraint] fvcs = [];
         if (size(fds) > i) {
-          fvds = [fvd | FieldValueDeclaration fvd <- fds[i].decls];
+          fvcs = [fvc | FieldValueConstraint fvc <- fds[i].decls];
         }
         
-        instances += constructInstance(m, (/StateRef sr := state) ? just(sr) : nothing(), fvds);
+        instances += constructInstance(m, (/StateRef sr := state) ? just(sr) : nothing(), fvcs);
       }
     }
   }

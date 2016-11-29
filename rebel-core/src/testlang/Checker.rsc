@@ -27,3 +27,4 @@ set[Message] checkFields(TestModule m, Reff fieldRefs) =
   
 set[Message] checkAllConstraintsReferToFields(TestModule m) =
   {error("Constraint is not declared on a field", fvc@\loc) | (TestDef)`<StateSetup setup>` <- m.testDefs, /FieldValueConstraint fvc := setup, /expr:(Expr)`<Ref _>` !:= fvc.constraint};
+  

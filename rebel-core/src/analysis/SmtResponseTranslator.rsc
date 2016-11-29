@@ -45,7 +45,14 @@ str formatAsRebelLit((Formula)`(consTime <Formula hour> <Formula minutes> <Formu
 str formatAsRebelLit((Formula)`(consDateTime <Formula date> <Formula time>)`, str (int) scl) = "<formatAsRebelLit(date, scl)>, <formatAsRebelLit(time, scl)>";
 
 str formatAsRebelLit((Formula)`(consIBAN <Formula cc> <Formula checksum> <Formula nr>)`, str (int) scl) = "<scl(toInt("<cc>"))><right("<checksum>", 2, "0")><scl(toInt("<nr>"))>";
-str formatAsRebelLit((Formula)`(consMoney <Formula currency> <Formula amount>)`, str (int) scl) = "<scl(toInt("<currency>"))><floor(toInt("<amount>") / 100)>.<left("<toInt("<amount>") % 100>", 2, "0")>";
+
+str formatAsRebelLit((Formula)`(consMoney <Formula currency> <Formula amount>)`, str (int) scl) = "<scl(toInt("<currency>"))><floor(am / 100)>.<left("<am % 100>", 2, "0")>" 
+  when (Formula)`<Int a>` := amount,
+       int am := toInt("<a>");
+
+str formatAsRebelLit((Formula)`(consMoney <Formula currency> <Formula amount>)`, str (int) scl) = "- <scl(toInt("<currency>"))><floor(am / 100)>.<left("<am % 100>", 2, "0")>"
+  when (Formula)`(- <Int a>)` := amount,
+       int am := toInt("<a>"); 
 
 default str formatAsRebelLit((Formula)`<Formula f>`, str (int) scl) = "<f>";
 
