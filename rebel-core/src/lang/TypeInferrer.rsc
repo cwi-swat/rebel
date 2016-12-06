@@ -18,7 +18,7 @@ import Node;
 import ParseTree;
 import Set;
 
-extend lang::CommonSyntax;
+extend lang::ExtendedSyntax;
 
 syntax Type 
   = "$$INVALID_TYPE$$"
