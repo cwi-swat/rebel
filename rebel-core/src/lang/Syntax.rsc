@@ -30,7 +30,9 @@ syntax LibraryModule
   
 // Library rules
 
-syntax EventDef = Annotations annos "event" FullyQualifiedVarName name EventConfigBlock? configParams "(" {Parameter ","}* transitionParams")" "{" Preconditions? pre Postconditions? post SyncBlock? sync "}";
+syntax EventDef = Annotations annos "event" FullyQualifiedVarName name EventConfigBlock? configParams "(" {Parameter ","}* transitionParams")" "{" Preconditions? pre Postconditions? post MaybeSyncBlock sync "}";
+
+syntax MaybeSyncBlock = SyncBlock?;
 
 syntax EventConfigBlock = "[" {Parameter ","}+ params "]";
 
@@ -88,7 +90,7 @@ syntax SyncExpr
 syntax Statement  
 	= bracket "(" Statement ")"
 	| "case" Expr "{" Case+ cases "}" ";"
-	| Annotations annos Expr ";"
+	| Annotations annos Expr expr ";"
 	;  
   	
 syntax Case = Literal lit "=\>" Statement stat;
