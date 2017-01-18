@@ -65,12 +65,12 @@ State constructStateSetup(StateSetup setup, TestRefs refs, set[Built] builtSpecs
      
       instances += constructInstance(m, (/StateRef sr := state) ? just(sr) : nothing(), [fvc | FieldValueConstraint fvc <- fvcs]); 
     } else {
-      list[MultipleInstanceFieldValueConstraints] fds = [fvc | /fvc:(MultipleInstanceFieldValueConstraints)`- one with <{FieldValueConstraint DeclSeperator}+ consts>` <- values];
+      list[MultipleInstanceFieldValueConstraints] fcs = [fvc | /fvc:(MultipleInstanceFieldValueConstraints)`- one with <{FieldValueConstraint DeclSeperator}+ consts>` <- values];
       
       for (int i <- [0..toInt("<nr>")]) {
         list[FieldValueConstraint] fvcs = [];
-        if (size(fds) > i) {
-          fvcs = [fvc | FieldValueConstraint fvc <- fds[i].decls];
+        if (size(fcs) > i) {
+          fvcs = [fvc | FieldValueConstraint fvc <- fcs[i].decls];
         }
         
         instances += constructInstance(m, (/StateRef sr := state) ? just(sr) : nothing(), fvcs);
