@@ -36,6 +36,8 @@ void generateForStatic(loc base, loc output) {
 	// step 1, generate the internal machines
 	set[JsSpec] specs = generateJsStructuresOfInternals(base, {});
 	
+	println("Built the internal JS structure");
+	
 	// step 3, remove links to external machines that are not part of the generation
 	specs = filterMissingLinks(specs);
 	

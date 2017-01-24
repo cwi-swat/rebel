@@ -83,6 +83,8 @@ syntax Type
   | @category="Type" Term
   | @category="Type" "Time"
   | @category="Type" "IBAN"
+  | @category="Type" "InterestNorm"
+  | @category="Type" "InterestTariff"
   | @category="Type" Type "-\>" Type
   | bracket @category="Type" "(" {Type ","}+ ")" 
   | @category="Type"  TypeName custom
@@ -102,6 +104,8 @@ syntax Literal
   | @category="Constant" Money
   | @category="Constant" Currency
   | @category="Constant" IBAN
+  | @category="Constant" InterestNorm
+  | @category="Constant" InterestTariff
   ;
   
 syntax Literal
@@ -121,6 +125,16 @@ syntax DateTime
 syntax Term = Int factor Period period;
 
 syntax Money = Currency cur MoneyAmount amount;
+
+syntax InterestTariff 
+  = fixed:            "fixed" Percentage p
+  | normBased:        "norm" InterestNorm norm 
+  | withPosAddition:  InterestTariff base "++" InterestTariff posAddition
+  | withNegAddition:  InterestTariff base "--" InterestTariff negAddition
+  | withMinMaxTariff: InterestTariff base "bounded by" ("min" "=" InterestTariff min)? ("max" "=" InterestTariff max)? 
+  ; 
+
+lexical InterestNorm = "EURIBOR" | "AIRBOR" | "LIBOR" | "INGBASIS";
 
 lexical Currency 
   = "EUR" | "USD" 
@@ -144,6 +158,7 @@ lexical MoneyAmount = [0-9]+ whole [.] ([0-9][0-9][0-9]?) decimals;
 keyword Keywords = "this" | "now";
 keyword Keywords = "Jan" | "Feb" | "Mar" | "Apr" | "May" | "Jun" | "Jul" | "Aug" | "Sep" | "Oct" | "Nov" | "Dec" ; 
 keyword Keywords = "Daily" | "Monthly" | "Quarterly" | "Yearly" | "Day" | "Month" | "Quarter" | "Year" | "True" | "False"; 
-keyword Keywords = "Date" | "Integer" | "Period" | "Frequency" | "Percentage" | "Boolean" | "String" | "Time" | "Money" | "Currency" | "Term" | "IBAN";
+keyword Keywords = "Date" | "Integer" | "Period" | "Frequency" | "Percentage" | "Boolean" | "String" | "Time" | "Money" | "Currency" | "Term" | "IBAN" | "InterestTariff" | "InterestNorm" ;
 keyword Keywords = "EUR" | "USD" | "CUR";
 keyword Keywords = "Daily" | "Monthly" | "Quarterly" | "Yearly" | "Day" | "Month" | "Quarter" | "Year" | "True" | "False"; 
+keyword Keywords = "EURIBOR" | "AIRBOR" | "LIBOR" | "INGBASIS";
