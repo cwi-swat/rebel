@@ -69,10 +69,11 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
   
   tuple[set[Message], BuiltInternal, set[Module]] build(Module modul) {
     ImporterResult importResult = loadImports(modul, cachedParse);
-    Refs refs = resolve(modul, importResult<1>);
     
     if (modul has spec) {
       FlattenerResult flattenResult = flatten(modul, importResult<1>);
+      Refs refs = resolve(flattenResult<1>, importResult<1>);
+
       NormalizeResult inliningResult =  inline(flattenResult.flattenedModule, importResult<1>, refs);
       TypeCheckerResult inlineTypeCheckerResult = checkTypes(inliningResult<1>, importResult<1>);
 
@@ -81,6 +82,7 @@ tuple[set[Message], set[Built]] loadAll(loc modLoc,
       
       return <importResult<0> + flattenResult<0> + inliningResult<0> + desugaringResult<0> + inlineTypeCheckerResult<0> + desugaredTypeCheckerResult<0>, <inliningResult<1>, desugaringResult<1>, refs, inlineTypeCheckerResult<1> + desugaredTypeCheckerResult<1>>, importResult<1>>;
     } else {
+      Refs refs = resolve(modul, importResult<1>);
       return <importResult<0>, <modul, modul, refs, ()>, importResult<1>>;
     }
   } 

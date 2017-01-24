@@ -65,9 +65,33 @@ lrel[Built, EventDef] getAllEventsOrderedByCallOrder(set[Built] specs) {
     return syncedEvents;
   }
 
+  void printGraph(Graph[EventDef] syncGraph) {
+    void pr(EventDef cur, str indent) {
+      println("<indent>-\><cur.name>");
+
+      for (EventDef to <- syncGraph[cur]) {
+        pr(to, "<indent>  ");
+      }
+    }
+    
+    str indent = "";
+    for (EventDef evnt <- top(syncGraph)) {
+      pr(evnt, "");
+    }
+  }
+
   Graph[EventDef] callOrder = ({} | it + getSyncedEvents(e, b, specs) | Built b <- specs, b.normalizedMod has spec, EventDef e <- b.normalizedMod.spec.events.events);
   
+  for (<from, to> <- callOrder) {
+    println("<from.name> -\> <to.name>");
+  }
+  
+  println("Printing event sync order graph. Size of graph = <size(callOrder)>, size of top of graph = <size(top(callOrder))>");
+  printGraph(callOrder);
+  
   list[EventDef] ordered = reverse(dup(order(callOrder)));
+  
+  
 
   return [<b, e> | EventDef e <- ordered, just(Built b) := findBuiltBeloningToEvent(e@\loc, specs)];
 }

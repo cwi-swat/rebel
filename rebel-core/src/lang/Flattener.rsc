@@ -82,38 +82,38 @@ Module mergeImports(orig:(Module)`<ModuleDef modDef> <Import* imports> <Specific
 
 Fields initFields(Fields? f) = /Fields ff := f ? ff :  (Fields)`fields {}`;
 
-Fields mergeFields((Fields) `fields { <FieldDecl* l> }`, FieldDecl d) = 
+Fields mergeFields(orig:(Fields) `fields { <FieldDecl* l> }`, FieldDecl d) = 
 	(Fields) `fields { 
              '  <FieldDecl* l>
              '  <FieldDecl d>
-             '}`
+             '}`[@\loc=orig@\loc]
   when /d !:= l;
 default Fields mergeFields(Fields f, FieldDecl _) = f; 
 
 EventRefs initEventRefs(EventRefs? e) = /EventRefs ee := e ? ee : (EventRefs)`events {}`;  
 
-EventRefs mergeEventRefs((EventRefs)`events { <EventRef* orig> }`, EventRef er) =
+EventRefs mergeEventRefs(orig:(EventRefs)`events { <EventRef* evnts> }`, EventRef er) =
 	(EventRefs) `events {
-				      '  <EventRef* orig>
+				      '  <EventRef* evnts>
 				      '  <EventRef er>
-				      '}`
+				      '}`[@\loc=orig@\loc]
   when /er !:= orig;     
 default EventRefs mergeEventRefs(EventRefs ers, EventRef _) = ers;				 	
 
 InvariantRefs initInvariantRefs(InvariantRefs? i) = /InvariantRefs ii := i ? ii : (InvariantRefs)`invariants {}`;
 
-InvariantRefs mergeInvariantRefs((InvariantRefs)`invariants { <FullyQualifiedVarName* orig> }`, FullyQualifiedVarName new) =
+InvariantRefs mergeInvariantRefs(orig:(InvariantRefs)`invariants { <FullyQualifiedVarName* invs> }`, FullyQualifiedVarName new) =
 	(InvariantRefs) `invariants {
-					'  <FullyQualifiedVarName* orig>
+					'  <FullyQualifiedVarName* invs>
 					'  <FullyQualifiedVarName new>
-					'}`;	
+					'}`[@\loc=orig@\loc];	
 
 LifeCycle initLifeCycle(LifeCycle? lc) = /LifeCycle lcc := lc ? lcc : (LifeCycle)`lifeCycle {}`;
 
 LifeCycle mergeLifeCycle(LifeCycle orig, StateFrom* newStates) =
 	(LifeCycle)	`lifeCycle {
 				      '  <StateFrom* mergedStates>
-				      '}`
+				      '}`[@\loc=orig@\loc]
 	when 
 		/StateFrom* origStates := orig,
 		StateFrom* mergedStates := (origStates | mergeStates(it, n) | n <- newStates);	
@@ -121,14 +121,14 @@ LifeCycle mergeLifeCycle(LifeCycle orig, StateFrom* newStates) =
 StateFrom* mergeStates(StateFrom* orig, newState:(StateFrom)`<LifeCycleModifier? _> <VarName from> <StateTo* destinations>`) =
 	(LifeCycle) `lifeCycle {
 					    '	<StateFrom* orig>
-					    '	<StateFrom newState>}`.from
+					    '	<StateFrom newState>}`.from[@\loc=orig@\loc]
 	when 
 		!existingState(from, orig);
 
 StateFrom* mergeStates(StateFrom* orig, (StateFrom)`<LifeCycleModifier? _> <VarName from> <StateTo* destinations>`) = 
 	(LifeCycle) `lifeCycle {
 					    '	<StateFrom* merged>
-					    '}`.from
+					    '}`.from[@\loc=orig@\loc]
 	 when
 	 	existingState(from, orig),
 	 	StateFrom* merged := visit (orig) {
@@ -146,9 +146,9 @@ StateFrom mergeStateTo(StateFrom orig, StateTo* newDestinations) =
 		
 default StateFrom mergeStateTo(StateFrom orig, StateTo* newDestinations) = orig;
 
-StateFrom mergeStateTo((StateFrom) `<LifeCycleModifier? lcm> <VarName from> <StateTo* dest>`, StateTo new) = 
+StateFrom mergeStateTo(orig:(StateFrom) `<LifeCycleModifier? lcm> <VarName from> <StateTo* dest>`, StateTo new) = 
 	(StateFrom) `<LifeCycleModifier? lcm> <VarName from> <StateTo* dest> 
-				'  <StateTo new>`
+				'  <StateTo new>`[@\loc=orig@\loc]
 	when
 		!existingStateTo(new.to, dest);
 
@@ -168,8 +168,8 @@ bool existingStateTo(VarName state, StateTo* to) =
 	/(StateTo)`-\> <VarName st> : <StateVia _>` := to && st == state; 
 
 
-StateVia mergeStateVia((StateVia)`<{VarName ","}+ via>`, VarName evnt) =
-	(StateVia)`<{VarName ","}+ via>, <VarName evnt>`
+StateVia mergeStateVia(orig:(StateVia)`<{VarName ","}+ via>`, VarName evnt) =
+	(StateVia)`<{VarName ","}+ via>, <VarName evnt>`[@\loc=orig@\loc]
 	when
 		!existingStateVia(evnt, via);
 

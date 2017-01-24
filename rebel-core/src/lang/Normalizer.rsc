@@ -52,7 +52,7 @@ NormalizeResult inline(Module flattenedSpc, set[Module] modules, Refs refs) {
 	// Inline all the imports all directly imported files
 	set[Import] allImports = inlineImports(flattenedSpc, modules);
 	
-	Module inlined = visit(flattenedSpc) { 
+	Module inlined = visit(flattenedSpc) {  
 		case m:(Module)`<ModuleDef modDef> <Import* imports> <Specification spec>` => 
 			mergedImports
 			when 
@@ -207,7 +207,7 @@ tuple[set[Message], set[EventDef]] resolveReferenceEvents(Module flattenedSpec, 
       msgs += error("Unable to find referenced event", evntRef@\loc);
     }
   }
-  
+   
   return <msgs, events>;  
 }
 

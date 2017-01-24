@@ -1,0 +1,23 @@
+module rivercrossing.Goat
+
+//import rivercrossing.Passenger
+import rivercrossing.GoatLib
+
+specification Goat {
+  fields {
+    id: Integer @key
+  }
+  
+  events {
+    start[]
+    crossToFarSide[]
+    crossToNearSide[]
+  }
+
+  lifeCycle {
+    initial init -> near: start
+    near -> far: crossToFarSide 
+    far -> near: crossToNearSide
+  }  
+}
+ 

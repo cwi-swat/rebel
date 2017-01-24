@@ -1,0 +1,5 @@
+module rivercrossing.WolfLib
+
+event start() {}
+event crossToFarSide() {}
+event crossToNearSide() {}

@@ -1,0 +1,17 @@
+module rivercrossing.Problem
+
+import rivercrossing.Farmer
+import rivercrossing.Goat
+import rivercrossing.Wolf
+import rivercrossing.Cabbage
+
+state everybodyOnTheFarSide {
+  now is 18 Jan, 12:00;
+  
+  near Farmer with id == 1;
+  near Goat with id == 2; 
+  near Cabbage with id == 3;
+  near Wolf with id == 4;
+}
+
+check everybodyOnTheFarSide reachable in max 20 steps;

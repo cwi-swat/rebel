@@ -22,7 +22,7 @@ start syntax Response
 	;
 	
 syntax CheckSat 
-	= sat: "sat" 
+	= sat: "sat"  
 	| unsat: "unsat"
 	| unknown: "unknown"
 	;

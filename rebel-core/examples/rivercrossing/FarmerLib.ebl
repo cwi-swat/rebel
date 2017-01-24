@@ -1,0 +1,107 @@
+module rivercrossing.FarmerLib
+
+import rivercrossing.Goat
+import rivercrossing.Wolf
+import rivercrossing.Cabbage
+
+event startFarmer(goat: Integer, wolf: Integer, cabbage: Integer) {
+  postconditions {
+    new this.goat == goat;
+    new this.wolf == wolf;
+    new this.cabbage == cabbage; 
+  }
+}
+
+@doc{
+  The farmer and the cabbage cross the river to the far side.
+  The Goat and Wolf can not be left behind on the near shore since the wolf will then eat the Goat 
+}
+event crossToFarSideWithCabbage() {
+  preconditions {
+    not (Wolf[this.wolf] instate near && Goat[this.goat] instate near);
+  } 
+  sync {
+    Cabbage[this.cabbage].crossToFarSide();
+  }
+}
+
+@doc {
+  The farmer and the wolf cross the river to the far side.
+  The Goat and Cabbage can not be left behind on the near shore since the goat will eat the cabbage
+} 
+event crossToFarSideWithWolf() {
+  preconditions {
+    not (Goat[this.goat] instate near && Cabbage[this.cabbage] instate near);
+  }
+  sync {
+    Wolf[this.wolf].crossToFarSide();
+  }
+}
+
+@doc {
+  The farmer and the goat cross the river to the far side.
+  Since the wolf does not eat the cabbage the goat can always be transported safely 
+}
+event crossToFarSideWithGoat() {
+  sync {
+    Goat[this.goat].crossToFarSide();
+  }
+}
+
+@doc {
+  The farmer crosses the river to the far side alone.
+  The Goat and Wolf and the Goat and Cabbage can not be left behind on the near shore since they will eat eachother
+}
+event crossToFarSideAlone() {
+  preconditions {
+    not (Goat[this.goat] instate near && Wolf[this.wolf] instate near);
+    not (Goat[this.goat] instate near && Cabbage[this.cabbage] instate near);
+  }
+} 
+
+@doc {
+  The farmer and the cabbage cross the river to the near shore.
+  The wolf and goat should not be left behind on the far shore since the wolf will eat the goat
+}
+event crossToNearSideWithCabbage() {
+  preconditions {
+    not (Goat[this.goat] instate far && Wolf[this.wolf] instate far);
+  }
+  sync { 
+    Cabbage[this.cabbage].crossToNearSide();
+  }
+}
+
+@doc {
+  The farmer and the wolf cross the river to the near shore.
+  The goat and cabbage should not be left behind on the far shore since the goat will eat the cabbage
+}
+event crossToNearSideWithWolf() {
+  preconditions {
+    not (Goat[this.goat] instate far && Cabbage[this.cabbage] instate far);
+  }
+  sync {
+    Wolf[this.wolf].crossToNearSide();
+  } 
+}
+
+@doc {
+  The farmer and the goat cross the river to the near shore.
+  Since the Wolf does not eat the cabbage they can be left behind without any trouble
+}
+event crossToNearSideWithGoat() {
+  sync {
+    Goat[this.goat].crossToNearSide();
+  }
+}
+
+@doc {
+  The farmer crosses the river to the near shore alone.
+  The Goat and Wolf and the Goat and Cabbage can not be left behind on the far shore since the will eat eachother.
+}
+event crossToNearSideAlone() {
+  preconditions {
+    not (Goat[this.goat] instate far && Wolf[this.wolf] instate far);
+    not (Goat[this.goat] instate far && Cabbage[this.cabbage] instate far);
+  }
+} 

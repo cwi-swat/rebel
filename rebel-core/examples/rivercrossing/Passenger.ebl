@@ -1,0 +1,5 @@
+module rivercrossing.Passenger
+
+abstract specification Passenger {
+
+}

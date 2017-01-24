@@ -1,0 +1,5 @@
+module rivercrossing.GoatLib
+
+event start() {}
+event crossToFarSide() {}
+event crossToNearSide() {}

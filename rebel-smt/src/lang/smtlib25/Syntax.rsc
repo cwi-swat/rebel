@@ -1,9 +1,7 @@
 module lang::smtlib25::Syntax
 
-extend lang::std::Whitespace;
-
-start syntax Script = script: Command* commands;
-
+start syntax Script = script: Command* commands; 
+ 
 syntax Command 
 	= setLogic: 				"(" "set-logic" Logic logic ")"
 	| setOption:				"(" "set-option" Option opt ")"
@@ -78,10 +76,10 @@ syntax Sort = @category="Type" \int:	"Int";
 
 syntax Formula
 	= neg:	"(" "-" Formula val ")"
-	| sub:	"(" "-" Formula lhs Formula+ lhs ")"
-	| add:	"(" "+" Formula lhs Formula+ rhs ")"
-	| mul:	"(" "*" Formula lhs Formula+ rhs ")"
-	| div:	"(" "div" Formula lhs Formula+ rhs ")"
+	| sub:	"(" "-" Formula lhs Formula+ rhss ")"
+	| add:	"(" "+" Formula lhs Formula+ rhss ")"
+	| mul:	"(" "*" Formula lhs Formula+ rhss ")"
+	| div:	"(" "div" Formula lhs Formula+ rhss ")"
 	| \mod:	"(" "%" Formula lhs Formula rhs ")"
 	| abs:	"(" "abs" Formula term ")"
 	| lte:	"(" "\<=" Formula lhs Formula rhs ")"
@@ -101,7 +99,7 @@ syntax Sort = @category="Type" \real: "Real";
 syntax Literal = realVal: Real r;
 
 syntax Formula
-	= realDiv: "(" "/" Formula lhs Formula+ rhs ")"
+	= realDiv: "(" "/" Formula lhs Formula+ rhss ")"
 	// others are already defined in the theory of integer numbers
 	; 
 
@@ -113,7 +111,7 @@ syntax Sort
 	= @category="Type" bitVec: 		"(" "_" "BitVec" Int size ")"
 	;
 
-syntax Formula = bitVecConst:	"(" "_" "bv" Int val Int size ")";
+syntax Formula = bitVecConst:	"(" "_" "bv" Int intVal Int size ")";
 
 syntax Formula
 	= bvadd:	"(" "bvadd" Formula lhs Formula rhs ")"
@@ -166,7 +164,7 @@ syntax Formula
 
 // Syntax for the theory of Algabraic Data Types
 syntax Command
-	= @Foldable @fences=<1,3> declareDataTypes: "(" "declare-datatypes" "(" SortId* sortNames ")" "(" DataTypeDefinition* definitions ")" ")"
+	= @Foldable declareDataTypes: "(" "declare-datatypes" "(" SortId* sortNames ")" "(" DataTypeDefinition* definitions ")" ")"
 	;  
 	
 syntax DataTypeDefinition 
@@ -210,7 +208,7 @@ syntax Info
 
 syntax Attribute
 	= named:					":" "named" AttributeValue val
-	| @fences=<2,4> pattern:	":" "pattern" "(" Formula* terms ")"
+	| pattern:	":" "pattern" "(" Formula* terms ")"
 	;
 
 lexical Int = [0-9] !<< [0-9]+ !>> [0-9];
@@ -236,6 +234,10 @@ lexical WhitespaceOrComment
   ; 
   
 lexical Comment = @lineComment @category="Comment" ";" ![\n\r]* $;
+
+lexical Whitespace 
+  = [\u0009-\u000D \u0020 \u0085 \u00A0 \u1680 \u180E \u2000-\u200A \u2028 \u2029 \u202F \u205F \u3000]
+  ; 
 
 keyword Keywords = "Int" | "Bool" | "Array" | "Real" | "BitVec" | "String" | "bv" | "_" | "set-logic" | "set-option" | "set-info" | "declare-sort" |
 	"define-sort" | "declare-const" | "declare-fun" | "define-fun" | "check-sat" | "get-value" | "declare-datatypes" | "as" |

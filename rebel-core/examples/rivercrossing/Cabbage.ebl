@@ -1,0 +1,21 @@
+module rivercrossing.Cabbage
+
+import rivercrossing.CabbageLib 
+
+specification Cabbage {
+  fields {
+    id: Integer @key
+  }
+  
+  events {
+    start[]
+    crossToFarSide[]
+    crossToNearSide[]
+  }
+  
+  lifeCycle {
+    initial init -> near: start
+    near -> far: crossToFarSide 
+    far -> near: crossToNearSide
+  }  
+}  

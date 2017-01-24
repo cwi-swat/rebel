@@ -1,40 +1,37 @@
 module analysis::SmtResponseTranslator
 
-//import lang::smtlib25::Syntax;
-import lang::smtlib25::response::Syntax;
-import lang::smtlib25::response::Parser;
-
-import solver::SolverRunner;
- 
+import lang::smtlib25::response::Syntax; 
+import lang::smtlib25::response::Parser; 
+  
 import String;
-import util::Math;
+import util::Math; 
 import IO;
-
+ 
 str parseSmtResponse(str smtOutput, str (int) stringConstantLookup) {
-  GetValue resp = [GetValue]"<smtOutput>";
+  GetValue resp = [GetValue]"<smtOutput>"; 
   
   if ((GetValue)`((<Formula _> <Formula newVal>))` := resp) {
-    str result = formatAsRebelLit(newVal, stringConstantLookup);
+    str result = formatAsRebelLit(newVal, stringConstantLookup); 
     println(result);
     
-    return result;
-  } 
+    return result;  
+  }    
   
-  throw "Unable to parse new value";
-}
+  throw "Unable to parse new value"; 
+} 
 
 list[str] parseSmtUnsatCore(str unsatCoreOutput) {
-  Response resp = parseResponse(unsatCoreOutput);
+  Response resp = parseResponse(unsatCoreOutput);  
   
   list[str] result = [];
   
   if ((Response)`<GetUnsatCore unsatCore>` := resp, Labell l <- unsatCore.labels) {
-    result += "<l>";
-  }
+    result += "<l>"; 
+  } 
+    
   
-  
-  return result;
-}
+  return result; 
+} 
 
 str formatAsRebelLit((Formula)`(consDate <Formula date> <Formula month>)`, str (int) scl) = "<date> <formatMonth(toInt("<month>"))>";
 str formatAsRebelLit((Formula)`(consDate <Formula date> <Formula month> <Formula year>)`, str (int) scl) = "<date> <formatMonth(toInt("<month>"))> <year>";

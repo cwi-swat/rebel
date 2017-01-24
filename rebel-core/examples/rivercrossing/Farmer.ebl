@@ -1,0 +1,33 @@
+module rivercrossing.Farmer
+
+import rivercrossing.FarmerLib
+ 
+specification Farmer {
+  fields {
+    id: Integer @key
+     
+    goat: Integer 
+    wolf: Integer
+    cabbage: Integer
+  }  
+  
+  events {
+    startFarmer[]
+    
+    crossToFarSideWithCabbage[]
+    crossToFarSideWithWolf[]
+    crossToFarSideWithGoat[]
+    crossToFarSideAlone[]  
+
+    crossToNearSideWithCabbage[]
+    crossToNearSideWithWolf[]
+    crossToNearSideWithGoat[]
+    crossToNearSideAlone[] 
+  } 
+   
+  lifeCycle {
+    initial init -> near: startFarmer
+    near -> far: crossToFarSideWithCabbage, crossToFarSideWithWolf, crossToFarSideWithGoat, crossToFarSideAlone
+    far -> near: crossToNearSideWithCabbage, crossToNearSideWithWolf, crossToNearSideWithGoat, crossToNearSideAlone
+  }
+}
