@@ -134,7 +134,7 @@ syntax InterestTariff
   | withMinMaxTariff: InterestTariff base "bounded by" ("min" "=" InterestTariff min)? ("max" "=" InterestTariff max)? 
   ; 
 
-lexical InterestNorm = "EURIBOR" | "AIRBOR" | "LIBOR" | "INGBASIS";
+lexical InterestNorm = "EURIBOR" | "AIRBOR" | "LIBOR" | "INGBASIS" | "LIMITBASED";
 
 lexical Currency 
   = "EUR" | "USD" 

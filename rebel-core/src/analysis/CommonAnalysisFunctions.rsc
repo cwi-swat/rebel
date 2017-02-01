@@ -306,7 +306,7 @@ list[Command] translateEventsToFunctions(lrel[Built, EventDef] evnts, Context ct
            [translateStat(s, ctx) | /Statement s := evnt.post] + 
            [translateSyncStat(s, ctx) | /SyncStatement s := evnt]));
   
-  return [translate(b.normalizedMod, evnt) | Built b <- dup(evnts<0>), b.normalizedMod has spec, EventDef evnt <- evnts[b], bprintln("Module = <b.normalizedMod.modDef.fqn>, Event def name = <evnt.name>")];
+  return [translate(b.normalizedMod, e) | <Built b, EventDef e> <- evnts, b.normalizedMod has spec];
 }
 
 list[Formula] translateFrameConditionsForUnchangedInstances(EventDef evnt, State current, Context ctx) {

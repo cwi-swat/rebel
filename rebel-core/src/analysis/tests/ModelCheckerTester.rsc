@@ -15,15 +15,17 @@ import IO;
 import List;
 import util::Maybe;
 
-test bool testIfStateIsReachable() = testIfStateIsReachable(|project://rebel-core/examples/simple_transaction/TransactionTest.tebl|);
+test bool testIfStateIsReachable() = testIfStateIsReachable(|project://rebel-core/examples/simple_transaction/TransactionTest.tebl|,7);
 
-bool testIfStateIsReachable(loc testFile) {
+test bool solveRiverCrossingProblem() = testIfStateIsReachable(|project://rebel-core/examples/rivercrossing/Problem.tebl|, 12);
+
+bool testIfStateIsReachable(loc testFile, int maxSteps) {
   if (<_, TestLoaderResult loaded> := loadTestModule(testFile), /StateSetup setup := loaded.testModule.testDefs) {
     State state = constructStateSetup(setup, loaded.refs, loaded.importedSpecs);
 
     map[loc, Type] allResolvedTypes = loaded.resolvedTypes + (() | it + b.resolvedTypes | Built b <- loaded.importedSpecs);
 
-    if (reachable(list[State] trace) := checkIfStateIsReachable(state, max(7), loaded.importedSpecs, allResolvedTypes, true)) {
+    if (reachable(list[State] trace) := checkIfStateIsReachable(state, max(maxSteps), loaded.importedSpecs, allResolvedTypes, true)) {
       printTrace(trace);
       
       return true; 

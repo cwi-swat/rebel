@@ -7,11 +7,14 @@ import rivercrossing.Cabbage
 
 state everybodyOnTheFarSide {
   now is 18 Jan, 12:00;
-  
-  near Farmer with id == 1;
-  near Goat with id == 2; 
-  near Cabbage with id == 3;
-  near Wolf with id == 4;
+
+  far Farmer with id == 1;
+  far Goat with id == 1; 
+  far Cabbage with id == 1;
+  far Wolf with id == 1;
 }
 
-check everybodyOnTheFarSide reachable in max 20 steps;
+check everybodyOnTheFarSide reachable in max 11 steps;
+
+//check everybodyOnTheFarSide reachable from everybodyOnTheNearSides in max 12 steps 
+//  using events Farmer.*, Goat.start, Cabbage.start and Wolf.start;

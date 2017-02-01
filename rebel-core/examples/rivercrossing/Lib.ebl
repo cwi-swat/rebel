@@ -1,0 +1,78 @@
+module rivercrossing.Lib
+
+import rivercrossing.Farmer
+import rivercrossing.Goat
+import rivercrossing.Wolf
+import rivercrossing.Cabbage
+
+event startFarmer() {
+  preconditions {
+    initialized Wolf[1];
+    initialized Goat[1];
+    initialized Cabbage[1];
+  }
+}
+
+event startGoat() {}
+event startWolf() {}
+event startCabbage() {}
+
+event farmerCrossToFarSide() {
+  preconditions {
+    not ((Goat[1] instate far && Wolf[1] instate far) || (Cabbage[1] instate far && Goat[1] instate far));
+  } 
+}
+
+event farmerCrossToNearSide() {
+  preconditions {
+    not ((Goat[1] instate near && Wolf[1] instate near) || (Cabbage[1] instate near && Goat[1] instate near));
+  } 
+}
+
+event cabbageCrossToFarSide() {
+  preconditions {
+    not (Wolf[1] instate near && Goat[1] instate near); 
+  }
+  sync {
+    Farmer[1].farmerCrossToFarSide();
+  }    
+}
+
+event cabbageCrossToNearSide() {
+  preconditions {
+    not (Wolf[1] instate far && Goat[1] instate far); 
+  }
+  sync {
+    Farmer[1].farmerCrossToNearSide();
+  }  
+}
+
+event goatCrossToFarSide() {
+  sync {
+    Farmer[1].farmerCrossToFarSide();
+  }
+}
+
+event goatCrossToNearSide() {
+  sync {
+    Farmer[1].farmerCrossToNearSide();
+  }
+}
+
+event wolfCrossToFarSide() {
+  preconditions {
+    not (Goat[1] instate near && Cabbage[1] instate near);
+  }
+  sync {
+    Farmer[1].farmerCrossToFarSide();
+  }  
+}
+
+event wolfCrossToNearSide() {
+  preconditions {
+    not (Goat[1] instate far && Cabbage[1] instate far);
+  }
+  sync {
+    Farmer[1].farmerCrossToNearSide();
+  }  
+}

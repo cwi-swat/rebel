@@ -173,6 +173,10 @@ Reff resolveInStateReferences(set[Module] modules) {
     println("Found instate def: <sr@\loc>");
     refs += <sr@\loc, defs["<fqnLookup["<spc>"]>.<sr>"]>;
   } 
+  for (Module libMod <- modules, libMod has decls, /EventDef evnt := libMod.decls, /(Expr)`new <Expr spc>[<Expr _>] instate <StateRef sr>` := evnt, "<spc>" in fqnLookup, /(StateRef)`<VarName state>` := sr, "<fqnLookup["<spc>"]>.<state>" in defs) {
+    println("Found new instate def: <sr@\loc>");
+    refs += <sr@\loc, defs["<fqnLookup["<spc>"]>.<sr>"]>;
+  } 
   
   return refs;
 }

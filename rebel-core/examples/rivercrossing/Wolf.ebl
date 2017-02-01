@@ -1,6 +1,6 @@
 module rivercrossing.Wolf
 
-import rivercrossing.WolfLib
+import rivercrossing.Lib
 
 specification Wolf {
   fields {
@@ -8,14 +8,14 @@ specification Wolf {
   }
   
   events {
-    start[]
-    crossToFarSide[]
-    crossToNearSide[]
+    startWolf[]
+    wolfCrossToFarSide[]
+    wolfCrossToNearSide[]
   }
   
   lifeCycle {
-    initial init -> near: start
-    near -> far: crossToFarSide 
-    far -> near: crossToNearSide
+    initial init -> near: startWolf
+    near -> far: wolfCrossToFarSide 
+    far -> near: wolfCrossToNearSide
   }  
 }

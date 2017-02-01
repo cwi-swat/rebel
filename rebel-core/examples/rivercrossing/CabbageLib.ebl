@@ -1,5 +1,0 @@
-module rivercrossing.CabbageLib
-
-event start() {}
-event crossToFarSide() {}
-event crossToNearSide() {}

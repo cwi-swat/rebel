@@ -31,12 +31,12 @@ PreProcessorResult preprocess(set[Built] allBuilts) {
 }
 
 list[FunctionDef] getAllFunctionsOrderedByCallOrder(set[Built] specs) {
-  Graph[FunctionDef] getFunctionCallOrder(FunctionDef currentFunc, Built currentBuild, set[Built] allBuilts) {
-    rel[FunctionDef, FunctionDef] calledFunctions = {<currentFunc, currentFunc>};
+  Graph[FunctionDef] getFunctionCallOrder(FunctionDef currentFunc, Built currentBuild) {
+    rel[FunctionDef, FunctionDef] calledFunctions = {}; //<currentFunc, currentFunc>};
     
     for (<loc ref, loc def> <- currentBuild.refs.functionRefs,
          contains(currentFunc@\loc, ref),
-         just(FunctionDef calledFunc) := findFunctionDef(def, allBuilts)) {
+         just(FunctionDef calledFunc) := findFunctionDef(def, specs)) {
       
       calledFunctions += <currentFunc, calledFunc>;
     }
@@ -44,14 +44,24 @@ list[FunctionDef] getAllFunctionsOrderedByCallOrder(set[Built] specs) {
     return calledFunctions;
   }
   
-  Graph[FunctionDef] callOrder = ({} | it + getFunctionCallOrder(f, b, specs) | Built b <- specs, b.normalizedMod has spec, FunctionDef f <- b.normalizedMod.spec.functions.defs);
+  Graph[FunctionDef] callOrder = {};
+  list[FunctionDef] ordered = []; 
   
-  return reverse(dup(order(callOrder)));
+  for (Built b <- specs, b.normalizedMod has spec, FunctionDef f <- b.normalizedMod.spec.functions.defs) {
+    Graph[FunctionDef] partial = getFunctionCallOrder(f, b);
+    if (partial == {}) {
+      ordered += f;
+    } else {
+      callOrder += partial;
+    }
+  }
+    
+  return dup(ordered + reverse(order(callOrder)));
 }
 
 lrel[Built, EventDef] getAllEventsOrderedByCallOrder(set[Built] specs) {
   Graph[EventDef] getSyncedEvents(EventDef currentEvent, Built currentBuilt, set[Built] allBuilts) {
-    Graph[EventDef] syncedEvents = {<currentEvent, currentEvent>};
+    Graph[EventDef] syncedEvents = {};
   
     for (<loc ref, loc def> <- currentBuilt.refs.syncedEventRefs, 
          contains(currentEvent@\loc, ref),
@@ -80,19 +90,25 @@ lrel[Built, EventDef] getAllEventsOrderedByCallOrder(set[Built] specs) {
     }
   }
 
-  Graph[EventDef] callOrder = ({} | it + getSyncedEvents(e, b, specs) | Built b <- specs, b.normalizedMod has spec, EventDef e <- b.normalizedMod.spec.events.events);
+  Graph[EventDef] callOrder = {};
+  list[EventDef] ordered = [];
   
-  for (<from, to> <- callOrder) {
-    println("<from.name> -\> <to.name>");
+  for (Built b <- specs, b.normalizedMod has spec, EventDef e <- b.normalizedMod.spec.events.events) {
+      // the event has synced events, the call order should be decided
+    Graph[EventDef] partial = getSyncedEvents(e,b,specs);
+    if (partial == {}) {
+      ordered += e;
+    } else {
+      callOrder += partial;
+   }
   }
   
-  println("Printing event sync order graph. Size of graph = <size(callOrder)>, size of top of graph = <size(top(callOrder))>");
-  printGraph(callOrder);
+  //println("Printing event sync order graph. Size of graph = <size(callOrder)>, size of top of graph = <size(top(callOrder))>");
+  //printGraph(callOrder);
   
-  list[EventDef] ordered = reverse(dup(order(callOrder)));
+  ordered = dup(ordered + reverse(order(callOrder)));
+  for (EventDef e <- ordered) { println(e.name); }
   
-  
-
   return [<b, e> | EventDef e <- ordered, just(Built b) := findBuiltBeloningToEvent(e@\loc, specs)];
 }
 
@@ -116,10 +132,16 @@ lrel[Built, EventDef] rewriteInStateExpression(lrel[Built, EventDef] events, map
       return just([Expr]"<intercalate(" || ", exprs)>");
     }    
   }
-  
-    
+
+  Maybe[Expr] rewrite(Built b, e:(Expr)`new <Expr spc>[<Expr id>] instate <StateRef sr>`) {
+    if((StateRef)`<VarName state>` := sr, just(str expr) := construct("<spc>", "<id>", state, b)) {
+      return just([Expr]"new <expr>");
+    }
+  }
+      
   EventDef rewrite(Built b, EventDef orig) = bottom-up visit(orig) {
     case e:(Expr)`<Expr spc>[<Expr _>] instate <StateRef state>` => newExpr[@\loc = e@\loc] when just(Expr newExpr) := rewrite(b, e)
+    case e:(Expr)`new <Expr spc>[<Expr _>] instate <StateRef state>` => newExpr[@\loc = e@\loc] when just(Expr newExpr) := rewrite(b, e)
   };
   
   return [<b, rewrite(b, evnt)> | <Built b, EventDef evnt> <- events];
@@ -160,10 +182,8 @@ lrel[Built, EventDef] addToStateAndIdToSyncedEventCalls(lrel[Built, EventDef] ev
   
   Expr consToStateArg(str evnt, Module spc) {
     list[int] possibleStates = [];
-    for (/LifeCycle lc := spc.spec.lifeCycle, StateFrom sf <- lc.from, (StateTo)`-\> <VarName to>: <StateVia via>` <- sf.destinations) {
-      if (VarName e <- via.refs, "<e>" == evnt) {
-        possibleStates += toInt("<sf.nr>");      
-      }
+    for (/LifeCycle lc := spc.spec.lifeCycle, StateFrom sf <- lc.from, (StateTo)`-\> <VarName to>: <StateVia via>` <- sf.destinations, VarName e <- via.refs, "<e>" == evnt, StateFrom targetState <- lc.from, "<targetState.from>" == "<to>") {
+      possibleStates += toInt("<targetState.nr>");      
     }
     
     return [Expr]"<intercalate(" || ",  dup(possibleStates))>";

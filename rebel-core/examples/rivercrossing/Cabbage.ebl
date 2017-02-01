@@ -1,6 +1,6 @@
 module rivercrossing.Cabbage
 
-import rivercrossing.CabbageLib 
+import rivercrossing.Lib 
 
 specification Cabbage {
   fields {
@@ -8,14 +8,14 @@ specification Cabbage {
   }
   
   events {
-    start[]
-    crossToFarSide[]
-    crossToNearSide[]
+    startCabbage[]
+    cabbageCrossToFarSide[]
+    cabbageCrossToNearSide[]
   }
   
   lifeCycle {
-    initial init -> near: start
-    near -> far: crossToFarSide 
-    far -> near: crossToNearSide
+    initial init -> near: startCabbage
+    near -> far: cabbageCrossToFarSide 
+    far -> near: cabbageCrossToNearSide
   }  
 }  
