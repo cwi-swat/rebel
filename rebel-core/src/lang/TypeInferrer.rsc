@@ -79,6 +79,7 @@ Type resolveAddition((Type)`Integer`,   (Type)`Integer`) = (Type)`Integer`;
 Type resolveAddition((Type)`Date`,      (Type)`Date`)    = (Type)`Term`;
 Type resolveAddition((Type)`Date`,      (Type)`Term`)    = (Type)`Date`;
 Type resolveAddition((Type)`Money`,     (Type)`Money`)   = (Type)`Money`;
+Type resolveAddition((Type)`String`,     (Type)`String`)   = (Type)`String`;
 default Type resolveAddition(Type _, Type _)             = (Type)`$$INVALID_TYPE$$`;
 
 // Multiply

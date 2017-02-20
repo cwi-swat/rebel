@@ -1,0 +1,29 @@
+module account.extended.MultiCurrencyAccount
+
+import account.extended.MultiCurrencyAccountLib
+
+specification MultiCurrencyAccount {
+    fields {
+        accountNumber: IBAN @key
+        balance: map[Currency : Integer]
+    }
+    events {
+        openAccount[]
+        closeAccount[]
+        openCurrency[]
+        closeCurrency[]
+        deposit[]
+        withdraw[]
+    }
+    
+    invariants {
+    }
+    
+    lifeCycle {
+        initial init -> opened: openAccount
+        opened -> opened: openCurrency, closeCurrency, deposit, withdraw
+        opened -> closed: closeAccount
+        final closed  
+    }
+    
+}

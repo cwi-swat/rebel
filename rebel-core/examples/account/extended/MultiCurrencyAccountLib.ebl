@@ -1,0 +1,48 @@
+module account.extended.MultiCurrencyAccountLib
+
+import account.extended.MultiCurrencyAccount
+
+event openAccount() {}
+
+event openCurrency(currency : Currency) {
+    preconditions {
+       not (currency in this.balance);
+    }
+    postconditions {
+       currency in new this.balance;
+    }
+}
+
+event closeCurrency(currency : Currency) {
+    preconditions {
+       currency in this.balance;
+    }
+    postconditions {
+       not (currency in new this.balance);
+    }
+}
+
+event deposit(amount : Money) {
+    preconditions { 
+        amount.cur in this.balance;
+    }
+    postconditions {
+        new this.balance[amount.cur] == this.balance[amount.cur] + amount.amount;
+    }
+}
+
+event withdraw(amount : Money) {
+    preconditions { 
+        amount.cur in this.balance;
+    }
+    postconditions {
+        new this.balance[amount.cur] == this.balance[amount.cur] - amount.amount;
+    }
+}
+
+
+event closeAccount() {
+    preconditions {
+        // this.balance == ();
+    }
+}
