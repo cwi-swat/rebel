@@ -35,7 +35,7 @@ alias UsedBy = set[loc];
 
 private str buildDir = "bin";
 
-loc getOutputLoc(loc srcFile)  = |<srcFile.scheme>://<srcFile.authority>/<buildDir>/rebel|;
+loc getOutputLoc(loc srcFile)  = srcFile.scheme == "project" ? |<srcFile.scheme>://<srcFile.authority>/<buildDir>/rebel| : (|home:///<buildDir>/rebel/| + srcFile.path);
 
 tuple[set[Message], Maybe[Built]] load(loc modLoc, 
   loc outputDir = getOutputLoc(modLoc), 
