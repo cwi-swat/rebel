@@ -350,7 +350,7 @@ Formula translateSyncExpr((SyncExpr)`<TypeName spc>[<Expr id>].<VarName event>(<
 
 Formula translateStat((Statement)`(<Statement s>)`, Context ctx) = translateStat(s, ctx);
 Formula translateStat((Statement)`<Annotations _> <Expr e>;`, Context ctx) = translateExpr(e, ctx);
-default Formula translateStat(Statement s) { throw "Unable to translate statement \'<s>\' to SMT"; }
+default Formula translateStat(Statement s, Context ctx) { throw "Unable to translate statement \'<s>\' to SMT"; }
 
 Formula translateExpr((Expr)`new <Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("next")), translateExpr(id, ctx)]);
 Formula translateExpr((Expr)`new <Expr spc>[<Expr id>].<VarName field>`, Context ctx) = functionCall(simple("field_<ctx.specLookup["<spc>"]>_<field>"), [functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("next")), translateExpr(id, ctx)])]);
