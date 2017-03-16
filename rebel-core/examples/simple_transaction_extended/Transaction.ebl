@@ -1,0 +1,33 @@
+module simple_transaction_extended.Transaction
+
+import simple_transaction_extended.Library
+import simple_transaction_extended.Account
+
+@doc{
+	This is a specification of a toy Transaction.
+	Via a transaction money can be transfered between two accounts
+}
+specification Transaction {
+	fields {
+		id: Integer @key
+		amount: Money 
+		from: IBAN @ref=Account
+		to: IBAN @ref=Account 
+		//createdOn: DateTime
+		//bookedOn: Date
+	}
+	  
+	events {   
+		start[]  
+		book[]  
+		fail[]  
+	}
+	
+	lifeCycle {
+		initial uninit -> validated: start 
+		validated    -> booked: book 
+					-> failed: fail
+		final booked
+		final failed
+	}	
+}

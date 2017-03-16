@@ -1,0 +1,33 @@
+module simple_transaction_extended.Customer
+
+import simple_transaction_extended.Library
+
+@doc {
+    This is a specification of a toy User.
+    A user can have multiple accounts.
+}
+specification Customer {
+    fields {
+        id: Integer @key
+        firstName: String
+        lastName: String
+        country: String      
+    }
+    
+    events {
+        createCustomer[]
+        onboardCustomer[]
+        declineCustomer[]
+        deleteCustomer[]
+    } 
+
+    lifeCycle {
+        initial init -> createdCustomer: createCustomer
+        
+        createdCustomer -> onboardedCustomer: onboardCustomer
+                    -> declinedCustomer:  declineCustomer
+        onboardedCustomer -> deletedCustomer: deleteCustomer      
+        final declinedCustomer
+        final deletedCustomer
+    }
+}
