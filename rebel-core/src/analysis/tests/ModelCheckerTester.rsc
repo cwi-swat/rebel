@@ -15,7 +15,7 @@ import IO;
 import List;
 import util::Maybe;
 
-test bool testIfStateIsReachable() = testIfStateIsReachable(|project://rebel-core/examples/simple_transaction/TransactionTest.tebl|,7);
+test bool testIfStateIsReachable() = testIfStateIsReachable(|project://rebel-core/examples/simple_transaction/TransactionTest.tebl|,5);
 
 test bool solveRiverCrossingProblem() = testIfStateIsReachable(|project://rebel-core/examples/rivercrossing/Problem.tebl|, 12);
 

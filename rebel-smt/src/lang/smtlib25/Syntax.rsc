@@ -39,7 +39,7 @@ syntax VarBinding
 
 syntax QualifiedId
 	= as:"(" "as" Id name Sort sort ")"
-	| simple: Id name
+	| simple: Id name 
 	;
 
 syntax Formula

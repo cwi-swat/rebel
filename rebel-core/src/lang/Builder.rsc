@@ -43,7 +43,7 @@ tuple[set[Message], Maybe[Built]] load(loc modLoc,
   bool clean = false, 
   Log log = stdOutLog) {
   
-  <msgs, allNormalizedBuilds> = loadAll(modLoc, outputDir, modulPt = modulPt, clean = clean, log = log);
+  <msgs, allNormalizedBuilds> = loadAll(modLoc, outputDir = outputDir, modulPt = modulPt, clean = clean, log = log);
   
   if (Built m <- allNormalizedBuilds, m.inlinedMod.modDef@\loc.top == modLoc) {
     return <msgs, just(m)>;
@@ -53,7 +53,7 @@ tuple[set[Message], Maybe[Built]] load(loc modLoc,
 }
 
 tuple[set[Message], set[Built]] loadAll(loc modLoc, 
-  loc outputDir, 
+  loc outputDir = getOutputLoc(modLoc), 
   Maybe[Module] modulPt = nothing(),
   bool clean = false, 
   Log log = stdOutLog) {

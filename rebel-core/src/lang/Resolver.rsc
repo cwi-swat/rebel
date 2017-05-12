@@ -165,16 +165,12 @@ Reff resolveInStateReferences(set[Module] modules) {
   
   map[str, loc] defs = ("<m.modDef.fqn>.<sf.from>" : sf@\loc | Module m <- modules, m has spec, /LifeCycle lc := m.spec.lifeCycle, StateFrom sf <- lc.from);
   map[str, str] fqnLookup = ("<m.spec.name>" : "<m.modDef.fqn>"  | m <- modules, m has spec);
-  
-  println({"<m.spec.name>" | Module m <- modules, m has spec});
-  println("InState defs: <defs>");
+ 
   
   for (Module libMod <- modules, libMod has decls, /EventDef evnt := libMod.decls, /(Expr)`<Expr spc>[<Expr _>] instate <StateRef sr>` := evnt, "<spc>" in fqnLookup, /(StateRef)`<VarName state>` := sr, "<fqnLookup["<spc>"]>.<state>" in defs) {
-    println("Found instate def: <sr@\loc>");
     refs += <sr@\loc, defs["<fqnLookup["<spc>"]>.<sr>"]>;
   } 
   for (Module libMod <- modules, libMod has decls, /EventDef evnt := libMod.decls, /(Expr)`new <Expr spc>[<Expr _>] instate <StateRef sr>` := evnt, "<spc>" in fqnLookup, /(StateRef)`<VarName state>` := sr, "<fqnLookup["<spc>"]>.<state>" in defs) {
-    println("Found new instate def: <sr@\loc>");
     refs += <sr@\loc, defs["<fqnLookup["<spc>"]>.<sr>"]>;
   } 
   

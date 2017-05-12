@@ -16,7 +16,7 @@ specification Account {
 		openAccount[minimalDeposit = EUR 50.00]
 		withdraw[]   
 		deposit[] 
-		interest[]  
+		interest[]   
 		block[]  
 		unblock[] 
 		close[]

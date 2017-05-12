@@ -38,7 +38,7 @@ data ReachabilityResult
 
 ReachabilityResult checkIfStateIsReachable(State state, StepConfig config, set[Built] allBuilts, map[loc, Type] resolvedTypes, bool requireTrace) {
   map[str, int] stringIntMapping = ();
-   
+    
   int convertToInt(str astr) {
     tuple[int, map[str,int]] result = fromStrToInt(astr, stringIntMapping);
     stringIntMapping = result<1>;
@@ -95,7 +95,7 @@ ReachabilityResult checkIfStateIsReachable(State state, StepConfig config, set[B
   ReachabilityResult result;
   
   try { 
-    writeFile(|project://rebel-core/examples/output-reachable.smt2|, intercalate("\n", compile(smt + checkSatisfiable())));
+    writeFile(|project://rebel-core/examples/last-output-modelchecker.smt2|, intercalate("\n", compile(smt + checkSatisfiable(), skipComments=false)));
     
     list[str] rawSmt = compile(smt);
     for (s <- rawSmt) {
@@ -141,7 +141,7 @@ list[State] getTrace(SolverPID pid, State initialState, StepConfig cfg, map[str,
   
   return reverse(trace);    
 }
-
+ 
 State createInitialState(State objective) = 
   state(0, 
     objective.now,
@@ -153,23 +153,6 @@ bool isGoalState(SolverPID pid, str currentStateLabel) {
   
   str smtOutput = runSolver(pid, compile(isGoalStateCmd), wait = 2);
   return fromString(parseSmtResponse(smtOutput, emptyLookup));
-}
-
-Command declareTransitionFunction(lrel[Built, EventDef] events, State state, set[Built] allBuilts, map[str, str] specLookup, map[loc, Type] types) {
-  list[Formula] body = [];
-  
-  for (<Built b, EventDef e> <- events) {
-    body += \and(
-      [functionCall(simple("event_<b.normalizedMod.modDef.fqn>_<e.name>"), [var(simple("current")), var(simple("next"))] + 
-        [functionCall(simple("eventParam_<b.normalizedMod.modDef.fqn>_<e.name>_<p.name>"), [var(simple("next"))]) | Parameter p <- e.transitionParams]
-      )] +
-      [equal(functionCall(simple("step_entity"), [var(simple("next"))]), lit(strVal("<b.normalizedMod.modDef.fqn>"))),
-      equal(functionCall(simple("step_transition"), [var(simple("next"))]), lit(strVal("<e.name>")))] +
-      translateFrameConditionsForUnchangedInstances(e, state, flattenedEvent("<b.normalizedMod.modDef.fqn>", "<e.name>", specLookup = specLookup, types = types))
-      );
-  }
-  
-  return defineFunction("transition", [sortedVar("current", custom("State")), sortedVar("next", custom("State"))], \boolean(), \or(body));
 }
 
 Command declareInitialFunction(set[Built] allBuilts, State state) {

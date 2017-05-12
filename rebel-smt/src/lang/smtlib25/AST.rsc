@@ -18,7 +18,7 @@ data Command
 	| getValue(list[Formula] terms)
 	| getUnsatCore()
 	| getModel()
-	| eval(Formula term)
+	| eval(Formula term) 
 	| echo(str text)
 	| push(int nr)
 	| pop(int nr)
@@ -40,7 +40,7 @@ data VarBinding
 	;
 
 data QualifiedId
-	= as(str name, Sort sort)
+	= as(str name, Sort sort) 
 	| simple(str name)
 	;
 

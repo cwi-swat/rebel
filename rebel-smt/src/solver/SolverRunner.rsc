@@ -15,6 +15,8 @@ SolverPID startSolver() {
 	
 	// make sure that the unsatisfiable core are produced
 	runSolver(pid, "(set-option :produce-unsat-cores true)");
+	// also make sure that the right string theory engine is used
+	//runSolver(pid, "(set-option :smt.string_solver z3str3)");
 	
 	return pid;
 }
@@ -28,7 +30,7 @@ bool isSatisfiable(SolverPID pid, str smtFormula) {
 	if ("" !:= solverResult) {
 		throw "Unable to assert clauses: <solverResult>"; 
 	} 	
-	
+	 
 	return checkSat(pid);
 }
 
@@ -43,7 +45,7 @@ bool checkSat(SolverPID pid) {
 
 str runSolver(SolverPID pid, str commands, int wait = 0) {
 	try {
-		return run(pid, commands, debug=true, wait = wait);
+		return run(pid, commands, debug=false, wait = wait);
 	}
 	catch er: throw "Error while running SMT solver, reason: <er>"; 	
 }

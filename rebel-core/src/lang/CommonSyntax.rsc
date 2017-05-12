@@ -115,7 +115,10 @@ syntax Literal
 
 syntax Date = Int day Month month Int? year;
   
-syntax Time = hhmmss: [0-9][0-9]? hour ":" [0-9][0-9]? minutes (":" [0-9][0-9]?)? seconds;
+syntax Time 
+  = hhmm: [0-9][0-9]? hour ":" [0-9][0-9]? minutes
+  | hhmmss: [0-9][0-9]? hour ":" [0-9][0-9]? minutes ":" [0-9][0-9]? seconds
+  ;
 
 syntax DateTime 
   = Date date "," Time time

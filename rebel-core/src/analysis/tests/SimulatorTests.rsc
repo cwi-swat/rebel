@@ -1,83 +1,121 @@
 module analysis::tests::SimulatorTests
 
 import analysis::Simulator;
-import analysis::SimulationLoader;
+import analysis::SimulationHelper;
+import analysis::CommonAnalysisFunctions;
 
-import lang::Resolver;
+import lang::Resolver; 
 import lang::Builder;
 import lang::ExtendedSyntax;
 
 import lang::smtlib25::Compiler;
 import lang::smtlib25::AST;
-import ParseTree;
+import ParseTree; 
 
 import IO;
+import String;
 import List;
 import util::Maybe; 
 
 test bool testInitialStateSetup() {
   loc file = |project://rebel-core/examples/simple_transaction/Account.ebl|; 
-  
+
+  set[Built] allSpecs = loadAllSpecs(file, {});  
+  map[loc, Type] resolvedTypes = (() | it + b.resolvedTypes | Built b <- allSpecs);
+     
   State initial = constructInitialState(getInitialConfiguration(file));
-    
-  list[Variable] transitionParams = [
-        var("_accountNumber", [Type]"IBAN", [IBAN]"NL01INGB0000001"),
-        var("_toState", [Type]"Integer", [Int]"2"),
-        var("initialDeposit", [Type]"Money", [Money]"EUR 51.00")
-      ];
-   
-  TransitionResult result = transition(file, "simple_transaction.Account", "openAccount", transitionParams, initial);
+  list[Variable] transitionParams = buildTransitionParams("simple_transaction.Account", "openAccount", "opened", var("accountNumber", "NL01INGB0000001"), [var("initialDeposit", "EUR 51.00")], allSpecs);
+      
+  TransitionResult result = step("simple_transaction.Account", "openAccount", transitionParams, initial, allSpecs, resolvedTypes);
   
-  return successful(_) := result;
+  if (successful(State new) := result) {
+    printState(new, allSpecs);
+    return true;
+  } 
+  
+  return false;
 }
 
 test bool testStartTransaction() {
   loc file = |project://rebel-core/examples/simple_transaction/Transaction.ebl|; 
   
-  set[Module] normalizedSpecs = {b.normalizedMod | Built b <- loadSpecsTransitive(file, {})};
+  set[Built] allSpecs = loadAllSpecs(file, {});  
+  map[loc, Type] resolvedTypes = (() | it + b.resolvedTypes | Built b <- allSpecs);
 
-  // Build up the current state, all possible entities must be present, even if they are not initialized
-  State current = state(
-    1, // state nr
-    [DateTime]"12 Jul 2016, 12:00:00", // now 
-    [instance("simple_transaction.Account", [[lang::ExtendedSyntax::Literal]"NL01INGB0000001"], [var("accountNumber", [Type]"IBAN", [IBAN]"NL34ING001"), // all possible instances and their current values
-                                                    var("balance", [Type]"Money", [Money]"EUR 10.00"),
-                                                    var("_state", [Type]"Int", [Int]"1")]),
-     instance("simple_transaction.Account", [[lang::ExtendedSyntax::Literal]"NL01INGB0000002"], [var("accountNumber", [Type]"IBAN", [IBAN]"NL34ING002"),
-                                                   var("balance", [Type]"Money", [Money]"EUR 20.00"),
-                                                   var("_state", [Type]"Int", [Int]"1")]),
-     instance("simple_transaction.Account", [[lang::ExtendedSyntax::Literal]"NL01INGB0000003"], [var("_state", [Type]"Int", [Int]"4")]),
-     instance("simple_transaction.Transaction", [[lang::ExtendedSyntax::Literal]"1"], [var("_state", [Type]"Int", [Int]"1")])   
-  ]);
+  EntityInstance account1     = buildInstance("simple_transaction.Account", var("accountNumber", "NL01INGB0000001"), "opened", [var("balance", "EUR 10.00")], allSpecs);
+  EntityInstance account2     = buildInstance("simple_transaction.Account", var("accountNumber", "NL01INGB0000002"), "opened", [var("balance", "EUR 20.00")], allSpecs);
+  EntityInstance account3     = buildInstance("simple_transaction.Account", var("accountNumber", "NL01INGB0000003"), "closed", [var("balance", "EUR 0.00")], allSpecs);
+  EntityInstance transaction  = buildInstance("simple_transaction.Transaction", var("id", "1"), "uninit", [], allSpecs);
+
+  State current = buildState("12 Jul 2016, 12:00:00", [account1, account2, account3, transaction]);
   
-  list[Variable] transitionParams = [
-        var("_id", [Type]"Integer", [Int]"1"),
-        var("_toState", [Type]"Integer", [Int]"4"),
-        var("amount", [Type]"Money", [Money]"EUR 5.00"),
-        var("from", [Type]"IBAN", [IBAN]"NL01INGB0000001"),
-        var("to", [Type]"IBAN", [IBAN]"NL01INGB0000002"),
-        var("bookOn", [Type]"Date", [Date]"12 Jul 2016")
-      ];
-   
-  TransitionResult result = transition(file, "simple_transaction.Transaction", "start", transitionParams, current);
+  list[Variable] transitionParams = buildTransitionParams("simple_transaction.Transaction", "start", "validated", var("id", "1"), 
+    [var("amount", "EUR 10.00"), var("from", "NL01INGB0000001"), var("to", "NL01INGB0000002")], allSpecs);
+     
+  TransitionResult result = step("simple_transaction.Transaction", "start", transitionParams, current, allSpecs, resolvedTypes);
   
-  return successful(_) := result;
+  if (successful(State new) := result) {
+    printState(new, allSpecs);
+    return true;
+  } 
   
+  return false;
 }
 
-set[Built] loadSpecsTransitive(loc origin, set[Built] alreadyLoaded) {
-  bool isAlreadyLoaded(loc b) = b.top in {al.normalizedMod@\loc.top | al <- alreadyLoaded};
+test bool testStartTransactionAndThenBook() {
+  loc file = |project://rebel-core/examples/simple_transaction/Transaction.ebl|; 
   
-  set[Built] loaded  = {};
-  if (<set[Message] _, just(Built b)> := load(origin)) {
-    if (b.normalizedMod has spec) {
-      loaded += b;
-    }
+  set[Built] allSpecs = loadAllSpecs(file, {});  
+  map[loc, Type] resolvedTypes = (() | it + b.resolvedTypes | Built b <- allSpecs);
+
+  EntityInstance account1     = buildInstance("simple_transaction.Account", var("accountNumber", "NL01INGB0000001"), "opened", [var("balance", "EUR 10.00")], allSpecs);
+  EntityInstance account2     = buildInstance("simple_transaction.Account", var("accountNumber", "NL01INGB0000002"), "opened", [var("balance", "EUR 20.00")], allSpecs);
+  EntityInstance transaction  = buildInstance("simple_transaction.Transaction", var("id", "1"), "uninit", [], allSpecs);
+
+  State current = buildState("12 Jul 2016, 12:00:00", [account1, account2, transaction]);
+  
+  list[Variable] transitionParams1 = buildTransitionParams("simple_transaction.Transaction", "start", "validated", var("id", "1"), 
+    [var("amount", "EUR 5.00"), var("from", "NL01INGB0000001"), var("to", "NL01INGB0000002")], allSpecs);
+     
+  TransitionResult result1 = step("simple_transaction.Transaction", "start", transitionParams1, current, allSpecs, resolvedTypes);
+  
+  if (successful(State next) := result1) {
+    printState(next, allSpecs);
     
-    for (<_, loc def> <- b.refs.imports, !isAlreadyLoaded(def)) {
-      loaded += loadSpecsTransitive(def.top, alreadyLoaded + b);
-    }
-  }
+    list[Variable] transitionParams2 = buildTransitionParams("simple_transaction.Transaction", "book", "booked", var("id", "1"), [], allSpecs);
+    TransitionResult result2 = step("simple_transaction.Transaction", "book", transitionParams2, next, allSpecs, resolvedTypes);
+    
+    if (successful(State next2) := result2) {
+      printState(next2, allSpecs);
+    }         
+    return true;
+  } 
   
-  return loaded;
+  return false;
+}
+
+test bool testTransactionCannotBeBooked() {
+  loc file = |project://rebel-core/examples/simple_transaction/Transaction.ebl|; 
+  
+  set[Built] allSpecs = loadAllSpecs(file, {});  
+  map[loc, Type] resolvedTypes = (() | it + b.resolvedTypes | Built b <- allSpecs);
+
+  EntityInstance account1     = buildInstance("simple_transaction.Account", var("accountNumber", "NL01INGB0000001"), "opened", [var("balance", "EUR 10.00")], allSpecs);
+  EntityInstance account2     = buildInstance("simple_transaction.Account", var("accountNumber", "NL01INGB0000002"), "opened", [var("balance", "EUR 10.00")], allSpecs);
+  EntityInstance transaction  = buildInstance("simple_transaction.Transaction", var("id", "1"), "validated", [var("from", "NL01INGB0000001"), var("to", "NL01INGB0000002"), var("amount", "EUR 15.00")], allSpecs);
+
+  State current = buildState("12 Jul 2016, 12:00:00", [account1, account2, transaction]);
+  
+  list[Variable] transitionParams = buildTransitionParams("simple_transaction.Transaction", "book", "booked", var("id", "1"), [], allSpecs);
+     
+  TransitionResult result = step("simple_transaction.Transaction", "book", transitionParams, current, allSpecs, resolvedTypes);
+  
+  if (failed(list[str] reasons) := result) {
+    println("Transition failed because of reason:");
+    for(str r <- reasons) { println(r); }
+        
+    return true;
+  } 
+  
+  return false;
 }

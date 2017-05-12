@@ -12,8 +12,6 @@ str parseSmtResponse(str smtOutput, str (int) stringConstantLookup) {
   
   if ((GetValue)`((<Formula _> <Formula newVal>))` := resp) {
     str result = formatAsRebelLit(newVal, stringConstantLookup); 
-    println(result);
-    
     return result;  
   }    
   

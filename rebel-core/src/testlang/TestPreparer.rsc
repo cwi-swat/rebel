@@ -16,8 +16,6 @@ import DateTime;
 import IO;
 
 State constructStateSetup(StateSetup setup, TestRefs refs, set[Built] builtSpecs) {
-  println(setup);
-  
   Expr (Type) idGenerator = idGenerator();
   
   DateTime getValueOfNow() {
@@ -93,7 +91,7 @@ private Expr (Type) idGenerator(str IBANPrefix = "NL10INGB000000") {
   int accountIter = 0;
   int intIter = 0;
 
-  Expr generateId((Type)`IBAN`) { accountIter += 1; println("Generated IBAN = <IBANPrefix><accountIter>"); return [Expr]"<IBANPrefix><accountIter>"; }
+  Expr generateId((Type)`IBAN`) { accountIter += 1; return [Expr]"<IBANPrefix><accountIter>"; }
   Expr generateId((Type)`Integer`) {intIter += 1; return [Expr]"<intIter>"; }
   default Expr generateId(Type t) { throw "Id proposal for type \'<t>\' not yet implemented"; }
   

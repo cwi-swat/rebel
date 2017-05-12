@@ -134,11 +134,9 @@ str emptyLookup(int label) { throw "No string lookup function defined. Given lab
 Step getStep(SolverPID pid, str smtStateLabel, StringConstantPool scp, set[Built] allBuilts) {
   Command stepEntityCmd = getValue([functionCall(simple("step_entity"), [var(simple(smtStateLabel))])]);
   str entity = scp.toStr(toInt(parseSmtResponse(runSolver(pid, compile(stepEntityCmd), wait = 2), scp.toStr)));
-  println(entity);
   
   Command stepEventCmd = getValue([functionCall(simple("step_transition"), [var(simple(smtStateLabel))])]);
   str event = scp.toStr(toInt(parseSmtResponse(runSolver(pid, compile(stepEventCmd), wait = 2), scp.toStr)));
-  println(event);
   
   list[Variable] transitionValues = [];
 
@@ -175,10 +173,10 @@ Variable getNewVarValue(SolverPID pid, str entityType, list[Expr] id, Variable c
   str smtOutput = runSolver(pid, compile(replaceStringsWithInts(newValCmd, scp)), wait = 10);
 
   str formattedRebelExpr = parseSmtResponse(smtOutput, scp.toStr);
+
   if (isStringType(current.tipe)) {
     formattedRebelExpr = scp.toStr(toInt(formattedRebelExpr));
   }
-  println(formattedRebelExpr);
   Expr newVal = [Expr]"<formattedRebelExpr>";
   
   return var(current.name, current.tipe, newVal);
@@ -258,6 +256,23 @@ list[Command] declareSmtTypes(set[Module] specs) {
   smt += toList({declareSort("<m.modDef.fqn>") | /Module m := specs, m has spec});
   
   return smt; 
+}
+
+Command declareTransitionFunction(lrel[Built, EventDef] events, State state, set[Built] allBuilts, map[str, str] specLookup, map[loc, Type] types) {
+  list[Formula] body = [];
+  
+  for (<Built b, EventDef e> <- events) {
+    body += \and(
+      [functionCall(simple("event_<b.normalizedMod.modDef.fqn>_<e.name>"), [var(simple("current")), var(simple("next"))] + 
+        [functionCall(simple("eventParam_<b.normalizedMod.modDef.fqn>_<e.name>_<p.name>"), [var(simple("next"))]) | Parameter p <- e.transitionParams]
+      )] +
+      [equal(functionCall(simple("step_entity"), [var(simple("next"))]), lit(strVal("<b.normalizedMod.modDef.fqn>"))),
+      equal(functionCall(simple("step_transition"), [var(simple("next"))]), lit(strVal("<e.name>")))] +
+      translateFrameConditionsForUnchangedInstances(e, state, flattenedEvent("<b.normalizedMod.modDef.fqn>", "<e.name>", specLookup = specLookup, types = types))
+      );
+  }
+   
+  return defineFunction("transition", [sortedVar("current", custom("State")), sortedVar("next", custom("State"))], \boolean(), \or(body));
 }
 
 list[Command] translateInvariants(set[Built] specs, Context ctx) =
