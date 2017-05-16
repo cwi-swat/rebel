@@ -25,7 +25,7 @@ specification Customer {
         initial init -> createdCustomer: createCustomer
         
         createdCustomer -> onboardedCustomer: onboardCustomer
-                    -> declinedCustomer:  declineCustomer
+                        -> declinedCustomer:  declineCustomer
         onboardedCustomer -> deletedCustomer: deleteCustomer      
         final declinedCustomer
         final deletedCustomer

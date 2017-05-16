@@ -32,7 +32,7 @@ test bool testInitialStateSetup() {
     printState(new, allSpecs);
     return true;
   } 
-  
+   
   return false;
 }
 

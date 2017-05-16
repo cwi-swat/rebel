@@ -156,11 +156,11 @@ lrel[Built, EventDef] addSyncedInstances(lrel[Built, EventDef] events, set[Built
       set[Statement] result = findSyncedInstances(key, evnt, b, allBuilts);
     
       return visit(evnt) {
-        case orig:(EventDef)`<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>){<Preconditions? pre> <Postconditions? post> <SyncBlock? sync>}` =>
+        case orig:(EventDef)`<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>){<Preconditions? pre> <Postconditions? post> <MaybeSyncBlock sync>}` =>
           (EventDef)`<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>){
             ' <Preconditions? pre>
             ' <Postconditions? post>
-            ' <SyncBlock? sync>
+            ' <MaybeSyncBlock sync>
             ' <SyncInstances si>
             '}`[@\loc=orig@\loc]
           when SyncInstances si := ((SyncInstances)`syncInstances {}` | merge(it, stat) | Statement stat <- result)

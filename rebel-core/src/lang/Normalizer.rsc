@@ -337,16 +337,16 @@ set[EventDef] addFrameConditions(set[EventDef] events, set[FieldDecl] fields) {
                                 ' <Statement* origPostCon>
                                 ' <Statement fc>
                                 '}`
-    } when /Statement* _ := evnt.post;          
+    } when /Statement* _ := evnt.post;           
 	
-	EventDef mergePost(orig:(EventDef)`<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>){<Preconditions? pre> <Postconditions? post> <SyncBlock? sync>}`, Statement fc) 
+	EventDef mergePost(orig:(EventDef)`<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>){<Preconditions? pre> <Postconditions? post> <MaybeSyncBlock sync>}`, Statement fc) 
 	  =  (EventDef)
 	       `<Annotations annos> event <FullyQualifiedVarName name><EventConfigBlock? configParams>(<{Parameter ","}* transitionParams>) {
 	       '  <Preconditions? pre> 
 	       '  postconditions {
          '    <Statement fc>
          '  }
-         '  <SyncBlock? sync>
+         '  <MaybeSyncBlock sync>
          '}`[@\loc = orig@\loc]
        when /Statement* _ !:= post;
 	
@@ -388,13 +388,13 @@ set[EventDef] createEventMapping(set[EventDef] events) {
 			};
 		} else {
 			e = visit(e) {
-				case orig:(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
+				case orig:(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <MaybeSyncBlock sync> }` => 
 					(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
 								'  <Preconditions? pre> 
 								'  postconditions {
 								'    <Statement labeledEvent>
 								'  }
-								'  <SyncBlock? sync> 
+								'  <MaybeSyncBlock sync> 
 								'}`[@\loc = orig@\loc]
 			}			
 		}
@@ -420,11 +420,11 @@ set[StateFrom] createStateMapping(set[StateFrom] states) {
 	return {labelState(s) | s <- states};
 }
 
-EventDef addTransitionParam(orig:(EventDef) `<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* origParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }`, Parameter newTransitionParam) =
+EventDef addTransitionParam(orig:(EventDef) `<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* origParams>) { <Preconditions? pre> <Postconditions? post> <MaybeSyncBlock sync> }`, Parameter newTransitionParam) =
   (EventDef)  `<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* origParams>, <Parameter newTransitionParam>) {
               '  <Preconditions? pre>
               '  <Postconditions? post>
-              '  <SyncBlock? sync>
+              '  <MaybeSyncBlock sync>
               '}`[@\loc = orig@\loc];  
   
 
@@ -444,13 +444,13 @@ tuple[set[Message], set[EventDef], set[StateFrom]] desugarStates(set[EventDef] e
       };
     } else {
       return visit(e) {
-        case orig:(EventDef) `<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
+        case orig:(EventDef) `<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <MaybeSyncBlock sync> }` => 
           (EventDef)  `<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
                 '  <Preconditions? pre> 
                 '  postconditions {
                 '    <Statement labeledEvent>
                 '  }
-                '  <SyncBlock? sync> 
+                '  <MaybeSyncBlock sync> 
                 '}`[@\loc = orig@\loc]
       }     
     }
@@ -531,13 +531,13 @@ tuple[set[Message], set[EventDef], set[StateFrom]] desugarStates(set[EventDef] e
   			} 	 
   		} else {
   			e = visit(e) {
-  				case orig:(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
+  				case orig:(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <MaybeSyncBlock sync> }` => 
   					(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
   								'  preconditions {
   								'    <Statement inlinedLifeCycle>
   								'  } 
   								'  <Postconditions? post>
-  								'  <SyncBlock? sync> 
+  								'  <MaybeSyncBlock sync> 
   								'}`[@\loc = orig@\loc]
   					when Statement inlinedLifeCycle := createInlinedPreconditionLifeCycleStatement(e)
   			}			
@@ -554,13 +554,13 @@ tuple[set[Message], set[EventDef], set[StateFrom]] desugarStates(set[EventDef] e
 			}	
 		} else {
 			e = visit(e) {
-				case orig:(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <SyncBlock? sync> }` => 
+				case orig:(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { <Preconditions? pre> <Postconditions? post> <MaybeSyncBlock sync> }` => 
 					(EventDef)	`<Annotations annos> event <FullyQualifiedVarName name> <EventConfigBlock? configParams> (<{Parameter ","}* transitionParams>) { 
 								'  <Preconditions? pre>
 								'  postconditions {
 								'    <Statement postCon>
 								'  } 
-								'  <SyncBlock? sync> 
+								'  <MaybeSyncBlock sync> 
 								'}`[@\loc = orig@\loc]
 			}			
 

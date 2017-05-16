@@ -169,9 +169,11 @@ default str findStep(set[Built] allSpecs, str entity, str stepLabel) = "?";
 void printState(State st, set[Built] allSpecs) {
   str printStateLabel(EntityInstance ei) = printStateVar(v, ei.entityType)
     when v:var("_state", Type _, Expr _) <- ei.vals;
+  default str printStateLabel(EntityInstance ei) = "?";
     
   str printStepLabel(EntityInstance ei) = printStateVar(v, ei.entityType)
     when v:var("_step", Type _, Expr _) <- ei.vals;
+  default str printStepLabel(EntityInstance ei) = "?";
      
   str printStateVar(var("_state", Type t, Expr val), str entity) = "State = <findState(allSpecs, entity, "<val>")>";  
   str printStateVar(var("_step", Type t, Expr val), str entity) = "Last event triggered = <findStep(allSpecs, entity, "<val>")>";

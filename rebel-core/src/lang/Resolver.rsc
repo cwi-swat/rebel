@@ -175,7 +175,7 @@ Reff resolveInStateReferences(set[Module] modules) {
   } 
   
   return refs;
-}
+} 
 
 Reff resolveInheritance(set[Module] modules) {
 	Reff refs = {}; 

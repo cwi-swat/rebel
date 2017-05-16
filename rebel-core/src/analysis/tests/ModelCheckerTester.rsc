@@ -3,6 +3,7 @@ module analysis::tests::ModelCheckerTester
 import analysis::ModelChecker;
 import testlang::TestPreparer;
 import analysis::CommonAnalysisFunctions;
+import analysis::SimulationHelper;
 
 import testlang::Loader;
 import testlang::Syntax;
@@ -26,11 +27,11 @@ bool testIfStateIsReachable(loc testFile, int maxSteps) {
     map[loc, Type] allResolvedTypes = loaded.resolvedTypes + (() | it + b.resolvedTypes | Built b <- loaded.importedSpecs);
 
     if (reachable(list[State] trace) := checkIfStateIsReachable(state, max(maxSteps), loaded.importedSpecs, allResolvedTypes, true)) {
-      printTrace(trace);
+      printTrace(trace, loaded.importedSpecs);
       
       return true; 
     } else {
-      return false;
+      return false; 
     }
   } 
   else {
@@ -38,31 +39,8 @@ bool testIfStateIsReachable(loc testFile, int maxSteps) {
   }
 }
 
-void printTrace(list[State] t) {
+void printTrace(list[State] t, set[Built] builds) {
   for (State st <- t) {
-    println("<st.nr>:
-            '  now = <st.now>");
-
-    if (step(str entity, str event, list[Variable] transitionParameters) := st.step) {
-      println("  step: <entity>.<event> <for (v <- transitionParameters) {>
-              '    var <v.name> (type: <v.tipe>) = <v.val> <}>
-              '");
-    }
-    
-    println("<for (i <- st.instances) {>
-            '  instance: <i.entityType>, key = <intercalate(",", i.id)> <for (v <- i.vals) {>
-            '    var <v.name> (type: <v.tipe>) = <((uninitialized(_,_) !:= v) ? v.val : "uninitialized")> <}>  
-            '<}>
-            '");
+    printState(st, builds);
   }
-}
-
-void printState(State st) {
-  println("<st.nr>:
-          'now = <st.now>
-          '<for (i <- st.instances) {>
-          'instance: <i.entityType>, key = <intercalate(",", i.id)> <for (v <- i.vals) {>
-          '  var <v.name> (type: <v.tipe>) = <v.val> <}>  
-          '<}>
-          '");  
 }

@@ -15,7 +15,7 @@ module lang::Syntax
 
 extend lang::CommonSyntax;
  
-start syntax Module
+start syntax Module 
 	= ModuleDef modDef Import* imports Specification spec
 	| ModuleDef modDef Import* imports LibraryModule* decls
 	;

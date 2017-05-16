@@ -26,7 +26,7 @@ syntax EventDefs = "eventDefs" "{" EventDef* events "}";
 syntax InvariantDefs = "invariantDefs" "{" InvariantDef* defs "}";
 
 syntax EventDef = 
-  Annotations annos "event" FullyQualifiedVarName name EventConfigBlock? configParams "(" {Parameter ","}* transitionParams")" "{" Preconditions? pre Postconditions? post SyncBlock? sync SyncInstances syncInstances "}";
+  Annotations annos "event" FullyQualifiedVarName name EventConfigBlock? configParams "(" {Parameter ","}* transitionParams")" "{" Preconditions? pre Postconditions? post MaybeSyncBlock sync SyncInstances syncInstances "}";
 
 syntax SyncInstances = "syncInstances" "{" Statement* stats "}";
 

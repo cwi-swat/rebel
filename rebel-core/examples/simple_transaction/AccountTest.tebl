@@ -1,0 +1,11 @@
+module simple_transaction.AccountTest
+
+import simple_transaction.Account 
+
+state accountBelowZero {
+  now is 26 Sep 2016, 16:42;
+
+  opened Account with balance < EUR 0.00;
+}
+
+check accountBelowZeroInMax reachable in max 2 steps;

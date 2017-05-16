@@ -2,7 +2,7 @@ module lang::CommonSyntax
 
 extend lang::std::Layout;
 extend lang::std::Comment;
-extend lang::std::Id;
+extend lang::std::Id; 
 
 syntax ModuleDef = "module" FullyQualifiedName fqn;
 
