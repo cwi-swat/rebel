@@ -70,7 +70,7 @@ alias StateAndVars = tuple[State state, Variables vars];
 Response handle(post((URI)`/rest/sim/fire/<Part spec>/<Part event>`, Body b), AppRunContext ctx) {
   if (StateAndVars sav := b(#StateAndVars)) {
     loc specLoc = resolveSpec("<spec>", ctx);
-    
+     
     TransitionResult result = transition(specLoc, "<spec>", "<event>", toSim(sav.vars), toSim(sav.state));
     
     switch(result) {

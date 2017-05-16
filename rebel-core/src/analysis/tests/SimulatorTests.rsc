@@ -80,15 +80,16 @@ test bool testStartTransactionAndThenBook() {
   TransitionResult result1 = step("simple_transaction.Transaction", "start", transitionParams1, current, allSpecs, resolvedTypes);
   
   if (successful(State next) := result1) {
-    printState(next, allSpecs);
-    
     list[Variable] transitionParams2 = buildTransitionParams("simple_transaction.Transaction", "book", "booked", var("id", "1"), [], allSpecs);
     TransitionResult result2 = step("simple_transaction.Transaction", "book", transitionParams2, next, allSpecs, resolvedTypes);
     
     if (successful(State next2) := result2) {
+      printState(next, allSpecs);
       printState(next2, allSpecs);
+      return true;
     }         
-    return true;
+    
+    return false;
   } 
   
   return false;
