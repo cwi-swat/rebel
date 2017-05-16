@@ -24,7 +24,7 @@ data Context(map[str,str] specLookup = (), map[loc, Type] types = ())
  = inGoalState(str spec, list[Expr] ids)
  ;
 
-data StepConfig
+data StepConfig 
   = max(int nrOfSteps)
   | exact(int nrOfSteps) 
   | between(int lower, int upper)

@@ -11,7 +11,7 @@ set[Message] checkReferences(TestModule m, TestRefs refs) =
   checkSpecs(m, refs.specs) +
   checkStates(m, refs.states) +
   checkFields(m, refs.fields) +
-  checkAllConstraintsReferToFields(m);
+  checkAllConstraintsReferToFields(m); 
   
 set[Message] checkImports(TestModule m, Reff importRefs) =
   {error("Unable to locate imported module", i.fqn@\loc) | Import i <- m.imports, importRefs[i.fqn@\loc] == {}}; 

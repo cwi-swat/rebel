@@ -29,7 +29,7 @@ alias FlattenerResult = tuple[set[Message] msgs, Module flattenedModule];
 FlattenerResult flatten(Module current, set[Module] imports) {
 	tuple[set[Message], set[Module]] parents = findParents(current, imports);
 	
-	set[Import] allImports = {imp | /Import imp := parents<1>}; 
+	set[Import] allImports = {imp | /Import imp := parents<1>};  
 	
 	Module flattenedMod = visit(current) {
 		case m:(Module)`<ModuleDef modDef> <Import* _> <Specification spec>` => 
@@ -95,7 +95,7 @@ EventRefs initEventRefs(EventRefs? e) = /EventRefs ee := e ? ee : (EventRefs)`ev
 EventRefs mergeEventRefs(orig:(EventRefs)`events { <EventRef* evnts> }`, EventRef er) =
 	(EventRefs) `events {
 				      '  <EventRef* evnts>
-				      '  <EventRef er>
+				      '  <EventRef er> 
 				      '}`[@\loc=orig@\loc]
   when /er !:= orig;     
 default EventRefs mergeEventRefs(EventRefs ers, EventRef _) = ers;				 	

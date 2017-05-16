@@ -13,14 +13,14 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 @contributor{Jouke Stoel - jouke.stoel@cwi.nl - CWI}
 module lang::tests::TypeResolverTester
 
-import lang::TypeResolver;
+import lang::TypeChecker;
 import lang::ExtendedSyntax;
 
 import lang::Parser;
 import lang::Importer;
 import lang::Resolver;
 import lang::Normalizer;
-
+ 
 import ParseTree;
 import Map;
 import IO;
@@ -42,7 +42,7 @@ test bool testResolveType() =
 
 bool testResolveSpec(loc file) {
   Module orig = parseModule(file);
-  set[Module] imports = loadImports(orig);
+  set[Module] imports = loadImports(orig); 
   Refs refs = resolve({orig} + imports);  
   Module inlinedSpec = inline(orig, imports, refs);
 

@@ -595,7 +595,7 @@ set[EventDef] inlineConfigurationParameters(set[EventDef] events) {
 
 tuple[set[Message], set[EventDef]] mergeConfig(set[EventDef] events, Specification spc, Reff keywordRefs) {
   Maybe[Expr] findConfigParameterValue(loc def) {
-    if (<def, loc ref> <- keywordRefs, /EventRef er := spc.events, ConfigParameter overriddenConfig <- er.config, overriddenConfig@\loc == ref) {
+    if (<def, loc ref> <- keywordRefs, /EventRef er := spc.optEventRefs, ConfigParameter overriddenConfig <- er.config, overriddenConfig@\loc == ref) {
       return just(overriddenConfig.val);
     } else {
       return nothing();
@@ -606,7 +606,7 @@ tuple[set[Message], set[EventDef]] mergeConfig(set[EventDef] events, Specificati
     when 
       EventDef evnt <- events, 
       configParam <= evnt@\loc, 
-      /EventRef er := spc.events, 
+      /EventRef er := spc.optEventRefs, 
       "<er.eventRef>" == "<evnt.name>";
   default Maybe[loc] findEventRef(loc configParam) = nothing();  
   

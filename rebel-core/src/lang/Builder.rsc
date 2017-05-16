@@ -1,10 +1,10 @@
 module lang::Builder
 
-import Message;
+//import Message;
 import util::Maybe;
 import util::FileSystem;
 
-import lang::Importer;
+import lang::Importer; 
 import lang::Flattener;
 import lang::Resolver;
 import lang::Normalizer;
@@ -16,13 +16,13 @@ import IO;
 import ValueIO;
 import List;
 import String;
-import ParseTree;
-import Set;
+import ParseTree; 
+import Set; 
 
 alias Log = void(str);
 
 void stdOutLog(str x) {println(x);}
-
+ 
 //data Built 
 //  = buildSpec(Module inlinedMod, Module normalizedMod, Refs refs)
 //  | buildLib(Module normalizedMod, Refs refs)
@@ -30,8 +30,8 @@ void stdOutLog(str x) {println(x);}
 
 alias BuiltInternal = tuple[Module inlinedMod, Module normalizedMod, Refs refs, map[loc, Type] resolvedTypes];
 alias Built = tuple[Module inlinedMod, Module normalizedMod, Refs refs, map[loc, Type] resolvedTypes, UsedBy usedBy];
-
-alias UsedBy = set[loc];
+ 
+alias UsedBy = set[loc]; 
 
 private str buildDir = "bin";
 

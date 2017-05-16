@@ -29,7 +29,7 @@ Maybe[Built] findBuiltBeloningToEvent(loc locEventDef, set[Built] mods) {
 Maybe[Module] findInlinedSpec(loc specDef, set[Built] mods) {
   if (Built b <- mods, b.inlinedMod has spec, b.inlinedMod.spec@\loc == specDef) {
     return just(b.inlinedMod);
-  }
+  } 
   else {
     return nothing();
   }
@@ -63,7 +63,7 @@ Maybe[Module] findNormalizedSpecModuleContaining(loc specToFind, set[Built] buil
   if (Built b <- builds, Module m := b.normalizedMod, m has spec, contains(m@\loc, specToFind)) {
     return just(m);
   } else {
-    return nothing();
+    return nothing(); 
   }
 }
 

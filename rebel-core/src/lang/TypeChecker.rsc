@@ -47,7 +47,7 @@ TypeCheckerResult checkTypes(Module modul, set[Module] imports) {
         }  
       }
     }
-    
+     
     msgs += internalMsg;
     types += internalTypes;
     

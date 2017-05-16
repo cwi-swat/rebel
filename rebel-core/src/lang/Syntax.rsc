@@ -32,7 +32,7 @@ syntax EventDef = Annotations annos "event" FullyQualifiedVarName name EventConf
 
 syntax MaybeSyncBlock = SyncBlock?;
 
-syntax EventConfigBlock = "[" {Parameter ","}+ params "]";
+syntax EventConfigBlock = "[" {Parameter ","}+ params "]"; 
 
 syntax Preconditions = "preconditions" "{" Statement* stats"}";
 
@@ -47,7 +47,7 @@ syntax InvariantDef = Annotations annos "invariant" FullyQualifiedVarName name "
 // Specification rules
 
 syntax Specification = 
-  spec:Annotations annos SpecModifier? modifier "specification" TypeName name Extend? extend "{" Fields? fields EventRefs? events InvariantRefs? invariants LifeCycle? lifeCycle "}";
+  spec:Annotations annos SpecModifier? modifier "specification" TypeName name Extend? extend "{" Fields? optFields EventRefs? optEventRefs InvariantRefs? optInvariantRefs LifeCycle? optLifeCycle "}";
 
 syntax Extend = "extends" FullyQualifiedName parent;
 
@@ -143,7 +143,7 @@ syntax MapElement =  Expr key ":" Expr val;
  
 syntax FieldDecl 
 	= VarName name ":" Type tipe Annotations meta
-	;	
+	;	 
 	  
 syntax Ref 
 	= FullyQualifiedVarName field
