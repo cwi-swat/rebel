@@ -37,6 +37,8 @@ list[Param] getTransitionParams(loc spec, str transitionToFire) =
        EventDef evnt <- b.normalizedMod.spec.events.events,
        "<evnt.name>" == transitionToFire;
 
+default list[Param] getTransitionParams(loc spec, str transitionToFire) {throw "Unable to locate transition \'<transitionToFire>\' in specification \'<spec>\'. Does the transition exist?";}
+
 TransitionResult step(str entity, str transitionToFire, list[Variable] transitionParams, State current, set[Built] allBuilts, map[loc, Type] resolvedTypes) {	
     map[str, int] stringIntMapping = ();
     

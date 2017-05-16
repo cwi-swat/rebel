@@ -88,10 +88,16 @@ list[Variable] buildTransitionParams(str entity, str transitionToFire, str toSta
     when Built b <- allSpecs,
          b has normalizedMod,
          "<b.normalizedMod.modDef.fqn>" == entity;
-  
+
+  default loc findSpec() { throw "Unable to locate the specification \'<entity>\'. Is it correctly spelled?"; }
+
   list[Param] paramsInTransition = getTransitionParams(findSpec(), transitionToFire);
  
   list[Variable] result = [];
+
+  if (/param("_<id.fieldName>", _) !:= paramsInTransition, /param(str name, _) := paramsInTransition, startsWith(name, "_"), name != "_toState") {
+    throw "The provided id field \'<id.fieldName>\' does not match the id field of the entity. The id field should be \'<substring(name,1)>\'";
+  } 
 
   for (param(str name, Type tipe) <- paramsInTransition) {
     if (v:var(name, str val) <- params) {
@@ -133,6 +139,10 @@ EntityInstance buildInstance(str entity, Var id, str state, list[Var] fieldsAndV
 
   list[Variable] initializedFields = [var("<f.name>", [Type]"<f.tipe>", [Expr]"<val>") |
     Built b <- allSpecs, b has normalizedMod, entity == "<b.normalizedMod.modDef.fqn>", FieldDecl f <- b.normalizedMod.spec.fields.fields, "<f.name>" in fieldsWithValues, var("<f.name>", str val) <- fieldsAndVals];
+  
+  if (var(str name, _) <- fieldsAndVals, /var(name, _, _) !:= uninitializedFields + initializedFields) {
+    throw "Provided field \'<name>\' is not a known field of the entity \'<entity>\'. Could it be a typo?";
+  }
   
   return instance(entity, [[lang::ExtendedSyntax::Expr]"<id.val>"], 
     [keyField()] + [var("_state", [Type]"Int", findStateLabel(allSpecs, entity, state))] + initializedFields + uninitializedFields);

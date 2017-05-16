@@ -120,3 +120,39 @@ test bool testTransactionCannotBeBooked() {
   
   return false;
 }
+
+test bool testOpenAccountWhileFramingOtherEntities() {
+  loc file = |project://rebel-core/examples/simple_transaction/Account.ebl|; 
+  
+  set[Built] allSpecs = loadAllSpecs(file, {});  
+  map[loc, Type] resolvedTypes = (() | it + b.resolvedTypes | Built b <- allSpecs);
+
+  EntityInstance account1     = buildInstance("simple_transaction.Account", var("accountNumber", "NL01INGB0000001"), "init", [], allSpecs);
+  EntityInstance account2     = buildInstance("simple_transaction.Account", var("accountNumber", "NL01INGB0000002"), "opened", [var("balance", "EUR 10.00")], allSpecs);
+  EntityInstance account3     = buildInstance("simple_transaction.Account", var("accountNumber", "NL01INGB0000003"), "opened", [var("balance", "EUR 30.00")], allSpecs);
+
+  State current = buildState("12 Jul 2016, 12:00:00", [account1, account2, account3]);
+  
+  list[Variable] transitionParams = buildTransitionParams("simple_transaction.Account", "openAccount", "opened", var("accountNumber", "NL01INGB0000001"), [var("initialDeposit", "EUR 55.00")], allSpecs);
+
+  TransitionResult result = step("simple_transaction.Account", "openAccount", transitionParams, current, allSpecs, resolvedTypes);
+
+  if (successful(State new) := result) {
+    printState(new, allSpecs);
+   
+    if (EntityInstance ei <- new.instances, /Expr id := ei.id, "<id>" == "NL01INGB0000002", /var("balance",_, Expr val) := ei.vals, "<val>" != "EUR10.00") {
+      println("The balance of account NL01INGB0000002 changed");
+      return false;
+    }
+    if (EntityInstance ei <- new.instances, /Expr id := ei.id, "<id>" == "NL01INGB0000003", /var("balance",_, Expr val) := ei.vals, "<val>" != "EUR30.00") {
+      println("The balance of account NL01INGB0000003 changed");
+      return false;
+    }
+    
+    return true;
+  } 
+  
+  println("Transition should be posible but failed for some reason");
+  return false;
+
+}
