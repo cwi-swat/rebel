@@ -160,7 +160,7 @@ str findStep(set[Built] allSpecs, str entity, str stepLabel) = "<evnt.name>"
   when  Built b <- allSpecs, 
         b has normalizedMod, 
         entity == "<b.normalizedMod.modDef.fqn>",
-        EventDef evnt <- b.normalizedMod.spec.inlinedEvents.events,
+        EventDef evnt <- b.normalizedMod.spec.events.events,
         /(Statement)`new <Expr spc>[<Expr id>]._step == <Int i>;` := evnt.post,
         stepLabel == "<i>";
 default str findStep(set[Built] allSpecs, str entity, str stepLabel) = "?";
