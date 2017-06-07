@@ -24,9 +24,9 @@ specification Transaction {
 	}
 	
 	lifeCycle {
-		initial uninit -> validated: start 
-		validated    -> booked: book 
-					-> failed: fail
+		initial uninit  -> validated: start  
+		validated       -> booked: book 
+					          -> failed: fail
 		final booked
 		final failed
 	}	

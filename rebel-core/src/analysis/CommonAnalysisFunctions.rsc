@@ -177,6 +177,7 @@ Variable getNewVarValue(SolverPID pid, str entityType, list[Expr] id, Variable c
   if (isStringType(current.tipe)) {
     formattedRebelExpr = scp.toStr(toInt(formattedRebelExpr));
   }
+  
   Expr newVal = [Expr]"<formattedRebelExpr>";
   
   return var(current.name, current.tipe, newVal);
