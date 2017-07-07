@@ -16,7 +16,7 @@ specification Transaction {
 		//createdOn: DateTime
 		//bookedOn: Date
 	}
-	  
+	    
 	events {   
 		start[]  
 		book[]  
@@ -27,7 +27,7 @@ specification Transaction {
 		initial uninit -> validated: start 
 		validated    -> booked: book 
 					-> failed: fail
-		final booked
+		final booked 
 		final failed
 	}	
 }

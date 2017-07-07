@@ -149,11 +149,11 @@ list[Command] declareStates() = [declareConst("current", custom("State")), decla
 list[Command] assertCurrentState(State current) {
   return [\assert(\equal(
     functionCall(simple("field_<ei.entityType>_<name>"), [functionCall(simple("spec_<ei.entityType>"), [var(simple("current"))] + [translateExpr(id, emptyCtx()) | Expr id <- ei.id])]), translateExpr(val, emptyCtx())))
-     | EntityInstance ei <- current.instances, var(str name, Type tipe, Expr val) <- ei.vals];
+     | EntityInstance ei <- current.instances, var(str name, Type tipe, Expr val) <- ei.vals, (Expr)`ANY` !:= val];
 }
 
 list[Command] assertTransitionParams(str entity, str transitionToFire, list[Variable] params) =
-  [\assert(equal(functionCall(simple("eventParam_<entity>_<transitionToFire>_<p.name>"), [var(simple("next"))]), translateExpr(p.val, emptyCtx()))) | Variable p <- params] +
+  [\assert(equal(functionCall(simple("eventParam_<entity>_<transitionToFire>_<p.name>"), [var(simple("next"))]), translateExpr(p.val, emptyCtx()))) | Variable p <- params, (Expr)`ANY` !:= p.val] +
   [\assert(equal(functionCall(simple("step_entity"), [var(simple("next"))]), lit(strVal(entity))))] +
   [\assert(equal(functionCall(simple("step_transition"), [var(simple("next"))]), lit(strVal(transitionToFire))))] ; 
 

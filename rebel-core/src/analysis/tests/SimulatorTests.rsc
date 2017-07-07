@@ -62,6 +62,29 @@ test bool testStartTransaction() {
   return false;
 }
 
+test bool testOpenAccountWithAnyAmount() {
+  loc file = |project://rebel-core/examples/simple_transaction/Account.ebl|; 
+  
+  set[Built] allSpecs = loadAllSpecs(file, {});  
+  map[loc, Type] resolvedTypes = (() | it + b.resolvedTypes | Built b <- allSpecs);
+
+  EntityInstance account     = buildInstance("simple_transaction.Account", var("accountNumber", "NL01INGB0000001"), "init", [], allSpecs);
+
+  State current = buildState("12 Jul 2016, 12:00:00", [account]);
+  
+  list[Variable] transitionParams = buildTransitionParams("simple_transaction.Account", "openAccount", "opened", var("accountNumber", "NL01INGB0000001"), 
+    [var("initialDeposit", "ANY")], allSpecs);
+     
+  TransitionResult result = step("simple_transaction.Account", "openAccount", transitionParams, current, allSpecs, resolvedTypes);
+  
+  if (successful(State new) := result) {
+    printState(new, allSpecs);
+    return true;
+  } 
+  
+  return false;
+}
+
 test bool testStartTransactionAndThenBook() {
   loc file = |project://rebel-core/examples/simple_transaction/Transaction.ebl|; 
   
