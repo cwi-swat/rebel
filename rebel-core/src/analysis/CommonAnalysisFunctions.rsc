@@ -485,6 +485,7 @@ Sort translateSort((Type)`Integer`) = \integer();
 Sort translateSort((Type)`Frequency`) = custom("Frequency");
 Sort translateSort((Type)`Percentage`) = custom("Percentage");
 Sort translateSort((Type)`String`) = \string();
+Sort translateSort((Type)`Boolean`) = \boolean();
 
 
 default Sort translateSort(Type t) { throw "Sort conversion for <t> not yet implemented"; }
