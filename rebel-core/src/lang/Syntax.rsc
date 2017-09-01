@@ -166,6 +166,7 @@ lexical TagString
 lexical SpecModifier 
 	= "abstract"
 	| "external"
+	| "singleton"
 	; 
 
 lexical LifeCycleModifier = "initial" | "final";
