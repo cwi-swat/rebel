@@ -18,6 +18,8 @@
     <modules>
         <module>rebel-core</module>
         <module>rebel-eclipse</module>
+        <module>rebel-smt</module>
+        <module>rebel-web</module>
     </modules>
 
 	<properties>
