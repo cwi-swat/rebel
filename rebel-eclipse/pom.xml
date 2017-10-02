@@ -4,55 +4,15 @@
 
     <modelVersion>4.0.0</modelVersion>
     
-	<parent>
-		<groupId>io.usethesource</groupId>
-		<artifactId>pom-parent</artifactId>
-		<version>0.2.0-SNAPSHOT</version>
-	</parent>
+    <parent>
+        <groupId>org.rascalmpl</groupId>
+        <artifactId>rebel</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
 
     <groupId>org.rascalmpl</groupId>
     <artifactId>rebel_eclipse</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>eclipse-plugin</packaging>
 
-	<distributionManagement>
-		<repository>
-			<id>usethesource-releases</id>
-			<url>http://nexus.usethesource.io/content/repositories/releases/</url>
-		</repository>
-		<snapshotRepository>
-			<id>usethesource-snapshots</id>
-			<url>http://nexus.usethesource.io/content/repositories/snapshots/</url>
-		</snapshotRepository>
-	</distributionManagement>
-
-    <repositories>
-        <repository>
-            <id>usethesource-cache</id>
-            <url>http://nexus.usethesource.io/content/repositories/public/</url>
-        </repository>
-
-        <repository>
-            <id>usethesource-snapshots</id>
-            <url>http://nexus.usethesource.io/content/repositories/snapshots/</url>
-        </repository>
-
-        <repository>
-            <id>usethesource-rascalmpl-unstable</id>
-            <layout>p2</layout>
-            <url>https://update.rascal-mpl.org/unstable/</url>
-        </repository>
-
-        <repository>
-            <id>rascalmpl-libs</id>
-            <layout>p2</layout>
-            <url>https://update.rascal-mpl.org/libs/</url>
-        </repository>
-
-        <repository>
-            <id>neon</id>
-            <layout>p2</layout>
-            <url>http://nexus.usethesource.io/content/repositories/eclipse-neon/</url>
-        </repository>
-    </repositories>
 </project>

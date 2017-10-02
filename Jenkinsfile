@@ -9,14 +9,12 @@ node {
     }
     
     stage('Packaging') {
-      sh "cd rebel-core && mvn clean package"
-      sh "cd rebel-eclipse && mvn clean package"
+      sh "mvn clean package"
     }
     
     stage('Deploy') {
       if (env.BRANCH_NAME == "master") {
-        sh "cd rebel-core && mvn -s ${env.HOME}/usethesource-maven-settings.xml -DskipTests -B deploy"
-        sh "cd rebel-eclipse && mvn -s ${env.HOME}/usethesource-maven-settings.xml -DskipTests -B deploy"
+        sh "mvn -s ${env.HOME}/usethesource-maven-settings.xml -DskipTests -B deploy"
       }
     }
     
