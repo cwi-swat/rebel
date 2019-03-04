@@ -3,7 +3,7 @@ module analysis::CommonAnalysisFunctions
 import lang::ExtendedSyntax;
 import lang::Builder;
 import lang::Resolver;
-import lang::Finder;
+//import lang::Finder;
 
 import lang::smtlib25::AST;
 import lang::smtlib25::Compiler;
@@ -21,7 +21,7 @@ import util::Maybe;
 import util::Math;
 import ParseTree;
 import Boolean;
-import analysis::graphs::Graph;
+//import analysis::graphs::Graph;
 
 //alias RebelLit = lang::ExtendedSyntax::Literal;
 
@@ -55,7 +55,7 @@ list[Command] replaceStringsWithInts(list[Command] commands, StringConstantPool 
 
 Command replaceStringsWithInts(Command command, StringConstantPool scp) {
   return visit(command) {
-    case \string() => integer()
+    case \string() => \int()
     case strVal(str s) => intVal(scp.toInt(s))
   }
 }
@@ -226,7 +226,7 @@ list[Command] declareSmtSpecLookup(set[Module] mods, State st) {
 
     // declare an exist function to check whether keys are part of the predefined model universe
     smt += defineFunction("spec_<m.modDef.fqn>_exists", [sortedVar("<k.name>", translateSort(k.tipe)) | k <- keys], \boolean(),
-      or([and([equal(var(simple("<keys[i].name>")), translateExpr(ei.id[i], emptyCtx())) | int i <- [0..size(keys)]]) | ei <- getInstances("<m.modDef.fqn>")])
+      or([and([eq(var(simple("<keys[i].name>")), translateExpr(ei.id[i], emptyCtx())) | int i <- [0..size(keys)]]) | ei <- getInstances("<m.modDef.fqn>")])
     );
 
     // define the initialized function
@@ -234,10 +234,10 @@ list[Command] declareSmtSpecLookup(set[Module] mods, State st) {
     set[int] initializedStateNrs = {toInt("<sf.nr>") | /StateFrom sf := lc, /(LifeCycleModifier)`initial` !:= sf};
     smt += defineFunction("spec_<m.modDef.fqn>_initialized", 
       [sortedVar("entity", custom("<m.modDef.fqn>"))] + [sortedVar("<k.name>", translateSort(k.tipe)) | k <- keys], 
-      \boolean(), 
+      \bool(), 
       and([
         functionCall(simple("spec_<m.modDef.fqn>_exists"),[var(simple("<k.name>")) | k <- keys]),
-        or([equal(functionCall(simple("field_<m.modDef.fqn>__state"), [var(simple("entity"))]), lit(intVal(nr))) | int nr <- initializedStateNrs])
+        or([eq(functionCall(simple("field_<m.modDef.fqn>__state"), [var(simple("entity"))]), lit(intVal(nr))) | int nr <- initializedStateNrs])
       ]));
   }
   
@@ -268,12 +268,12 @@ Command declareTransitionFunction(lrel[Built, EventDef] events, State state, set
         [functionCall(simple("eventParam_<b.normalizedMod.modDef.fqn>_<e.name>_<p.name>"), [var(simple("next"))]) | Parameter p <- e.transitionParams]
       )] +
       [equal(functionCall(simple("step_entity"), [var(simple("next"))]), lit(strVal("<b.normalizedMod.modDef.fqn>"))),
-      equal(functionCall(simple("step_transition"), [var(simple("next"))]), lit(strVal("<e.name>")))] +
+      eq(functionCall(simple("step_transition"), [var(simple("next"))]), lit(strVal("<e.name>")))] +
       translateFrameConditionsForUnchangedInstances(e, state, flattenedEvent("<b.normalizedMod.modDef.fqn>", "<e.name>", specLookup = specLookup, types = types))
       );
   }
    
-  return defineFunction("transition", [sortedVar("current", custom("State")), sortedVar("next", custom("State"))], \boolean(), \or(body));
+  return defineFunction("transition", [sortedVar("current", custom("State")), sortedVar("next", custom("State"))], \bool(), \or(body));
 }
 
 list[Command] translateInvariants(set[Built] specs, Context ctx) =
@@ -371,6 +371,11 @@ default Formula translateStat(Statement s, Context ctx) { throw "Unable to trans
 Formula translateExpr((Expr)`new <Expr spc>[<Expr id>]`, Context ctx) = functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("next")), translateExpr(id, ctx)]);
 Formula translateExpr((Expr)`new <Expr spc>[<Expr id>].<VarName field>`, Context ctx) = functionCall(simple("field_<ctx.specLookup["<spc>"]>_<field>"), [functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("next")), translateExpr(id, ctx)])]);
 
+// hacky
+Formula translateExpr(e:(Expr)`new this.<VarName field>`, Context ctx) = functionCall(simple("<field>"), [translateExpr(lhs, ctx)]) when lhs := (Expr)`post_state`; 
+
+//translateExpr(fqvn, ctx) when bprintln(e), fqvn := [Expr]"post_state.<field>", bprintln(fqvn);
+
 Formula translateExpr((Expr)`<Expr spc>[<Expr id>]`, Context ctx)  = functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("current")), translateExpr(id, ctx)]);
 Formula translateExpr((Expr)`<Expr spc>[<Expr id>].<VarName field>`, Context ctx) = functionCall(simple("field_<ctx.specLookup["<spc>"]>_<field>"), [functionCall(simple("spec_<ctx.specLookup["<spc>"]>"), [var(simple("current")), translateExpr(id, ctx)])]);
 
@@ -455,7 +460,7 @@ Formula translateExpr((Expr)`<Expr lhs> \> <Expr rhs>`, Context ctx)
 Formula translateExpr((Expr)`<Expr lhs> \>= <Expr rhs>`, Context ctx)
   = translateFormula(lhs, rhs, ctx.types[lhs@\loc], ctx.types[rhs@\loc], ctx, Formula (Formula l, Formula r) { return gte(l, r); });
 
-Formula translateExpr((Expr)`<Expr lhs> == <Expr rhs>`, Context ctx) = equal(translateExpr(lhs, ctx), translateExpr(rhs, ctx));
+Formula translateExpr((Expr)`<Expr lhs> == <Expr rhs>`, Context ctx) = lang::smtlib25::AST::eq(translateExpr(lhs, ctx), translateExpr(rhs, ctx));
 Formula translateExpr((Expr)`<Expr lhs> != <Expr rhs>`, Context ctx) = \not(equal(translateExpr(lhs, ctx), translateExpr(rhs, ctx)));
 Formula translateExpr((Expr)`<Expr lhs> && <Expr rhs>`, Context ctx) = and([translateExpr(lhs, ctx), translateExpr(rhs, ctx)]);
 Formula translateExpr((Expr)`<Expr lhs> || <Expr rhs>`, Context ctx) = or([translateExpr(lhs, ctx), translateExpr(rhs, ctx)]);
@@ -481,7 +486,7 @@ Sort translateSort((Type)`Time`) = custom("Time");
 Sort translateSort((Type)`DateTime`) = custom("DateTime");
 Sort translateSort((Type)`IBAN`) = custom("IBAN");
 Sort translateSort((Type)`Money`) = custom("Money");
-Sort translateSort((Type)`Integer`) = \integer();
+Sort translateSort((Type)`Integer`) = \int();
 Sort translateSort((Type)`Frequency`) = custom("Frequency");
 Sort translateSort((Type)`Percentage`) = custom("Percentage");
 Sort translateSort((Type)`String`) = \string();
@@ -545,20 +550,20 @@ default Formula translateLit(value l) { throw "translateLit(..) not implemented 
 
 list[Command] declareRebelTypes() {   
   set[tuple[str,Sort]] rebelTypes = {<"Currency", \string()>,
-                                     <"Frequency", \integer()>,
-                                     <"Percentage", \integer()>,
-                                     <"Period", \integer()>,
-                                     <"Term", \integer()>};
+                                     <"Frequency", \int()>,
+                                     <"Percentage", \int()>,
+                                     <"Period", \int()>,
+                                     <"Term", \int()>};
                              
   return [defineSort(name, [], sort) | <str name, Sort sort> <- rebelTypes] +
-         [declareDataTypes([], [dataTypeDef("IBAN", [combinedCons("consIBAN", [sortedVar("countryCode", string()), sortedVar("checksum",\integer()), sortedVar("accountNumber", string())])])]),
-          declareDataTypes([], [dataTypeDef("Money", [combinedCons("consMoney", [sortedVar("currency", custom("Currency")), sortedVar("amount", \integer())])])]),
+         [declareDataTypes([], [dataTypeDef("IBAN", [combinedCons("consIBAN", [sortedVar("countryCode", string()), sortedVar("checksum",\int()), sortedVar("accountNumber", string())])])]),
+          declareDataTypes([], [dataTypeDef("Money", [combinedCons("consMoney", [sortedVar("currency", custom("Currency")), sortedVar("amount", \int())])])]),
           declareDataTypes([], [dataTypeDef("Date", [
-            combinedCons("consDate", [sortedVar("date", \integer()), sortedVar("month", \integer()), sortedVar("year", \integer())]), 
+            combinedCons("consDate", [sortedVar("date", \int()), sortedVar("month", \int()), sortedVar("year", \int())]), 
             cons("undefDate")])]),
           declareDataTypes([], [dataTypeDef("Time", [
 
-            combinedCons("consTime", [sortedVar("hour", \integer()), sortedVar("minutes", \integer()), sortedVar("seconds", \integer())]), 
+            combinedCons("consTime", [sortedVar("hour", \int()), sortedVar("minutes", \int()), sortedVar("seconds", \int())]), 
             cons("undefTime")])]),
           declareDataTypes([], [dataTypeDef("DateTime", [combinedCons("consDateTime", [sortedVar("date", custom("Date")), sortedVar("time", custom("Time"))]), cons("undefDateTime")])])                                   
           ];                                  

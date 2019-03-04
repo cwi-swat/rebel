@@ -15,7 +15,7 @@ module lang::Syntax
 
 extend lang::CommonSyntax;
  
-start syntax Module 
+start syntax Module
 	= ModuleDef modDef Import* imports Specification spec
 	| ModuleDef modDef Import* imports LibraryModule* decls
 	;
@@ -23,7 +23,7 @@ start syntax Module
 syntax LibraryModule
 	= @Foldable EventDef eventDef
 	| @Foldable FunctionDef functionDef 
-	| @Foldable InvariantDef invariantDef 
+	| @Foldable InvariantDef invariantDef
 	;  
   
 // Library rules

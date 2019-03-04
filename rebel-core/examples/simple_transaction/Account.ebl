@@ -9,7 +9,7 @@ import simple_transaction.Library
 specification Account {
 	fields {
 		accountNumber: IBAN @key
-		balance: Money		
+		balance: Money	
 	}
 	
 	events { 
